@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " D ",
+    "GHG",
+    " D "
+  ],
+  "key": {
+    "D": {
+      "item": "singulo:degenerate_matter_shell"
+    },
+    "G": {
+      "item": "singulo:gravity_field_stabilizer"
+    },
+    "H": {
+      "item": "singulo:hawking_condensate"
+    }
+  },
+  "result": {
+    "id": "singulo_arsenal:boundary_upgrade",
+    "count": 1
+  },
+  "category": "equipment"
+}

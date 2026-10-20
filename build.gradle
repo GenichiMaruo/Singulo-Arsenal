@@ -10,6 +10,8 @@ java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
 tasks.named('jar', Jar) {
     archiveFileName = "${mod_name}-${mod_version}-${minecraft_version}${mod_loader_suffix}.jar"
+    exclude 'io/github/genichimaruo/singuloarsenal/gametest/**'
+    exclude 'data/singulo_arsenal/structure/empty.nbt'
 }
 
 // 本体は未公開のため、開発用 JAR を -PsinguloJar=/absolute/path/to.jar で指定する。
@@ -38,12 +40,17 @@ neoForge {
             server()
             programArgument '--nogui'
         }
+        gameTestServer {
+            type = 'gameTestServer'
+            gameDirectory = project.file('build/gametest')
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
     }
     mods {
         "${mod_id}" { sourceSet(sourceSets.main) }
     }
 }
-tasks.matching { it.name in ['runClient', 'runServer'] }.configureEach {
+tasks.matching { it.name in ['runClient', 'runServer', 'runGameTestServer'] }.configureEach {
     dependsOn requireSingulo
 }
 
@@ -62,3 +69,10 @@ sourceSets.main.resources.srcDir generateModMetadata
 neoForge.ideSyncTask generateModMetadata
 
 tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
+
+tasks.register('offlineTest', Exec) {
+    workingDir projectDir
+    environment 'JAVA_HOME', javaToolchains.launcherFor(java.toolchain).get().metadata.installationPath.asFile.absolutePath
+    commandLine 'python3', 'tools/check.py'
+}
+tasks.named('check') { dependsOn 'offlineTest' }

@@ -1,0 +1,34 @@
+{
+  "parent": "minecraft:recipes/root",
+  "criteria": {
+    "has_material": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "singulo_arsenal:boundary_upgrade"
+            ]
+          }
+        ]
+      }
+    },
+    "has_recipe": {
+      "trigger": "minecraft:recipe_unlocked",
+      "conditions": {
+        "recipe": "singulo_arsenal:boundary_boots"
+      }
+    }
+  },
+  "requirements": [
+    [
+      "has_material",
+      "has_recipe"
+    ]
+  ],
+  "rewards": {
+    "recipes": [
+      "singulo_arsenal:boundary_boots"
+    ]
+  }
+}

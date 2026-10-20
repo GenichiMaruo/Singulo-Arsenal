@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "P P",
+    "PSP",
+    "PPP"
+  ],
+  "key": {
+    "P": {
+      "item": "singulo:steel_plate"
+    },
+    "S": {
+      "item": "singulo:white_ceramic_composite"
+    }
+  },
+  "result": {
+    "id": "singulo_arsenal:explorer_chestplate",
+    "count": 1
+  },
+  "category": "equipment"
+}

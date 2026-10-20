@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " C ",
+    "QEQ",
+    " C "
+  ],
+  "key": {
+    "C": {
+      "item": "singulo:superconducting_coil"
+    },
+    "Q": {
+      "item": "singulo:quantum_computing_module"
+    },
+    "E": {
+      "item": "singulo:entangled_element"
+    }
+  },
+  "result": {
+    "id": "singulo_arsenal:inertial_upgrade",
+    "count": 1
+  },
+  "category": "equipment"
+}

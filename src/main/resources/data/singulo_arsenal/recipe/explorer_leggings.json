@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "PSP",
+    "P P",
+    "P P"
+  ],
+  "key": {
+    "P": {
+      "item": "singulo:steel_plate"
+    },
+    "S": {
+      "item": "singulo:white_ceramic_composite"
+    }
+  },
+  "result": {
+    "id": "singulo_arsenal:explorer_leggings",
+    "count": 1
+  },
+  "category": "equipment"
+}

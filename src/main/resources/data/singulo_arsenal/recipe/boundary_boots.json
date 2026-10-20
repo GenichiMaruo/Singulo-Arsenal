@@ -1,0 +1,25 @@
+{
+  "type": "minecraft:smithing_transform",
+  "template": {
+    "item": "singulo_arsenal:boundary_upgrade"
+  },
+  "base": {
+    "item": "singulo_arsenal:inertial_boots"
+  },
+  "addition": {
+    "item": "singulo:gravity_field_stabilizer"
+  },
+  "result": {
+    "id": "singulo_arsenal:boundary_boots",
+    "components": {
+      "singulo_arsenal:energy": 0,
+      "singulo_arsenal:impact": 0,
+      "singulo_arsenal:repair": 0,
+      "singulo_arsenal:shield": 0,
+      "singulo_arsenal:active_until": 0,
+      "singulo_arsenal:ready_at": 0,
+      "singulo_arsenal:overloaded_until": 0,
+      "singulo_arsenal:collect_at": 0
+    }
+  }
+}

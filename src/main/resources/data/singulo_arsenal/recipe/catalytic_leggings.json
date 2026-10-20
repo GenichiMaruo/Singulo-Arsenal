@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "PSP",
+    "P P",
+    "P P"
+  ],
+  "key": {
+    "P": {
+      "item": "singulo:superconducting_coil"
+    },
+    "S": {
+      "item": "singulo:muon_bundle"
+    }
+  },
+  "result": {
+    "id": "singulo_arsenal:catalytic_leggings",
+    "count": 1
+  },
+  "category": "equipment"
+}

@@ -15,6 +15,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - uses: gradle/actions/setup-gradle@v4
       - run: ./gradlew --no-daemon build
       - uses: actions/upload-artifact@v4
@@ -22,3 +25,36 @@ jobs:
           name: Singulo-Arsenal-0.1.0-1.21.1N
           path: build/libs/Singulo-Arsenal-0.1.0-1.21.1N.jar
           if-no-files-found: error
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: GenichiMaruo/Singulo
+          ref: b2bf9034a5cb6b0d69edd68fbf1ecadaf8586c29
+          path: singulo-source
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build the pinned Singulo 1.21.1 dependency
+        working-directory: singulo-source
+        run: bash gradlew --no-daemon --no-configuration-cache --max-workers=4 build
+      - name: Validate Singulo material IDs
+        env:
+          SINGULO_SOURCE: ${{ github.workspace }}/singulo-source
+        run: python3 tools/check.py
+      - name: Run armor GameTests with Singulo
+        run: ./gradlew --no-daemon --max-workers=4 runGameTestServer -PsinguloJar="$GITHUB_WORKSPACE/singulo-source/build/libs/Singulo-0.10.0-1.21.1N.jar"
+      - name: Save integration logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: armor-integration-logs
+          path: build/gametest/logs/

@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    {
+      "item": "singulo:spent_muon_catalyst"
+    },
+    {
+      "item": "singulo:white_ceramic_composite"
+    },
+    {
+      "item": "singulo:steel_plate"
+    }
+  ],
+  "result": {
+    "id": "singulo_arsenal:circulation_cartridge",
+    "count": 1
+  },
+  "category": "misc"
+}

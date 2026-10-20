@@ -11,7 +11,7 @@ authors="${mod_authors}"
 displayURL="https://github.com/GenichiMaruo/Singulo-Arsenal"
 description='''
 The official Singulo weapons and armor addon, built around its materials and lost civilization technology.
-Initial development scaffold; equipment content is not implemented yet.
+Four armor tiers: ruin exploration, catalytic circulation, inertial control, and event boundary protection.
 '''
 
 [[dependencies.${mod_id}]]

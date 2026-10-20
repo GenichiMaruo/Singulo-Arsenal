@@ -1,0 +1,20 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "P P",
+    "S S"
+  ],
+  "key": {
+    "P": {
+      "item": "singulo:superconducting_coil"
+    },
+    "S": {
+      "item": "singulo:muon_bundle"
+    }
+  },
+  "result": {
+    "id": "singulo_arsenal:catalytic_boots",
+    "count": 1
+  },
+  "category": "equipment"
+}
