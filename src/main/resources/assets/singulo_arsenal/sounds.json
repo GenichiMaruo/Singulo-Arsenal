@@ -1,0 +1,26 @@
+{
+  "railgun_charge": {
+    "subtitle": "subtitles.singulo_arsenal.railgun_charge",
+    "sounds": [
+      "singulo_arsenal:railgun/charge"
+    ]
+  },
+  "railgun_ready": {
+    "subtitle": "subtitles.singulo_arsenal.railgun_ready",
+    "sounds": [
+      "singulo_arsenal:railgun/ready"
+    ]
+  },
+  "railgun_fire": {
+    "subtitle": "subtitles.singulo_arsenal.railgun_fire",
+    "sounds": [
+      "singulo_arsenal:railgun/fire"
+    ]
+  },
+  "railgun_vent": {
+    "subtitle": "subtitles.singulo_arsenal.railgun_vent",
+    "sounds": [
+      "singulo_arsenal:railgun/vent"
+    ]
+  }
+}

@@ -7,6 +7,8 @@ import net.minecraft.resources.ResourceLocation;
 import io.github.genichimaruo.singuloarsenal.armor.ArsenalContent;
 import io.github.genichimaruo.singuloarsenal.armor.ArmorAbilities;
 import io.github.genichimaruo.singuloarsenal.network.ArmorActionPayload;
+import io.github.genichimaruo.singuloarsenal.network.RailShotPayload;
+import io.github.genichimaruo.singuloarsenal.weapon.WeaponContent;
 import org.slf4j.Logger;
 
 /** Singulo の素材と失われた文明の技術を利用した武器・防具アドオン。 */
@@ -17,8 +19,10 @@ public final class SinguloArsenal {
 
     public SinguloArsenal(IEventBus bus) {
         ArsenalContent.register(bus);
+        WeaponContent.register(bus);
         ArmorAbilities.register(bus);
         bus.addListener(ArmorActionPayload::register);
+        bus.addListener(RailShotPayload::register);
         LOGGER.info("Singulo Arsenal initialized");
     }
 

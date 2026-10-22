@@ -55,5 +55,19 @@
   "hud.singulo_arsenal.overload": "慣性装甲 | 過負荷 あと%s秒",
   "hud.singulo_arsenal.impact": "慣性装甲 | 衝撃 %s | 回避 %s FE | 安定化 %s FE",
   "hud.singulo_arsenal.shield": "境界場 | 防壁 %s | あと%s秒",
-  "hud.singulo_arsenal.boundary": "境界装甲 | %s FE | 再展開 %s秒"
+  "hud.singulo_arsenal.boundary": "境界装甲 | %s FE | 再展開 %s秒",
+  "item.singulo_arsenal.ciel_railgun": "シエル式試作レールガン",
+  "railgun.singulo_arsenal.prototype": "クリエイティブ専用 · 電磁加速兵装",
+  "railgun.singulo_arsenal.controls": "メインハンドで右クリック長押し → 充電完了後に離して発射",
+  "railgun.singulo_arsenal.stats": "充電 1.6秒 / 冷却 1.2秒 / 射程 96m / 最大4体を貫通",
+  "railgun.singulo_arsenal.creative_only": "この試作兵装はクリエイティブモード専用です",
+  "railgun.singulo_arsenal.charging": "磁場収束中",
+  "railgun.singulo_arsenal.locked": "充電完了 — 離して発射",
+  "railgun.singulo_arsenal.cooling": "コイル冷却中",
+  "subtitles.singulo_arsenal.railgun_charge": "レールガンが充電される",
+  "subtitles.singulo_arsenal.railgun_ready": "レールガンの充電が完了する",
+  "subtitles.singulo_arsenal.railgun_fire": "レールガンが轟く",
+  "subtitles.singulo_arsenal.railgun_vent": "レールガンが放電する",
+  "death.attack.singulo_arsenal.railgun": "%1$sは%2$sの電磁加速弾に撃ち抜かれた",
+  "death.attack.singulo_arsenal.railgun.player": "%1$sは%2$sの電磁加速弾に撃ち抜かれた"
 }

@@ -220,3 +220,8 @@ path = ROOT / f'data/{MOD}/structure/empty.nbt'
 path.parent.mkdir(parents=True, exist_ok=True)
 path.write_bytes(gzip.compress(nbt, mtime=0))
 print('Generated 19 items, 8 armor textures, 19 recipes, recipe unlocks, ja/en translations and GameTest arena.')
+
+# Keep weapon translations alongside the armor catalog during deterministic regeneration.
+from generate_railgun_resources import generate as generate_railgun
+
+generate_railgun()

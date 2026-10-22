@@ -23,7 +23,7 @@ import net.neoforged.neoforge.event.entity.living.LivingFallEvent;
 @GameTestHolder(SinguloArsenal.MOD_ID)
 @PrefixGameTestTemplate(false)
 public final class ArmorGameTests {
-    private static final String ARENA = "singulo_arsenal:empty";
+    private static final String ARENA = "empty";
 
     private ArmorGameTests() {}
 

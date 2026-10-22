@@ -57,6 +57,7 @@ public final class ArsenalContent {
                     output.accept(CARTRIDGE.get());
                     output.accept(INERTIAL_UPGRADE.get());
                     output.accept(BOUNDARY_UPGRADE.get());
+                    output.accept(io.github.genichimaruo.singuloarsenal.weapon.WeaponContent.RAILGUN.get());
                 }).build());
     }
 

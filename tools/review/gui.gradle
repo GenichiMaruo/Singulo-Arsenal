@@ -1,0 +1,15 @@
+// Opt-in client review harness; never included by an ordinary build.
+allprojects {
+    afterEvaluate {
+        sourceSets.main.java.srcDir(file('tools/review/gui-src'))
+        neoForge.runs.client {
+            gameDirectory = file('build/gui-review')
+            programArgument '--quickPlaySingleplayer'
+            programArgument 'Review'
+            programArgument '--width'
+            programArgument '1280'
+            programArgument '--height'
+            programArgument '800'
+        }
+    }
+}

@@ -30,6 +30,7 @@ public final class ArsenalClient {
     };
 
     public ArsenalClient(IEventBus bus) {
+        io.github.genichimaruo.singuloarsenal.client.railgun.RailgunClient.register(bus);
         bus.addListener(ArsenalClient::keys);
         NeoForge.EVENT_BUS.addListener(ArsenalClient::tick);
         NeoForge.EVENT_BUS.addListener(ArsenalClient::hud);

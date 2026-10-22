@@ -60,6 +60,23 @@ for tier in TIERS:
         data = (RES/f'assets/singulo_arsenal/textures/models/armor/{tier}_layer_{layer}.png').read_bytes()
         assert struct.unpack('>II', data[16:24]) == (64, 32)
 
+# The prototype is deliberately obtainable only through Creative/commands.
+assert not (recipes/'ciel_railgun.json').exists()
+gun_model = json.loads((RES/'assets/singulo_arsenal/models/item/ciel_railgun.json').read_text())
+assert gun_model['parent'] == 'minecraft:builtin/entity', 'railgun must use its 3D renderer'
+assert all(context in gun_model['display'] for context in
+           ['gui', 'ground', 'fixed', 'firstperson_righthand', 'firstperson_lefthand',
+            'thirdperson_righthand', 'thirdperson_lefthand'])
+assert 'item.singulo_arsenal.ciel_railgun' in locales[0]
+damage = json.loads((RES/'data/singulo_arsenal/damage_type/railgun.json').read_text())
+assert f"death.attack.{damage['message_id']}" in locales[0]
+for event, definition in json.loads((RES/'assets/singulo_arsenal/sounds.json').read_text()).items():
+    assert definition['subtitle'] in locales[0], f'missing subtitle {event}'
+    for sound in definition['sounds']:
+        namespace, path = sound.split(':')
+        data = (RES/f'assets/{namespace}/sounds/{path}.ogg').read_bytes()
+        assert data.startswith(b'OggS') and b'vorbis' in data[:200], f'bad sound: {sound}'
+
 # Optional actual Singulo checkout validation; IDs are checked against source rather than invented stand-ins.
 if os.environ.get('SINGULO_SOURCE'):
     sys.path.insert(0, str(Path(os.environ['SINGULO_SOURCE'])/'tools'))
@@ -83,4 +100,4 @@ def snapshot():
 before = snapshot()
 subprocess.run([sys.executable, str(ROOT/'tools/generate_resources.py')], check=True, stdout=subprocess.DEVNULL)
 assert snapshot() == before, 'resource generation is not deterministic'
-print(f'Resources: {len(items)} recipes, 19 models, 8 armor layers, 2 locales, progression and regeneration checked')
+print(f'Resources: {len(items)} armor recipes, 20 models, 8 armor layers, railgun sounds/damage, 2 locales and regeneration checked')

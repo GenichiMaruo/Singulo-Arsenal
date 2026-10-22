@@ -55,5 +55,19 @@
   "hud.singulo_arsenal.overload": "Inertial | Overload: %ss",
   "hud.singulo_arsenal.impact": "Inertial | Impact %s | Dodge %s FE | Stabilizer %s FE",
   "hud.singulo_arsenal.shield": "Boundary | Shield %s | %ss",
-  "hud.singulo_arsenal.boundary": "Boundary | %s FE | Cooldown %ss"
+  "hud.singulo_arsenal.boundary": "Boundary | %s FE | Cooldown %ss",
+  "item.singulo_arsenal.ciel_railgun": "Ciel Prototype Railgun",
+  "railgun.singulo_arsenal.prototype": "Creative prototype · Electromagnetic accelerator",
+  "railgun.singulo_arsenal.controls": "Main hand: hold use to charge, release when ready to fire",
+  "railgun.singulo_arsenal.stats": "Charge 1.6s / Cooldown 1.2s / Range 96m / Pierces up to 4 targets",
+  "railgun.singulo_arsenal.creative_only": "This prototype requires Creative mode",
+  "railgun.singulo_arsenal.charging": "FIELD CHARGING",
+  "railgun.singulo_arsenal.locked": "READY — RELEASE TO FIRE",
+  "railgun.singulo_arsenal.cooling": "COILS COOLING",
+  "subtitles.singulo_arsenal.railgun_charge": "Railgun charging",
+  "subtitles.singulo_arsenal.railgun_ready": "Railgun ready",
+  "subtitles.singulo_arsenal.railgun_fire": "Railgun fires",
+  "subtitles.singulo_arsenal.railgun_vent": "Railgun discharges",
+  "death.attack.singulo_arsenal.railgun": "%1$s was pierced by %2$s’s railgun",
+  "death.attack.singulo_arsenal.railgun.player": "%1$s was pierced by %2$s’s railgun"
 }
