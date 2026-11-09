@@ -73,7 +73,7 @@ public final class ArsenalItems {
         }
         TABS.register("arsenal", () -> CreativeModeTab.builder()
                 .title(Component.translatable("itemGroup.singulo_arsenal"))
-                .icon(() -> new ItemStack(JET_LANCE.get()))
+                .icon(() -> new ItemStack(ModuleContent.INTEGRATOR_ITEM.get()))
                 .displayItems((params, output) -> {
                     for (ArmorSet set : ArmorSet.values()) {
                         for (ArmorItem.Type type : PIECES) output.accept(charged(SUITS.get(set).get(type).get()));

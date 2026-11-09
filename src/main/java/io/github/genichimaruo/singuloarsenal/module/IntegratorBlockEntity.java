@@ -29,7 +29,8 @@ import net.neoforged.neoforge.items.ItemStackHandler;
  * running the machine writes the sockets back. A module is therefore always in exactly one place, in the gear or in a socket.
  */
 public final class IntegratorBlockEntity extends BlockEntity implements MenuProvider {
-    public static final int GEAR = 0, FIRST_SOCKET = 1, SOCKETS = 3, SLOTS = FIRST_SOCKET + SOCKETS;
+    public static final int GEAR = 0, FIRST_SOCKET = 1, SOCKETS = 5, SLOTS = FIRST_SOCKET + SOCKETS;
+    public static final int DATA_PROGRESS = 0, DATA_ENERGY_LOW = 1, DATA_WORKING = 2, DATA_ENERGY_HIGH = 3, DATA_COUNT = 4;
 
     private final ItemStackHandler items = new ItemStackHandler(SLOTS) {
         @Override
@@ -82,13 +83,15 @@ public final class IntegratorBlockEntity extends BlockEntity implements MenuProv
     public final ContainerData data = new ContainerData() {
         @Override public int get(int index) {
             return switch (index) {
-                case 0 -> progress * 100 / Rules.INTEGRATE_TICKS;
-                case 1 -> (int) (energy.getEnergyStored() * 100L / energy.getMaxEnergyStored());
+                case DATA_PROGRESS -> progress * 100 / Rules.INTEGRATE_TICKS;
+                // Container data travels as shorts.
+                case DATA_ENERGY_LOW -> energy.getEnergyStored() & 0xFFFF;
+                case DATA_ENERGY_HIGH -> energy.getEnergyStored() >>> 16;
                 default -> working ? 1 : 0;
             };
         }
         @Override public void set(int index, int value) {}
-        @Override public int getCount() { return 3; }
+        @Override public int getCount() { return DATA_COUNT; }
     };
 
     /** Unpacks gear as it arrives. A piece of gear is only unpacked once, and only if its modules all have somewhere to go. */
@@ -195,7 +198,10 @@ public final class IntegratorBlockEntity extends BlockEntity implements MenuProv
     @Override
     protected void loadAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.loadAdditional(tag, registries);
-        items.deserializeNBT(registries, tag.getCompound("items"));
+        // Machines saved when there were fewer sockets must not shrink the inventory.
+        CompoundTag saved = tag.getCompound("items").copy();
+        saved.putInt("Size", SLOTS);
+        items.deserializeNBT(registries, saved);
         if (tag.contains("energy")) energy.deserializeNBT(registries, tag.get("energy"));
         progress = tag.getInt("progress");
         working = tag.getBoolean("working");

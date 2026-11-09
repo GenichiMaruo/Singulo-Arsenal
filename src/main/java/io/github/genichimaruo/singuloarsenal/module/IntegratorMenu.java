@@ -15,7 +15,10 @@ import net.neoforged.neoforge.items.ItemStackHandler;
 import net.neoforged.neoforge.items.SlotItemHandler;
 
 public final class IntegratorMenu extends AbstractContainerMenu {
-    public static final int[][] POSITIONS = {{80, 35}, {44, 35}, {116, 35}, {80, 59}};
+    /** Singulo's frame: the standard width, the inventory measured up from the bottom edge. */
+    public static final int WIDTH = 176, HEIGHT = 186, INVENTORY_X = 8, ARROW_X = 88, ARROW_Y = 37;
+    /** Modules flow left to right, through the arrow, into the gear. */
+    public static final int[][] POSITIONS = {{118, 37}, {26, 28}, {44, 28}, {62, 28}, {35, 46}, {53, 46}};
     private static final int MACHINE_SLOTS = IntegratorBlockEntity.SLOTS;
 
     private final IItemHandler items;
@@ -24,7 +27,7 @@ public final class IntegratorMenu extends AbstractContainerMenu {
 
     /** Client side. */
     public IntegratorMenu(int id, Inventory inventory, RegistryFriendlyByteBuf buffer) {
-        this(id, inventory, lookup(inventory, buffer), new ItemStackHandler(MACHINE_SLOTS), new SimpleContainerData(3));
+        this(id, inventory, lookup(inventory, buffer), new ItemStackHandler(MACHINE_SLOTS), new SimpleContainerData(IntegratorBlockEntity.DATA_COUNT));
     }
 
     private static IntegratorBlockEntity lookup(Inventory inventory, RegistryFriendlyByteBuf buffer) {
@@ -52,10 +55,11 @@ public final class IntegratorMenu extends AbstractContainerMenu {
                 @Override public int getMaxStackSize() { return 1; }
             });
         }
+        int top = HEIGHT - 82;
         for (int row = 0; row < 3; row++) {
-            for (int column = 0; column < 9; column++) addSlot(new Slot(inventory, column + row * 9 + 9, 8 + column * 18, 84 + row * 18));
+            for (int column = 0; column < 9; column++) addSlot(new Slot(inventory, column + row * 9 + 9, INVENTORY_X + column * 18, top + row * 18));
         }
-        for (int column = 0; column < 9; column++) addSlot(new Slot(inventory, column, 8 + column * 18, 142));
+        for (int column = 0; column < 9; column++) addSlot(new Slot(inventory, column, INVENTORY_X + column * 18, HEIGHT - 24));
         addDataSlots(data);
     }
 
@@ -67,9 +71,24 @@ public final class IntegratorMenu extends AbstractContainerMenu {
 
     public ItemStack gear() { return items.getStackInSlot(IntegratorBlockEntity.GEAR); }
     public boolean socketOpen(int socket) { return socket < Modules.slots(gear()); }
-    public int progress() { return data.get(0); }
-    public int energy() { return data.get(1); }
-    public boolean working() { return data.get(2) != 0; }
+    public int progress() { return data.get(IntegratorBlockEntity.DATA_PROGRESS); }
+    public int energyStored() { return (data.get(IntegratorBlockEntity.DATA_ENERGY_LOW) & 0xFFFF) | (data.get(IntegratorBlockEntity.DATA_ENERGY_HIGH) & 0xFFFF) << 16; }
+    public boolean working() { return data.get(IntegratorBlockEntity.DATA_WORKING) != 0; }
+
+    /** Whether the module in this socket can go into the gear on the bed. */
+    public boolean socketHolds(int socket) {
+        return socketOpen(socket) && Modules.fits(gear(), items.getStackInSlot(IntegratorBlockEntity.FIRST_SOCKET + socket));
+    }
+
+    /** The same test the machine applies when it starts, so the button is never live for a run that would be refused. */
+    public boolean valid() {
+        for (int socket = 0; socket < IntegratorBlockEntity.SOCKETS; socket++) {
+            if (!items.getStackInSlot(IntegratorBlockEntity.FIRST_SOCKET + socket).isEmpty() && !socketHolds(socket)) return false;
+        }
+        return true;
+    }
+
+    public boolean canStart() { return !working() && !gear().isEmpty() && valid(); }
 
     @Override
     public boolean clickMenuButton(Player player, int id) {
