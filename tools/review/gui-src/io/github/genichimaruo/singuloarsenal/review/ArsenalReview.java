@@ -335,9 +335,12 @@ public final class ArsenalReview {
 
         step(30, () -> server(mc, o -> hold(o, weapons().get(2))));
         step(2, () -> watch(mc, -100, 5));
-        step(12, () -> server(mc, o -> o.startUsingItem(InteractionHand.MAIN_HAND)));
+        // Through use(), as a right click arrives on the server.
+        step(12, () -> server(mc, o -> o.getMainHandItem().getItem().use(o.serverLevel(), o, InteractionHand.MAIN_HAND)));
         at += 35;
         shot("other-reaver-focus");
+        at += 15;
+        shot("other-reaver-focus-late");
         step(2, () -> server(mc, ServerPlayer::releaseUsingItem));
         at += 3;
         shot("other-reaver-shear");

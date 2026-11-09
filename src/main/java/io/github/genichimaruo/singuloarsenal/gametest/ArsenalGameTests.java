@@ -12,6 +12,7 @@ import io.github.genichimaruo.singuloarsenal.module.ModuleContent;
 import io.github.genichimaruo.singuloarsenal.module.ModuleType;
 import io.github.genichimaruo.singuloarsenal.module.Modules;
 import io.github.genichimaruo.singuloarsenal.weapon.JetLanceItem;
+import io.github.genichimaruo.singuloarsenal.weapon.TidalReaverItem;
 import io.github.genichimaruo.singuloarsenal.weapon.Weapons;
 import java.util.List;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -527,6 +528,52 @@ public final class ArsenalGameTests {
         JetLanceItem.pulse(p, h.getLevel());
         h.assertBlockPresent(Blocks.STONE, near);
         h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void reaverFocusIsCarriedOnTheStack(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 2.5);
+        ItemStack reaver = hold(p, new ItemStack(ArsenalItems.TIDAL_REAVER.get()));
+        long now = h.getLevel().getGameTime();
+        h.assertTrue(TidalReaverItem.focusProgress(reaver, now, 0) < 0, "focus open before use");
+        reaver.getItem().use(h.getLevel(), p, net.minecraft.world.InteractionHand.MAIN_HAND);
+        h.assertTrue(TidalReaverItem.focusProgress(reaver, now, 0) == 0, "other clients need the focus on the stack");
+        p.stopUsingItem();
+        reaver.getItem().inventoryTick(reaver, h.getLevel(), p, 0, true);
+        h.assertTrue(TidalReaverItem.focusProgress(reaver, now, 0) < 0, "focus stayed open after the hold ended");
+        h.succeed();
+    }
+
+    /** In a batch of its own: its line of fire is longer than the gap to the next test's structure, and machines stop the drill. */
+    @GameTest(template = ARENA, batch = "drilling_alone")
+    public static void drillingGivesOutAtItsDepth(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 0.5);
+        ItemStack cannon = hold(p, new ItemStack(ArsenalItems.JET_LANCE.get()));
+        cannon.set(ArsenalData.TERRAIN_MODE.get(), 1);
+        p.setYRot(0);
+        p.setXRot(0);
+        int depth = (int) Rules.LANCE_BORE_DEPTH;
+        var first = new net.minecraft.core.BlockPos(2, 2, 2);
+        var inside = first.south(depth - 1);
+        var beyond = first.south(depth + 4);
+        h.setBlock(first, Blocks.STONE);
+        h.setBlock(inside, Blocks.STONE);
+        h.setBlock(beyond, Blocks.STONE);
+        // The arena's own barrier wall is unbreakable and would rightly stop the drill.
+        h.setBlock(first.south(3), Blocks.AIR);
+        // GameTests only keep their own structure's chunks loaded, and the drill stops at unloaded ground.
+        var level = h.getLevel();
+        net.minecraft.world.level.ChunkPos start = new net.minecraft.world.level.ChunkPos(h.absolutePos(first)), stop = new net.minecraft.world.level.ChunkPos(h.absolutePos(beyond));
+        int low = Math.min(start.z, stop.z), high = Math.max(start.z, stop.z);
+        for (int z = low; z <= high; z++) for (int x = start.x - 1; x <= start.x + 1; x++) level.setChunkForced(x, z, true);
+        h.runAfterDelay(10, () -> {
+            ignite(h, p, cannon);
+            for (int z = low; z <= high; z++) for (int x = start.x - 1; x <= start.x + 1; x++) level.setChunkForced(x, z, false);
+            h.assertBlockPresent(Blocks.AIR, first);
+            h.assertBlockPresent(Blocks.AIR, inside);
+            h.assertBlockPresent(Blocks.STONE, beyond);
+            h.succeed();
+        });
     }
 
     @GameTest(template = ARENA)
