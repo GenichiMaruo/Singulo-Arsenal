@@ -168,5 +168,5 @@
 ## 検証
 
 - `tools/check.py`：計算の境界値テスト、レシピと本体の ID の照合、翻訳、再生成の決定性。
-- `runGameTestServer`：本体 JAR と同時ロードして27テスト。
+- `runGameTestServer`：本体 JAR と同時ロードして28テスト。
 - `tools/review`：実クライアントで全状態を撮影するハーネス。

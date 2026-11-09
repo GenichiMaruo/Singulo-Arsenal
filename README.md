@@ -51,7 +51,7 @@ Windows は `gradlew.bat build`。`build` の検査には Python 3 も必要で�
 python3 tools/check.py
 # 本体の素材IDも照合する場合
 SINGULO_SOURCE=/absolute/path/to/Singulo python3 tools/check.py
-# 本体と同時ロードする実際の GameTest（27テスト）
+# 本体と同時ロードする実際の GameTest（28テスト）
 ./gradlew runGameTestServer -PsinguloJar=/absolute/path/Singulo-0.16.0-1.21.1N.jar
 ```
 

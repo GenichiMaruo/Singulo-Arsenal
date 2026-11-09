@@ -53,6 +53,7 @@ public final class ArsenalGameTests {
         ServerPlayer player = h.makeMockServerPlayerInLevel();
         player.setGameMode(GameType.SURVIVAL);
         Vec3 at = h.absoluteVec(new Vec3(x, 1, z));
+        h.assertTrue(h.getBounds().contains(at), "player must stay inside the loaded test structure");
         player.moveTo(at.x, at.y, at.z, 0, 0);
         player.setHealth(player.getMaxHealth());
         clearSpawnProtection(player);
@@ -77,13 +78,14 @@ public final class ArsenalGameTests {
     private static Zombie target(GameTestHelper h, double x, double z) {
         Zombie mob = EntityType.ZOMBIE.create(h.getLevel());
         Vec3 at = h.absoluteVec(new Vec3(x, 1, z));
+        h.assertTrue(h.getBounds().contains(at), "target must stay inside the loaded test structure");
         mob.moveTo(at.x, at.y, at.z, 0, 0);
         mob.setNoAi(true);
         mob.setNoGravity(true);
         mob.getAttribute(Attributes.MAX_HEALTH).setBaseValue(100);
         mob.getAttribute(Attributes.ARMOR).setBaseValue(0);
         mob.setHealth(100);
-        h.getLevel().addFreshEntity(mob);
+        h.assertTrue(h.getLevel().addFreshEntity(mob), "target could not be added to the test level");
         return mob;
     }
 
@@ -276,7 +278,7 @@ public final class ArsenalGameTests {
 
     @GameTest(template = ARENA)
     public static void jetBurstRequiresBootsAndBurnsBehind(GameTestHelper h) {
-        ServerPlayer p = player(h, 2.5, 6.5);
+        ServerPlayer p = player(h, 2.5, 4.5);
         dress(p, ArmorSet.COLLAPSAR);
         ItemStack chest = p.getItemBySlot(EquipmentSlot.CHEST);
         ItemStack boots = p.getItemBySlot(EquipmentSlot.FEET);
@@ -360,7 +362,7 @@ public final class ArsenalGameTests {
     public static void tidalStressStacksAndShears(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 2.5);
         ItemStack reaver = hold(p, new ItemStack(ArsenalItems.TIDAL_REAVER.get()));
-        Zombie victim = target(h, 2.5, 5.5);
+        Zombie victim = target(h, 2.5, 4.5);
         for (int i = 0; i < Rules.STRESS_MAX + 2; i++) reaver.getItem().hurtEnemy(reaver, victim, p);
         h.assertTrue(Weapons.stress(victim) == Rules.STRESS_MAX, "stress should clamp at the maximum");
         victim.setHealth(100);
@@ -397,6 +399,17 @@ public final class ArsenalGameTests {
         float before = front.getHealth();
         JetLanceItem.pulse(p, h.getLevel());
         h.assertTrue(front.getHealth() == before, "jet passed through a wall");
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void cannonHitsTargetsContainingTheRayOrigin(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 2.5);
+        hold(p, new ItemStack(ArsenalItems.JET_LANCE.get()));
+        Zombie mob = target(h, 2.5, 3.0);
+        h.assertTrue(mob.getBoundingBox().inflate(Rules.LANCE_HIT_WIDTH).contains(p.getEyePosition()), "target must contain the ray origin");
+        JetLanceItem.pulse(p, h.getLevel());
+        near(h, 100 - mob.getHealth(), Rules.LANCE_DAMAGE, "point-blank cannon shot missed");
         h.succeed();
     }
 

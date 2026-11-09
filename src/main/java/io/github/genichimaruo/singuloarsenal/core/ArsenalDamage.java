@@ -47,6 +47,10 @@ public final class ArsenalDamage {
     /** Everything a straight segment passes through. Width is added to the bounding boxes. */
     public static List<LivingEntity> along(Player attacker, Vec3 from, Vec3 to, double width) {
         return attacker.level().getEntitiesOfClass(LivingEntity.class, new AABB(from, to).inflate(width + 1),
-                e -> canHit(attacker, e) && e.getBoundingBox().inflate(width).clip(from, to).isPresent());
+                e -> {
+                    if (!canHit(attacker, e)) return false;
+                    AABB bounds = e.getBoundingBox().inflate(width);
+                    return bounds.contains(from) || bounds.clip(from, to).isPresent();
+                });
     }
 }
