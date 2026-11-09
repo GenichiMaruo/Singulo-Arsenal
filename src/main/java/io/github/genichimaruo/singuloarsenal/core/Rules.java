@@ -200,6 +200,8 @@ public final class Rules {
     public static final float LANCE_DAMAGE = 14;
     public static final float LANCE_ARMOR_KEPT = 0.4F;
     public static final double LANCE_RANGE = 80;
+    /** Added to target hitboxes along the beam, so what looks hit is hit. */
+    public static final double LANCE_HIT_WIDTH = 0.45;
     public static final int LANCE_FE_PER_10_TICKS = 250_000;
     public static final int LANCE_COOLDOWN = 160;
     public static final int LANCE_SHORT_COOLDOWN = 20;
@@ -214,6 +216,40 @@ public final class Rules {
         if (heldTicks < LANCE_IGNITE) return LANCE_IGNITING;
         if (heldTicks < LANCE_COLLIMATE) return LANCE_COLLIMATING;
         return LANCE_FIRING;
+    }
+
+    // ---- Modules and the Module Integrator ---------------------------------------------------------------------------------
+
+    public static final int INTEGRATOR_CAPACITY = 400_000;
+    public static final int INTEGRATE_TICKS = 100;
+    public static final int INTEGRATE_FE_PER_TICK = 2_000;
+    public static final float CAPACITOR_BONUS = 0.5F;
+    public static final double PLATING_ARMOR = 2;
+    public static final double PLATING_TOUGHNESS = 1;
+    public static final double THRUSTER_JUMP = 0.1;
+    public static final double THRUSTER_STEP = 0.5;
+    public static final float COOLANT_FACTOR = 0.75F;
+    public static final float AMPLIFIER_BONUS = 0.15F;
+    public static final int BITS_PER_MODULE = 2;
+    public static final double BIT_RANGE = 16;
+    public static final float BIT_DAMAGE = 5;
+    public static final int BIT_FE = 1_500;
+
+    /** Sockets grow with what the gear cost to make: one at stage 2, two at stage 4, three at stage 5. */
+    public static int moduleSlots(int stage) {
+        return stage >= 5 ? 3 : stage >= 4 ? 2 : stage >= 2 ? 1 : 0;
+    }
+
+    public static int capacityWith(int base, int capacitors) {
+        return (int) Math.min(Integer.MAX_VALUE, (long) base + (long) (base * (double) CAPACITOR_BONUS) * Math.max(0, capacitors));
+    }
+
+    public static int cooled(int ticks, int coolants) {
+        return Math.max(1, Math.round(ticks * (float) Math.pow(COOLANT_FACTOR, Math.max(0, coolants))));
+    }
+
+    public static float amplified(int amplifiers) {
+        return 1 + AMPLIFIER_BONUS * Math.max(0, amplifiers);
     }
 
     // ---- Reload choreography: each curve is 0 at rest and runs over reload progress 0..1 --------------------------------------
@@ -262,10 +298,10 @@ public final class Rules {
 
     /** The beam is narrowed by three rings, stepping down exactly as the Accretion Jet Forge's does. */
     public static float lanceRadius(int heldTicks) {
-        if (heldTicks < LANCE_IGNITE) return 0.46F;
-        if (heldTicks < LANCE_IGNITE + 7) return 0.42F;
-        if (heldTicks < LANCE_IGNITE + 14) return 0.28F;
-        if (heldTicks < LANCE_COLLIMATE) return 0.2F;
-        return 0.13F;
+        if (heldTicks < LANCE_IGNITE) return 0.72F;
+        if (heldTicks < LANCE_IGNITE + 7) return 0.66F;
+        if (heldTicks < LANCE_IGNITE + 14) return 0.52F;
+        if (heldTicks < LANCE_COLLIMATE) return 0.42F;
+        return 0.34F;
     }
 }

@@ -4,10 +4,12 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import io.github.genichimaruo.singuloarsenal.armor.SuitItem;
 import io.github.genichimaruo.singuloarsenal.client.art.Canvas;
+import io.github.genichimaruo.singuloarsenal.client.art.MachineArt;
 import io.github.genichimaruo.singuloarsenal.client.art.SuitArt;
 import io.github.genichimaruo.singuloarsenal.client.art.SuitArt.Piece;
 import io.github.genichimaruo.singuloarsenal.client.art.WeaponArt;
 import io.github.genichimaruo.singuloarsenal.core.ArsenalData;
+import io.github.genichimaruo.singuloarsenal.module.ModuleContent;
 import io.github.genichimaruo.singuloarsenal.core.Rules;
 import io.github.genichimaruo.singuloarsenal.weapon.CasimirBladeItem;
 import io.github.genichimaruo.singuloarsenal.weapon.JetLanceItem;
@@ -37,6 +39,9 @@ public final class GearRenderer extends BlockEntityWithoutLevelRenderer {
         pose.translate(0.5, 0.5, 0.5);
         if (stack.getItem() instanceof SuitItem suit) {
             drawSuit(pose, buffers, t, light, overlay, suit);
+        } else if (stack.is(ModuleContent.INTEGRATOR_ITEM.get())) {
+            pose.scale(1F / 16, 1F / 16, 1F / 16);
+            Canvas.drawFine(pose, buffers, t, light, overlay, context != ItemDisplayContext.GUI, c -> MachineArt.integrator(c, -1, t));
         } else {
             pose.scale(1F / 16, 1F / 16, 1F / 16);
             Player owner = owner(mc, stack, context);
@@ -102,6 +107,7 @@ public final class GearRenderer extends BlockEntityWithoutLevelRenderer {
             }
             Canvas.drawFine(pose, buffers, t, light, overlay, world, c -> WeaponArt.lance(c, ignition, reload, t));
             if (owner != null) FxClient.lanceRendered(owner, pose, buffers, context, partial);
+            FirstPersonHands.drawLance(owner, pose, buffers, light, context, reload);
         }
     }
 

@@ -134,12 +134,12 @@ public final class WeaponArt {
         float vent = reloading ? Rules.reloadVent(reload) : 0;
         float cooling = reloading ? (1 - reload) * (1 - reload) : 0;
         boolean spinning = ignition > 0 || cooling > 0.3F;
-        // Skeleton stock and butt pad, so the recoil of a one-sided jet has somewhere to go.
-        c.box(-0.75, -10.5, 1.5, 0.75, -4, 2.5, VOID);
-        c.box(-0.75, -10.5, -3, 0.75, -4, -2, VOID);
-        c.box(-1.5, -12, -5, 1.5, -10.5, 4, VOID_EDGE);
-        c.box(-1.25, -12.5, -4.5, 1.25, -12, 3.5, VOID_DEEP);
-        c.box(-1.25, -8.5, 2.5, 1.25, -5, 3.5, IVORY);
+        // Short skeleton stock and butt pad, so the recoil of a one-sided jet has somewhere to go.
+        c.box(-0.75, -6.5, 1.5, 0.75, -4, 2.5, VOID);
+        c.box(-0.75, -6.5, -3, 0.75, -4, -2, VOID);
+        c.box(-1.5, -8, -5, 1.5, -6.5, 4, VOID_EDGE);
+        c.box(-1.25, -8.5, -4.5, 1.25, -8, 3.5, VOID_DEEP);
+        c.box(-1.25, -6.25, 2.5, 1.25, -4.5, 3.5, IVORY);
 
         // Rear pole: a stack of magnetic mirror coils that closes this end of the hole.
         c.box(-2.5, -4, -2.5, 2.5, -2.5, 2.5, VOID_DEEP);

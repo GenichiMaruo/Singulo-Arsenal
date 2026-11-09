@@ -105,6 +105,11 @@ public final class RulesTest {
         check(!Rules.reloadMagazineGone(0) && !Rules.reloadMagazineGone(1), "magazine is present at rest");
         check(Rules.lanceKick(Rules.LANCE_COLLIMATE - 1) == 0, "no recoil before firing");
         check(Rules.lanceKick(Rules.LANCE_COLLIMATE) == 1, "recoil on the pulse");
+        check(Rules.moduleSlots(1) == 0 && Rules.moduleSlots(2) == 1 && Rules.moduleSlots(4) == 2 && Rules.moduleSlots(5) == 3, "socket tiers");
+        check(Rules.capacityWith(1000, 0) == 1000 && Rules.capacityWith(1000, 2) == 2000, "capacitor bonus");
+        check(Rules.capacityWith(Integer.MAX_VALUE, 3) == Integer.MAX_VALUE, "capacity overflow");
+        check(Rules.cooled(160, 0) == 160 && Rules.cooled(160, 1) == 120 && Rules.cooled(1, 9) == 1, "coolant");
+        check(Rules.amplified(0) == 1 && Rules.amplified(-1) == 1, "amplifier");
         int fullBurst = (Rules.LANCE_MAX_HOLD - Rules.LANCE_COLLIMATE) / 10 + 1;
         check(fullBurst * Rules.LANCE_FE_PER_10_TICKS <= Rules.LANCE_CAPACITY, "a full tank must cover one full burst");
         System.out.println("Rules: " + checks + " checks passed");

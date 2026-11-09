@@ -3,6 +3,7 @@ package io.github.genichimaruo.singuloarsenal;
 import com.mojang.logging.LogUtils;
 import io.github.genichimaruo.singuloarsenal.armor.SuitEvents;
 import io.github.genichimaruo.singuloarsenal.core.ArsenalData;
+import io.github.genichimaruo.singuloarsenal.module.ModuleContent;
 import io.github.genichimaruo.singuloarsenal.net.AbilityPayload;
 import io.github.genichimaruo.singuloarsenal.net.FxPayload;
 import io.github.genichimaruo.singuloarsenal.weapon.Weapons;
@@ -20,6 +21,7 @@ public final class SinguloArsenal {
 
     public SinguloArsenal(IEventBus bus) {
         ArsenalData.REGISTER.register(bus);
+        ModuleContent.register(bus);
         ArsenalItems.register(bus);
         SuitEvents.register();
         Weapons.register();

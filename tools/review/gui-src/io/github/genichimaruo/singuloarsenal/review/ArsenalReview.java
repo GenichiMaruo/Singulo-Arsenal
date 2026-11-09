@@ -6,6 +6,10 @@ import io.github.genichimaruo.singuloarsenal.SinguloArsenal;
 import io.github.genichimaruo.singuloarsenal.armor.ArmorSet;
 import io.github.genichimaruo.singuloarsenal.core.ArsenalData;
 import io.github.genichimaruo.singuloarsenal.core.Fe;
+import io.github.genichimaruo.singuloarsenal.module.IntegratorBlockEntity;
+import io.github.genichimaruo.singuloarsenal.module.ModuleContent;
+import io.github.genichimaruo.singuloarsenal.module.ModuleType;
+import io.github.genichimaruo.singuloarsenal.module.Modules;
 import io.netty.channel.embedded.EmbeddedChannel;
 import java.nio.file.Files;
 import java.util.ArrayList;
@@ -178,6 +182,8 @@ public final class ArsenalReview {
                 all.add(ArsenalItems.COLLAPSAR_LAMINA.get());
                 all.add(ArsenalItems.JET_COLLIMATOR.get());
                 all.add(ArsenalItems.TIDAL_EDGE.get());
+                all.add(ModuleContent.INTEGRATOR_ITEM.get());
+                for (var module : ModuleContent.MODULES.values()) all.add(module.get());
                 for (int i = 0; i < all.size(); i++) p.getInventory().setItem(9 + i, charged(all.get(i)));
             });
         });
@@ -341,6 +347,42 @@ public final class ArsenalReview {
         shot("self-left-handed-lance");
         step(2, () -> { mc.options.mainHand().set(HumanoidArm.RIGHT); mc.options.broadcastOptions(); });
 
+        // Bit drones and the Module Integrator, seen as another player.
+        step(10, () -> server(mc, o -> {
+            dress(o, ArmorSet.COLLAPSAR, 10);
+            Modules.install(o.getItemBySlot(EquipmentSlot.CHEST), List.of(new ItemStack(ModuleContent.MODULES.get(ModuleType.BIT_DRONE).get()), new ItemStack(ModuleContent.MODULES.get(ModuleType.BIT_DRONE).get())));
+            o.setGameMode(GameType.SURVIVAL);
+        }));
+        step(2, () -> watch(mc, -40, 4.5));
+        at += 14;
+        shot("other-bits-orbit");
+        at += 4;
+        shot("other-bits-orbit-2");
+        step(2, () -> local(mc, p -> {
+            var level = p.serverLevel();
+            BlockPos at = new BlockPos(3, 81, 3);
+            level.setBlock(at, ModuleContent.INTEGRATOR.get().defaultBlockState(), 3);
+            var entity = (IntegratorBlockEntity) level.getBlockEntity(at);
+            entity.energy().receiveEnergy(400_000, false);
+            entity.items().setStackInSlot(0, charged(ArsenalItems.JET_LANCE.get()));
+            entity.items().setStackInSlot(1, new ItemStack(ModuleContent.MODULES.get(ModuleType.COOLANT).get()));
+            entity.items().setStackInSlot(2, new ItemStack(ModuleContent.MODULES.get(ModuleType.AMPLIFIER).get()));
+            p.connection.teleport(3.5, 81, 0.6, 0, 18);
+            p.getInventory().selected = 8;
+        }));
+        at += 20;
+        shot("integrator-idle");
+        step(2, () -> local(mc, p -> ((IntegratorBlockEntity) p.serverLevel().getBlockEntity(new BlockPos(3, 81, 3))).start()));
+        at += 30;
+        shot("integrator-working");
+        at += 70;
+        step(4, () -> local(mc, p -> p.openMenu((IntegratorBlockEntity) p.serverLevel().getBlockEntity(new BlockPos(3, 81, 3)), new BlockPos(3, 81, 3))));
+        at += 14;
+        shot("integrator-screen");
+        step(2, () -> mc.setScreen(null));
+        step(2, () -> { selectSlot(mc, 3); teleport(mc, OX, OZ - 4, 0, 4); });
+        at += 24;
+
         // Black holes on the suits, close up, front and back.
         step(10, () -> local(mc, p -> dress(p, ArmorSet.COLLAPSAR, 10)));
         step(2, () -> server(mc, o -> dress(o, ArmorSet.COLLAPSAR, 50)));
@@ -384,7 +426,7 @@ public final class ArsenalReview {
         }
         if (!prepared || mc.getOverlay() != null) return;
         if (STEPS.isEmpty()) script(mc);
-        if (mc.screen != null && !(mc.screen instanceof net.minecraft.client.gui.screens.inventory.InventoryScreen)) return;
+        if (mc.screen != null && !(mc.screen instanceof net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<?>)) return;
         ticks++;
         while (cursor < STEPS.size() && STEPS.get(cursor).tick <= ticks) STEPS.get(cursor++).action.run();
     }

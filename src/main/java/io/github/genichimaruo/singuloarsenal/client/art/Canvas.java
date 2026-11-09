@@ -150,6 +150,8 @@ public final class Canvas {
     /** One face, from origin along U and V. With a bevel: a lit top edge, a shadowed bottom edge and darker sides. */
     private void panel(float ox, float oy, float oz, float ux, float uy, float uz, float vx, float vy, float vz, float nx, float ny, float nz, int seed, int rgb, boolean withBevel) {
         float width = Math.abs(ux + uy + uz), height = Math.abs(vx + vy + vz), e = bevel;
+        // Icons have no world lighting to model them, so they get more contrast between faces instead.
+        if (!billboard) rgb = shade(rgb, ny < 0 ? 1.55F : ny > 0 ? 0.9F : nx != 0 ? 1.3F : 1.12F);
         int top = gradient ? shade(rgb, 1.12F) : rgb, bottom = gradient ? shade(rgb, 0.76F) : rgb;
         if (!withBevel || width < 3 * e || height < 3 * e) {
             strip(ox, oy, oz, ux, uy, uz, vx, vy, vz, nx, ny, nz, seed, 0, width, 0, height, width, height, top, bottom);

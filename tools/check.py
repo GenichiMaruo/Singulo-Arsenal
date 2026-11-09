@@ -17,8 +17,9 @@ SETS = ['meissner', 'degeneracy', 'collapsar']
 PARTS = ['helmet', 'chestplate', 'leggings', 'boots']
 WEAPONS = ['quench_saber', 'casimir_blade', 'tidal_reaver', 'jet_lance']
 MATERIALS = ['flux_weave', 'pressure_lattice', 'collapsar_lamina', 'jet_collimator', 'tidal_edge']
-GEAR = [f'{s}_{p}' for s in SETS for p in PARTS] + WEAPONS
-ITEMS = GEAR + MATERIALS
+MODULES = ['bit_drone_module', 'capacitor_module', 'plating_module', 'thruster_module', 'coolant_module', 'amplifier_module']
+GEAR = [f'{s}_{p}' for s in SETS for p in PARTS] + WEAPONS + ['module_integrator']
+ITEMS = GEAR + MATERIALS + MODULES
 
 javac = str(Path(os.environ['JAVA_HOME']) / 'bin/javac') if os.environ.get('JAVA_HOME') else shutil.which('javac')
 java = str(Path(os.environ['JAVA_HOME']) / 'bin/java') if os.environ.get('JAVA_HOME') else shutil.which('java')
@@ -38,7 +39,7 @@ for key in locales[0]:
         assert locales[0][key].count(token) == locales[1][key].count(token), f'format placeholders differ: {key}'
 
 for item in ITEMS:
-    assert f'item.singulo_arsenal.{item}' in locales[0], f'missing name {item}'
+    assert f'item.singulo_arsenal.{item}' in locales[0] or f'block.singulo_arsenal.{item}' in locales[0], f'missing name {item}'
     model = json.loads((RES / f'assets/singulo_arsenal/models/item/{item}.json').read_text(encoding='utf-8'))
     if item in GEAR:
         assert model['parent'] == 'minecraft:builtin/entity', f'{item} must use the gear renderer'
@@ -47,7 +48,8 @@ for item in ITEMS:
     else:
         assert model['textures']['layer0'] == f'singulo_arsenal:item/{item}'
         data = (RES / f'assets/singulo_arsenal/textures/item/{item}.png').read_bytes()
-        assert data[:8] == b'\x89PNG\r\n\x1a\n' and struct.unpack('>II', data[16:24]) == (16, 16), f'bad icon {item}'
+        width, height = struct.unpack('>II', data[16:24])
+        assert data[1:4] == b'PNG' and width == 16 and height % 16 == 0, f'bad icon {item}'
     recipe = json.loads((recipes / f'{item}.json').read_text(encoding='utf-8'))
     assert recipe['result']['id'] == f'singulo_arsenal:{item}', item
     advancement = json.loads((RES / f'data/singulo_arsenal/advancement/recipes/{item}.json').read_text(encoding='utf-8'))

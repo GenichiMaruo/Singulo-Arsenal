@@ -7,6 +7,7 @@ import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.ItemContainerContents;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
 /** Gear state lives in item components, so it saves with the stack and reaches other players' clients through equipment sync. */
@@ -26,6 +27,9 @@ public final class ArsenalData {
     /** When the current reload animation ends, and how long it runs. On the stack so other players' clients see it too. */
     public static final Supplier<DataComponentType<Long>> RELOAD_UNTIL = time("reload_until");
     public static final Supplier<DataComponentType<Integer>> RELOAD_TICKS = integer("reload_ticks");
+
+    public static final Supplier<DataComponentType<ItemContainerContents>> MODULES = REGISTER.registerComponentType("modules",
+            b -> b.persistent(ItemContainerContents.CODEC).networkSynchronized(ItemContainerContents.STREAM_CODEC).cacheEncoding());
 
     private ArsenalData() {}
 

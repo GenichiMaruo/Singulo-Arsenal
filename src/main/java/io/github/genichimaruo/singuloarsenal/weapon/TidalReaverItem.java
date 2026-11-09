@@ -97,8 +97,8 @@ public final class TidalReaverItem extends PoweredSword {
                 FxPayload.sendEntity(level, FxPayload.STRETCH, target, focus, stress);
             }
         }
-        player.getCooldowns().addCooldown(this, Rules.REAVER_COOLDOWN);
-        Weapons.beginReload(player.getMainHandItem(), level.getGameTime(), Rules.REAVER_COOLDOWN);
+        player.getCooldowns().addCooldown(this, Weapons.cooled(player.getMainHandItem(), Rules.REAVER_COOLDOWN));
+        Weapons.beginReload(player.getMainHandItem(), level.getGameTime(), Weapons.cooled(player.getMainHandItem(), Rules.REAVER_COOLDOWN));
         FxPayload.send(level, FxPayload.SHEAR, focus, player.getLookAngle(), (float) Rules.REAVER_RANGE);
         Weapons.sound(player, "black_hole.devour", 1.8F, 1.1F);
     }

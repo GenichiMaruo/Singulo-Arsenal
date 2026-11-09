@@ -7,6 +7,10 @@ import io.github.genichimaruo.singuloarsenal.armor.SuitEvents;
 import io.github.genichimaruo.singuloarsenal.core.ArsenalData;
 import io.github.genichimaruo.singuloarsenal.core.Fe;
 import io.github.genichimaruo.singuloarsenal.core.Rules;
+import io.github.genichimaruo.singuloarsenal.module.IntegratorBlockEntity;
+import io.github.genichimaruo.singuloarsenal.module.ModuleContent;
+import io.github.genichimaruo.singuloarsenal.module.ModuleType;
+import io.github.genichimaruo.singuloarsenal.module.Modules;
 import io.github.genichimaruo.singuloarsenal.weapon.JetLanceItem;
 import io.github.genichimaruo.singuloarsenal.weapon.Weapons;
 import java.util.List;
@@ -402,6 +406,85 @@ public final class ArsenalGameTests {
         h.succeed();
     }
 
+    // ---- Module Integrator -------------------------------------------------------------------------------------------
+
+    private static ItemStack module(ModuleType type) {
+        return new ItemStack(ModuleContent.MODULES.get(type).get());
+    }
+
+    private static IntegratorBlockEntity integrator(GameTestHelper h) {
+        h.setBlock(2, 2, 2, ModuleContent.INTEGRATOR.get());
+        IntegratorBlockEntity entity = h.getBlockEntity(new net.minecraft.core.BlockPos(2, 2, 2));
+        entity.energy().receiveEnergy(Rules.INTEGRATOR_CAPACITY, false);
+        return entity;
+    }
+
+    private static void run(IntegratorBlockEntity entity) {
+        entity.start();
+        for (int i = 0; i < Rules.INTEGRATE_TICKS; i++) entity.serverTick();
+    }
+
+    @GameTest(template = ARENA)
+    public static void integrationInstallsAndPaysForModules(GameTestHelper h) {
+        IntegratorBlockEntity entity = integrator(h);
+        var items = entity.items();
+        items.setStackInSlot(IntegratorBlockEntity.GEAR, new ItemStack(ArsenalItems.SUITS.get(ArmorSet.COLLAPSAR).get(ArmorItem.Type.CHESTPLATE).get()));
+        items.setStackInSlot(IntegratorBlockEntity.FIRST_SOCKET, module(ModuleType.CAPACITOR));
+        items.setStackInSlot(IntegratorBlockEntity.FIRST_SOCKET + 1, module(ModuleType.BIT_DRONE));
+        run(entity);
+        ItemStack gear = items.getStackInSlot(IntegratorBlockEntity.GEAR);
+        h.assertTrue(Modules.count(gear, ModuleType.CAPACITOR) == 1 && Modules.count(gear, ModuleType.BIT_DRONE) == 1, "modules not installed");
+        h.assertTrue(items.getStackInSlot(IntegratorBlockEntity.FIRST_SOCKET).isEmpty(), "module duplicated into the gear");
+        h.assertTrue(Fe.capacity(gear) == Rules.capacityWith(Rules.COLLAPSAR_CAPACITY, 1), "capacitor did not raise capacity");
+        h.assertTrue(entity.energy().getEnergyStored() == Rules.INTEGRATOR_CAPACITY - Rules.INTEGRATE_TICKS * Rules.INTEGRATE_FE_PER_TICK, "wrong energy cost");
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void placingGearUnpacksItsModulesExactlyOnce(GameTestHelper h) {
+        IntegratorBlockEntity entity = integrator(h);
+        var items = entity.items();
+        ItemStack gear = new ItemStack(ArsenalItems.SUITS.get(ArmorSet.COLLAPSAR).get(ArmorItem.Type.CHESTPLATE).get());
+        Modules.install(gear, java.util.List.of(module(ModuleType.PLATING), module(ModuleType.CAPACITOR)));
+        items.setStackInSlot(IntegratorBlockEntity.GEAR, gear);
+        ItemStack held = items.getStackInSlot(IntegratorBlockEntity.GEAR);
+        h.assertTrue(Modules.installed(held).isEmpty(), "gear kept its modules");
+        int found = 0;
+        for (int i = IntegratorBlockEntity.FIRST_SOCKET; i < IntegratorBlockEntity.SLOTS; i++) if (!items.getStackInSlot(i).isEmpty()) found++;
+        h.assertTrue(found == 2, "modules lost or duplicated: " + found);
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void integrationRefusesWrongOrExcessModules(GameTestHelper h) {
+        IntegratorBlockEntity entity = integrator(h);
+        var items = entity.items();
+        items.setStackInSlot(IntegratorBlockEntity.GEAR, new ItemStack(ArsenalItems.QUENCH_SABER.get()));
+        items.setStackInSlot(IntegratorBlockEntity.FIRST_SOCKET, module(ModuleType.BIT_DRONE));
+        run(entity);
+        h.assertTrue(Modules.installed(items.getStackInSlot(IntegratorBlockEntity.GEAR)).isEmpty(), "a sword took a bit drone");
+        h.assertTrue(!items.getStackInSlot(IntegratorBlockEntity.FIRST_SOCKET).isEmpty(), "refused module was consumed");
+        items.setStackInSlot(IntegratorBlockEntity.FIRST_SOCKET, module(ModuleType.COOLANT));
+        items.setStackInSlot(IntegratorBlockEntity.FIRST_SOCKET + 1, module(ModuleType.COOLANT));
+        run(entity);
+        h.assertTrue(Modules.installed(items.getStackInSlot(IntegratorBlockEntity.GEAR)).isEmpty(), "stage 2 gear took two modules");
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void bitsPayEnergyAndHitHostiles(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 2.5);
+        ItemStack chest = charged(ArmorSet.COLLAPSAR, ArmorItem.Type.CHESTPLATE);
+        Modules.install(chest, java.util.List.of(module(ModuleType.BIT_DRONE)));
+        Fe.set(chest, Rules.BIT_FE * 10);
+        p.setItemSlot(EquipmentSlot.CHEST, chest);
+        Zombie mob = target(h, 2.5, 4.5);
+        SuitEvents.fireBits(p);
+        h.assertTrue(mob.getHealth() == 100 - Rules.BIT_DAMAGE * Rules.BITS_PER_MODULE, "bits did not land: " + mob.getHealth());
+        h.assertTrue(Fe.stored(chest) == Rules.BIT_FE * (10 - Rules.BITS_PER_MODULE), "bit cost");
+        h.succeed();
+    }
+
     // ---- Recipes against the real base mod ---------------------------------------------------------------------------
 
     @GameTest(template = ARENA)
@@ -413,7 +496,7 @@ public final class ArsenalGameTests {
             h.assertTrue(recipes.byKey(id).isPresent(), "recipe failed to load: " + id);
             found++;
         }
-        h.assertTrue(found == 21, "unexpected item count " + found);
+        h.assertTrue(found == 28, "unexpected item count " + found);
         var lamina = recipes.byKey(SinguloArsenal.id("collapsar_lamina")).orElseThrow().value();
         h.assertTrue(BuiltInRegistries.RECIPE_SERIALIZER.getKey(lamina.getSerializer()).toString().equals("singulo:machine"), "lamina must be a Singulo machine recipe");
         h.succeed();

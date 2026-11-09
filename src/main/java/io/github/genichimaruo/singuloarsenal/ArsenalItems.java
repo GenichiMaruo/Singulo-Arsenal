@@ -4,6 +4,7 @@ import io.github.genichimaruo.singuloarsenal.armor.ArmorSet;
 import io.github.genichimaruo.singuloarsenal.armor.SuitItem;
 import io.github.genichimaruo.singuloarsenal.core.Fe;
 import io.github.genichimaruo.singuloarsenal.core.Powered;
+import io.github.genichimaruo.singuloarsenal.module.ModuleContent;
 import io.github.genichimaruo.singuloarsenal.weapon.CasimirBladeItem;
 import io.github.genichimaruo.singuloarsenal.weapon.JetLanceItem;
 import io.github.genichimaruo.singuloarsenal.weapon.QuenchSaberItem;
@@ -86,6 +87,8 @@ public final class ArsenalItems {
                     output.accept(COLLAPSAR_LAMINA.get());
                     output.accept(JET_COLLIMATOR.get());
                     output.accept(TIDAL_EDGE.get());
+                    output.accept(ModuleContent.INTEGRATOR_ITEM.get());
+                    for (var module : ModuleContent.MODULES.values()) output.accept(module.get());
                 }).build());
     }
 

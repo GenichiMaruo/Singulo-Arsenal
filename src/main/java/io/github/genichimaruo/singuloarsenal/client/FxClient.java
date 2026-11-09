@@ -28,7 +28,10 @@ import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
+import io.github.genichimaruo.singuloarsenal.client.art.MachineArt;
 import io.github.genichimaruo.singuloarsenal.client.art.WeaponArt;
+import io.github.genichimaruo.singuloarsenal.module.ModuleType;
+import io.github.genichimaruo.singuloarsenal.module.Modules;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
@@ -69,6 +72,7 @@ final class FxClient {
             case FxPayload.HORIZON -> 40;
             case FxPayload.SHEAR -> 16;
             case FxPayload.RUPTURE -> 14;
+            case FxPayload.BIT_SHOT -> 6;
             default -> 16;
         };
     }
@@ -146,6 +150,7 @@ final class FxClient {
         MultiBufferSource.BufferSource buffers = mc.renderBuffers().bufferSource();
 
         drawHoles(pose, buffers, mc, partial);
+        drawBits(pose, buffers, mc, partial);
         VertexConsumer glow = buffers.getBuffer(ArsenalRenderTypes.GLOW);
         long now = mc.level.getGameTime();
         for (Fx fx : ACTIVE) {
@@ -197,6 +202,17 @@ final class FxClient {
             case FxPayload.JET_BURST -> {
                 Vec3 thrust = at.subtract(fx.b()).normalize();
                 Canvas.worldRing(pose, glow, at, thrust, 0.5 + age * 0.3, 0.2, 0xBFE6FF, strength);
+            }
+            case FxPayload.BIT_SHOT -> {
+                if (Minecraft.getInstance().level.getEntity(fx.entity()) instanceof Player owner) {
+                    int count = bitCount(owner);
+                    if (count > 0) {
+                        Vec3 from = bitPosition(owner, (int) fx.value(), count, Minecraft.getInstance().getTimer().getGameTimeDeltaPartialTick(true));
+                        Canvas.tube(pose, glow, from, at, 0.05 * fade, 0x7CE8FF, strength * 0.6F);
+                        Canvas.tube(pose, glow, from, at, 0.02 * fade, 0xFFFFFF, strength);
+                        Canvas.worldRing(pose, glow, at, at.subtract(from).normalize(), 0.12 + age * 0.05, 0.08, 0x7CE8FF, strength);
+                    }
+                }
             }
             case FxPayload.RUPTURE -> {
                 Canvas.worldRing(pose, glow, at, fx.b(), 0.2 + age * 0.14, 0.16, 0xB8A8FF, strength);
@@ -313,6 +329,37 @@ final class FxClient {
         float pulse = 0.85F + 0.15F * (float) Math.sin(held * 1.3);
         Canvas.worldRing(pose, glow, hit.getLocation().add(normal.scale(0.05)), normal, 0.5 * pulse, 0.25, 0x8CD2FF, 0.8F);
         Canvas.worldRing(pose, glow, hit.getLocation().add(normal.scale(0.06)), normal, 0.22 * pulse, 0.14, 0xFFFFFF, 0.9F);
+    }
+
+    private static int bitCount(Player player) {
+        return Modules.count(player.getItemBySlot(EquipmentSlot.CHEST), ModuleType.BIT_DRONE) * Rules.BITS_PER_MODULE;
+    }
+
+    /** Bits circle the wearer at shoulder height. Purely a function of time, so every client agrees where each one is. */
+    private static Vec3 bitPosition(Player player, int index, int count, float partial) {
+        double t = (player.level().getGameTime() + partial) * 0.06 + index * Math.PI * 2 / count;
+        return player.getPosition(partial).add(Math.cos(t) * 1.05, 1.55 + 0.14 * Math.sin(t * 2.3 + index), Math.sin(t) * 1.05);
+    }
+
+    private static void drawBits(PoseStack pose, MultiBufferSource.BufferSource buffers, Minecraft mc, float partial) {
+        boolean any = false;
+        float t = mc.level.getGameTime() + partial;
+        for (Player player : mc.level.players()) {
+            int count = bitCount(player);
+            if (count == 0 || player.isInvisible()) continue;
+            any = true;
+            for (int i = 0; i < count; i++) {
+                Vec3 at = bitPosition(player, i, count, partial);
+                pose.pushPose();
+                pose.translate(at.x, at.y, at.z);
+                pose.mulPose(com.mojang.math.Axis.YP.rotation(-t * 0.06F - (float) (i * Math.PI * 2 / count)));
+                pose.scale(1F / 16, 1F / 16, 1F / 16);
+                int light = net.minecraft.client.renderer.LevelRenderer.getLightColor(mc.level, net.minecraft.core.BlockPos.containing(at));
+                Canvas.drawFine(pose, buffers, t, light, Canvas.noOverlay(), true, c -> MachineArt.bit(c, false));
+                pose.popPose();
+            }
+        }
+        if (any) buffers.endBatch();
     }
 
     private static void drawHoles(PoseStack pose, MultiBufferSource.BufferSource buffers, Minecraft mc, float partial) {

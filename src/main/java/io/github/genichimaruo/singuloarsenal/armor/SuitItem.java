@@ -39,16 +39,17 @@ public final class SuitItem extends ArmorItem implements Powered {
     }
 
     @Override public boolean isBarVisible(ItemStack stack) { return true; }
-    @Override public int getBarWidth(ItemStack stack) { return Math.round(13F * Fe.stored(stack) / Math.max(1, capacity())); }
+    @Override public int getBarWidth(ItemStack stack) { return Math.round(13F * Fe.stored(stack) / Math.max(1, Fe.capacity(stack))); }
     @Override public int getBarColor(ItemStack stack) { return 0x6FE3FF; }
 
     @Override
     public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> lines, TooltipFlag flag) {
         lines.add(Component.translatable("tooltip.singulo_arsenal.stage", set.stage).withStyle(ChatFormatting.GOLD));
         lines.add(Component.translatable("tooltip.singulo_arsenal." + set.id + "." + getType().getName()).withStyle(ChatFormatting.GRAY));
-        lines.add(Component.translatable("tooltip.singulo_arsenal.energy", Fe.stored(stack), capacity()).withStyle(ChatFormatting.AQUA));
+        lines.add(Component.translatable("tooltip.singulo_arsenal.energy", Fe.stored(stack), Fe.capacity(stack)).withStyle(ChatFormatting.AQUA));
         if (accretes()) lines.add(Component.translatable("tooltip.singulo_arsenal.accretion").withStyle(ChatFormatting.DARK_AQUA));
         lines.add(Component.translatable("tooltip.singulo_arsenal.charge").withStyle(ChatFormatting.DARK_GRAY));
         lines.add(Component.translatable("tooltip.singulo_arsenal.full_set." + set.id).withStyle(ChatFormatting.LIGHT_PURPLE));
+        io.github.genichimaruo.singuloarsenal.module.Modules.describe(stack, lines);
     }
 }

@@ -28,7 +28,7 @@ abstract class PoweredSword extends SwordItem implements ArsenalWeapon {
     @Override public InteractionResult useOn(UseOnContext context) { return Fe.chargeFromBlock(context); }
     @Override public boolean shouldCauseReequipAnimation(ItemStack from, ItemStack to, boolean changed) { return !ItemStack.isSameItem(from, to); }
     @Override public boolean isBarVisible(ItemStack stack) { return true; }
-    @Override public int getBarWidth(ItemStack stack) { return Math.round(13F * Fe.stored(stack) / Math.max(1, capacity)); }
+    @Override public int getBarWidth(ItemStack stack) { return Math.round(13F * Fe.stored(stack) / Math.max(1, Fe.capacity(stack))); }
     @Override public int getBarColor(ItemStack stack) { return 0x6FE3FF; }
 
     @Override

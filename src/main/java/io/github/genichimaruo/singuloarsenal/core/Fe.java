@@ -1,5 +1,7 @@
 package io.github.genichimaruo.singuloarsenal.core;
 
+import io.github.genichimaruo.singuloarsenal.module.ModuleType;
+import io.github.genichimaruo.singuloarsenal.module.Modules;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -20,7 +22,7 @@ public final class Fe {
     private Fe() {}
 
     public static int capacity(ItemStack stack) {
-        return stack.getItem() instanceof Powered powered ? powered.capacity() : 0;
+        return stack.getItem() instanceof Powered powered ? Rules.capacityWith(powered.capacity(), Modules.count(stack, ModuleType.CAPACITOR)) : 0;
     }
 
     public static int stored(ItemStack stack) {

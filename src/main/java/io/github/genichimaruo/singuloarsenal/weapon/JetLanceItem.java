@@ -41,7 +41,7 @@ public final class JetLanceItem extends Item implements ArsenalWeapon {
     @Override public InteractionResult useOn(UseOnContext context) { return Fe.chargeFromBlock(context); }
     @Override public boolean shouldCauseReequipAnimation(ItemStack from, ItemStack to, boolean changed) { return !ItemStack.isSameItem(from, to); }
     @Override public boolean isBarVisible(ItemStack stack) { return true; }
-    @Override public int getBarWidth(ItemStack stack) { return Math.round(13F * Fe.stored(stack) / capacity()); }
+    @Override public int getBarWidth(ItemStack stack) { return Math.round(13F * Fe.stored(stack) / Math.max(1, Fe.capacity(stack))); }
     @Override public int getBarColor(ItemStack stack) { return 0xFFC36B; }
 
     @Override
@@ -70,8 +70,8 @@ public final class JetLanceItem extends Item implements ArsenalWeapon {
         if (held == Rules.LANCE_COLLIMATE) Weapons.sound(player, "jet_forge.beam_start", 1.6F, 1.2F);
         if ((held - Rules.LANCE_COLLIMATE) % 10 == 0 && !Fe.spend(stack, Rules.LANCE_FE_PER_10_TICKS)) {
             player.stopUsingItem();
-            player.getCooldowns().addCooldown(this, Rules.LANCE_COOLDOWN);
-            Weapons.beginReload(stack, server.getGameTime(), Rules.LANCE_COOLDOWN);
+            player.getCooldowns().addCooldown(this, Weapons.cooled(stack, Rules.LANCE_COOLDOWN));
+            Weapons.beginReload(stack, server.getGameTime(), Weapons.cooled(stack, Rules.LANCE_COOLDOWN));
             return;
         }
         if ((held - Rules.LANCE_COLLIMATE) % Rules.LANCE_PULSE == 0) pulse(player, server);
@@ -84,13 +84,19 @@ public final class JetLanceItem extends Item implements ArsenalWeapon {
         if (level.isClientSide || !selected) return;
         float progress = Weapons.reloadProgress(stack, level.getGameTime(), 0);
         if (progress < 0) return;
+        // Cues are placed on the base 160-tick timeline. A coolant module shortens the run, so ticks can skip over a cue.
         int tick = Math.round(progress * Rules.LANCE_COOLDOWN);
-        if (tick == 8) Weapons.sound(entity, "sealed_container.vent", 0.9F, 1.1F);
-        else if (tick == 34) Weapons.sound(entity, "drone_port.hatch_open", 0.9F, 1.5F);
-        else if (tick == 92) Weapons.sound(entity, "sealed_container.insert", 1, 0.9F);
-        else if (tick == 110) Weapons.sound(entity, "drone_port.clamp", 1, 0.8F);
-        else if (tick == 118) Weapons.sound(entity, "drone_port.clamp", 1, 1.4F);
-        else if (tick == 140) Weapons.sound(entity, "sealed_container.unlock", 0.8F, 1.3F);
+        int previous = Math.round(Math.max(0, Weapons.reloadProgress(stack, level.getGameTime() - 1, 0)) * Rules.LANCE_COOLDOWN);
+        if (crossed(previous, tick, 8)) Weapons.sound(entity, "sealed_container.vent", 0.9F, 1.1F);
+        else if (crossed(previous, tick, 34)) Weapons.sound(entity, "drone_port.hatch_open", 0.9F, 1.5F);
+        else if (crossed(previous, tick, 92)) Weapons.sound(entity, "sealed_container.insert", 1, 0.9F);
+        else if (crossed(previous, tick, 110)) Weapons.sound(entity, "drone_port.clamp", 1, 0.8F);
+        else if (crossed(previous, tick, 118)) Weapons.sound(entity, "drone_port.clamp", 1, 1.4F);
+        else if (crossed(previous, tick, 140)) Weapons.sound(entity, "sealed_container.unlock", 0.8F, 1.3F);
+    }
+
+    private static boolean crossed(int previous, int now, int cue) {
+        return previous < cue && now >= cue;
     }
 
     /** Applies one damage pulse along the jet. Public so GameTests exercise the real path. */
@@ -99,7 +105,7 @@ public final class JetLanceItem extends Item implements ArsenalWeapon {
         Vec3 look = player.getLookAngle().normalize();
         Vec3 end = level.clip(new ClipContext(eye, eye.add(look.scale(Rules.LANCE_RANGE)), ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, player)).getLocation();
         var source = ArsenalDamage.source(level, ArsenalDamage.JET, player);
-        for (LivingEntity target : ArsenalDamage.along(player, eye, end, 0.3)) burn(target, source, Rules.LANCE_DAMAGE);
+        for (LivingEntity target : ArsenalDamage.along(player, eye, end, Rules.LANCE_HIT_WIDTH)) burn(target, source, Rules.LANCE_DAMAGE);
     }
 
     private static void burn(LivingEntity target, net.minecraft.world.damagesource.DamageSource source, float damage) {
@@ -110,9 +116,9 @@ public final class JetLanceItem extends Item implements ArsenalWeapon {
     public void releaseUsing(ItemStack stack, Level level, LivingEntity entity, int remaining) {
         if (!level.isClientSide && entity instanceof Player player) {
             boolean fired = Rules.LANCE_MAX_HOLD - remaining >= Rules.LANCE_COLLIMATE;
-            player.getCooldowns().addCooldown(this, fired ? Rules.LANCE_COOLDOWN : Rules.LANCE_SHORT_COOLDOWN);
+            player.getCooldowns().addCooldown(this, fired ? Weapons.cooled(stack, Rules.LANCE_COOLDOWN) : Rules.LANCE_SHORT_COOLDOWN);
             if (fired) {
-                Weapons.beginReload(stack, level.getGameTime(), Rules.LANCE_COOLDOWN);
+                Weapons.beginReload(stack, level.getGameTime(), Weapons.cooled(stack, Rules.LANCE_COOLDOWN));
                 Weapons.sound(player, "jet_forge.cool", 1, 1.2F);
             }
         }
@@ -121,8 +127,8 @@ public final class JetLanceItem extends Item implements ArsenalWeapon {
     @Override
     public ItemStack finishUsingItem(ItemStack stack, Level level, LivingEntity entity) {
         if (!level.isClientSide && entity instanceof Player player) {
-            player.getCooldowns().addCooldown(this, Rules.LANCE_COOLDOWN);
-            Weapons.beginReload(stack, level.getGameTime(), Rules.LANCE_COOLDOWN);
+            player.getCooldowns().addCooldown(this, Weapons.cooled(stack, Rules.LANCE_COOLDOWN));
+            Weapons.beginReload(stack, level.getGameTime(), Weapons.cooled(stack, Rules.LANCE_COOLDOWN));
             Weapons.sound(player, "jet_forge.cool", 1, 1.2F);
         }
         return stack;

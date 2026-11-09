@@ -21,6 +21,7 @@ public final class ArsenalDamage {
     public static final ResourceKey<DamageType> JET = key("jet");
     public static final ResourceKey<DamageType> SHEAR = key("shear");
     public static final ResourceKey<DamageType> HORIZON = key("horizon");
+    public static final ResourceKey<DamageType> BIT = key("bit");
 
     private ArsenalDamage() {}
 

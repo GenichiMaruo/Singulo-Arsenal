@@ -14,7 +14,8 @@ SETS = ['meissner', 'degeneracy', 'collapsar']
 PARTS = ['helmet', 'chestplate', 'leggings', 'boots']
 WEAPONS = ['quench_saber', 'casimir_blade', 'tidal_reaver', 'jet_lance']
 MATERIALS = ['flux_weave', 'pressure_lattice', 'collapsar_lamina', 'jet_collimator', 'tidal_edge']
-DAMAGE = ['quench', 'collapse', 'jet', 'shear', 'horizon']
+MODULES = ['bit_drone_module', 'capacitor_module', 'plating_module', 'thruster_module', 'coolant_module', 'amplifier_module']
+DAMAGE = ['quench', 'collapse', 'jet', 'shear', 'horizon', 'bit']
 MATERIAL_SIZE = 32
 FINE_SIZE = 64
 
@@ -134,11 +135,33 @@ shaped('tidal_reaver', [' T ', 'LGL', ' F '],
 shaped('jet_lance', [' J ', 'LBL', ' R '],
        {'J': own('jet_collimator'), 'L': own('collapsar_lamina'), 'B': s('micro_black_hole'), 'R': s('confinement_ring')}, own('jet_collimator'))
 
+# ---- Module Integrator and modules --------------------------------------------------------------------------------
+
+# Tool arms over a work lens, a control pair either side of the frame, on a plate base: the machine as it stands.
+shaped('module_integrator', ['ATA', 'QFQ', 'SSS'],
+       {'A': s('precision_actuator'), 'T': s('optical_lattice_substrate'), 'Q': s('quantum_computing_module'), 'F': s('nihonium_frame'), 'S': s('steel_plate')},
+       s('nihonium_frame'))
+ASSEMBLER = 'precision_assembler'
+machine('bit_drone_module', ASSEMBLER, 3, 300, 400, [(s('android_memory_bit'), 1), (s('entangled_element'), 2), (s('superconducting_coil'), 2), (s('nihonium_plate'), 2)], s('android_memory_bit'))
+machine('capacitor_module', ASSEMBLER, 3, 200, 400, [(s('superconducting_wire'), 4), (s('ceramic_substrate'), 2), (s('nihonium_plate'), 1)], s('superconducting_wire'))
+machine('plating_module', ASSEMBLER, 3, 200, 400, [(s('steel_plate'), 4), (s('white_ceramic_composite'), 2), (s('nihonium_plate'), 2)], s('nihonium_plate'))
+machine('thruster_module', ASSEMBLER, 3, 200, 400, [(s('precision_actuator'), 1), (s('superconducting_coil'), 2), (s('muon_bundle'), 2), (s('steel_plate'), 2)], s('muon_bundle'))
+machine('coolant_module', ASSEMBLER, 3, 200, 400, [(s('coolant_cartridge'), 2), (s('heat_exchange_core'), 1), (s('superconducting_wire'), 2)], s('coolant_cartridge'))
+machine('amplifier_module', ASSEMBLER, 3, 200, 400, [(s('quantum_computing_module'), 1), (s('entangled_element'), 2), (s('optical_lattice_substrate'), 1)], s('quantum_computing_module'))
+write(f'data/{MOD}/loot_table/blocks/module_integrator.json', {
+    'type': 'minecraft:block',
+    'pools': [{'rolls': 1, 'entries': [{'type': 'minecraft:item', 'name': own('module_integrator')}], 'conditions': [{'condition': 'minecraft:survives_explosion'}]}],
+})
+write('data/minecraft/tags/block/mineable/pickaxe.json', {'replace': False, 'values': [own('module_integrator')]})
+write('data/minecraft/tags/block/needs_iron_tool.json', {'replace': False, 'values': [own('module_integrator')]})
+write(f'assets/{MOD}/blockstates/module_integrator.json', {'variants': {'': {'model': f'{MOD}:block/module_integrator'}}})
+write(f'assets/{MOD}/models/block/module_integrator.json', {'textures': {'particle': 'minecraft:block/gray_concrete'}})
+
 # ---- Damage types and tags ---------------------------------------------------------------------------------------
 
 for name in DAMAGE:
     write(f'data/{MOD}/damage_type/{name}.json', {'message_id': f'{MOD}.{name}', 'scaling': 'never', 'exhaustion': 0.1, 'effects': 'hurt'})
-write('data/minecraft/tags/damage_type/bypasses_cooldown.json', {'replace': False, 'values': [own('jet'), own('shear')]})
+write('data/minecraft/tags/damage_type/bypasses_cooldown.json', {'replace': False, 'values': [own('jet'), own('shear'), own('bit')]})
 for tag, part in [('head_armor', 'helmet'), ('chest_armor', 'chestplate'), ('leg_armor', 'leggings'), ('foot_armor', 'boots')]:
     write(f'data/minecraft/tags/item/{tag}.json', {'replace': False, 'values': [own(f'{t}_{part}') for t in SETS]})
 write('data/minecraft/tags/item/swords.json', {'replace': False, 'values': [own(w) for w in WEAPONS[:3]]})
@@ -148,7 +171,7 @@ write('data/minecraft/tags/item/enchantable/durability.json', {'replace': False,
 
 BUILTIN = {'parent': 'minecraft:builtin/entity', 'textures': {'particle': 'minecraft:block/gray_concrete'}}
 SWORD_DISPLAY = {
-    'gui': {'rotation': [0, 0, -45], 'translation': [-0.8, -0.8, 0], 'scale': [0.5, 0.5, 0.5]},
+    'gui': {'rotation': [14, -26, -45], 'translation': [-0.8, -0.8, 0], 'scale': [0.5, 0.5, 0.5]},
     'ground': {'translation': [0, 2, 0], 'scale': [0.38, 0.38, 0.38]},
     'fixed': {'rotation': [0, 0, -45], 'scale': [0.7, 0.7, 0.7]},
     # Vanilla item/handheld, with 45 degrees taken out of the Z rotation: vanilla's blade runs up the sprite's diagonal, this one up +Y.
@@ -159,16 +182,16 @@ SWORD_DISPLAY = {
 }
 # Carried at the ready in both hands: +Y to the muzzle, +Z up. The translation seats the pistol grip in the fist.
 LANCE_DISPLAY = {
-    'gui': {'rotation': [-90, 0, -90], 'translation': [-1.9, 0.2, 0], 'scale': [0.36, 0.36, 0.36]},
+    'gui': {'rotation': [-74, 0, -90], 'translation': [-1.9, 0.2, 0], 'scale': [0.36, 0.36, 0.36]},
     'ground': {'rotation': [-90, 0, -90], 'translation': [0, 3, 0], 'scale': [0.3, 0.3, 0.3]},
     'fixed': {'rotation': [-90, 0, -90], 'scale': [0.5, 0.5, 0.5]},
-    'firstperson_righthand': {'rotation': [-90, 0, 5], 'translation': [2.5, 3, -7], 'scale': [0.42, 0.42, 0.42]},
-    'firstperson_lefthand': {'rotation': [-90, 0, 5], 'translation': [2.5, 3, -7], 'scale': [0.42, 0.42, 0.42]},
-    'thirdperson_righthand': {'rotation': [-90, 0, 0], 'translation': [0, 2.5, 0], 'scale': [0.72, 0.72, 0.72]},
-    'thirdperson_lefthand': {'rotation': [-90, 0, 0], 'translation': [0, 2.5, 0], 'scale': [0.72, 0.72, 0.72]},
+    'firstperson_righthand': {'rotation': [-90, 0, 0], 'translation': [-1.6, -0.6, -2.1], 'scale': [1, 1, 1]},
+    'firstperson_lefthand': {'rotation': [-90, 0, 0], 'translation': [-1.6, -0.6, -2.1], 'scale': [1, 1, 1]},
+    'thirdperson_righthand': {'rotation': [-90, 0, 0], 'translation': [0, 2.1, 0], 'scale': [0.62, 0.62, 0.62]},
+    'thirdperson_lefthand': {'rotation': [-90, 0, 0], 'translation': [0, 2.1, 0], 'scale': [0.62, 0.62, 0.62]},
 }
 ARMOR_DISPLAY = {
-    'gui': {'rotation': [16, 208, 0], 'scale': [0.72, 0.72, 0.72]},
+    'gui': {'rotation': [24, 216, 0], 'scale': [0.72, 0.72, 0.72]},
     'ground': {'translation': [0, 3, 0], 'scale': [0.5, 0.5, 0.5]},
     'fixed': {'rotation': [0, 180, 0], 'scale': [1, 1, 1]},
     'firstperson_righthand': {'rotation': [0, 150, 0], 'translation': [1.5, 3, 0], 'scale': [0.38, 0.38, 0.38]},
@@ -186,7 +209,16 @@ for name in WEAPONS:
 for t in SETS:
     for part in PARTS:
         write(f'assets/{MOD}/models/item/{t}_{part}.json', {**BUILTIN, 'display': ARMOR_DISPLAY})
-for name in MATERIALS:
+write(f'assets/{MOD}/models/item/module_integrator.json', {**BUILTIN, 'display': {
+    'gui': {'rotation': [28, 225, 0], 'scale': [0.56, 0.56, 0.56]},
+    'ground': {'translation': [0, 3, 0], 'scale': [0.25, 0.25, 0.25]},
+    'fixed': {'scale': [0.5, 0.5, 0.5]},
+    'firstperson_righthand': {'rotation': [0, 45, 0], 'scale': [0.4, 0.4, 0.4]},
+    'firstperson_lefthand': {'rotation': [0, 225, 0], 'scale': [0.4, 0.4, 0.4]},
+    'thirdperson_righthand': {'rotation': [75, 45, 0], 'translation': [0, 2.5, 0], 'scale': [0.375, 0.375, 0.375]},
+    'thirdperson_lefthand': {'rotation': [75, 45, 0], 'translation': [0, 2.5, 0], 'scale': [0.375, 0.375, 0.375]},
+}})
+for name in MATERIALS + MODULES:
     write(f'assets/{MOD}/models/item/{name}.json', {'parent': 'minecraft:item/generated', 'textures': {'layer0': f'{MOD}:item/{name}'}})
 
 # ---- Translations --------------------------------------------------------------------------------------------------
@@ -226,7 +258,7 @@ weapon_text = {
     'tidal_reaver': ('潮汐断裁刃', 'Tidal Reaver',
                      ['攻撃22／攻撃速度1.0。命中で潮汐応力を付与（最大5、被ダメージ+8%／層）。', '使用長押し：ロッシュ焦点が周囲の敵を引き寄せる（300,000 FE/秒）。', '離して断裁：応力に応じて16〜66ダメージを与え、応力を解放する。'],
                      ['22 damage, 1.0 attack speed. Hits apply tidal stress (up to 5, +8% damage taken each).', 'Hold use: a Roche focus drags nearby enemies in (300,000 FE/s).', 'Release to shear for 16-66 damage by stress, spending it.']),
-    'jet_lance': ('ジェットランス', 'Jet Lance',
+    'jet_lance': ('降着ジェット砲', 'Accretion Jet Cannon',
                   ['使用長押し：点火→3段の収束→照射（最長6秒）。', '前方80ブロックを貫通し、防具の6割を無視して56 DPS（500,000 FE/秒）。', '磁気ミラーが後極を塞いでいて、ジェットは銃身からのみ出る。'],
                   ['Hold use: ignition, three-ring collimation, then irradiation (up to 6s).', 'Pierces 80 blocks ahead for 56 DPS, ignoring 60% of armor (500,000 FE/s).', 'A magnetic mirror seals the rear pole, so the jet only leaves through the barrel.']),
 }
@@ -240,7 +272,23 @@ for name, j, e in [('flux_weave', '磁束織布', 'Flux Weave'), ('pressure_latt
                    ('tidal_edge', '潮汐鍛造刃', 'Tidal Edge')]:
     ja[f'item.{MOD}.{name}'], en[f'item.{MOD}.{name}'] = j, e
 
+for name, j, e, tj, te in [
+    ('bit_drone_module', 'ビットドローン・モジュール', 'Bit Drone Module', '胴用。ビット2機が周囲を巡回し、敵を毎秒自動で撃つ（5ダメージ、1,500 FE／発）。', 'Chestpieces. Two bits orbit you and shoot hostile mobs each second (5 damage, 1,500 FE per shot).'),
+    ('capacitor_module', '拡張コンデンサ', 'Capacitor Module', '防具・武器用。電力容量 +50%。', 'Any gear. +50% energy capacity.'),
+    ('plating_module', '追加装甲板', 'Plating Module', '防具用。防御力 +2、防具強度 +1。', 'Armor. +2 armor, +1 toughness.'),
+    ('thruster_module', '慣性スラスター', 'Inertial Thruster', '靴用。ジャンプ力と段差の乗り越えを強化する。', 'Boots. Higher jumps and step height.'),
+    ('coolant_module', '冷却モジュール', 'Coolant Module', '武器用。再使用時間 -25%（重複可）。', 'Weapons. -25% cooldown (stacks).'),
+    ('amplifier_module', '出力増幅器', 'Output Amplifier', '武器用。与えるダメージ +15%（重複可）。', 'Weapons. +15% damage dealt (stacks).'),
+]:
+    ja[f'item.{MOD}.{name}'], en[f'item.{MOD}.{name}'] = j, e
+    ja[f'tooltip.{MOD}.{name}'], en[f'tooltip.{MOD}.{name}'] = tj, te
+
 common = {
+    'block.singulo_arsenal.module_integrator': ('モジュール統合台', 'Module Integrator'),
+    'screen.singulo_arsenal.integrate': ('統合', 'Integrate'),
+    'tooltip.singulo_arsenal.modules': ('モジュール：%s / %s', 'Modules: %s / %s'),
+    'tooltip.singulo_arsenal.module_hint': ('モジュール統合台で装備に組み込む。', 'Install on gear at a Module Integrator.'),
+    'death.attack.singulo_arsenal.bit': ('%1$s は %2$s のビットに撃たれた', '%1$s was shot by %2$s\'s bit drone'),
     'itemGroup.singulo_arsenal': ('Singulo Arsenal', 'Singulo Arsenal'),
     'key.categories.singulo_arsenal': ('Singulo Arsenal', 'Singulo Arsenal'),
     'key.singulo_arsenal.ability': ('装甲の起動機能', 'Armor ability'),
@@ -295,12 +343,57 @@ def rgb(value):
     return ((value >> 16) & 255, (value >> 8) & 255, value & 255, 255)
 
 
+GLOWS = {'flux_weave': 'c', 'pressure_lattice': 'a', 'collapsar_lamina': 'oy', 'jet_collimator': 'cW', 'tidal_edge': 'sy',
+         'bit_drone_module': 'cW', 'capacitor_module': 'c', 'thruster_module': 'cW', 'coolant_module': 'c', 'amplifier_module': 'c'}
+FRAMES = 8
+
+
+def scale_rgb(colour, factor):
+    return (*[max(0, min(255, int(v * factor))) for v in colour[:3]], 255)
+
+
+def shade_pixel(art, x, y, grain):
+    """Light from the upper left: a bright rim where the top or left is open, a dark rim opposite, softer steps between colours."""
+    c = art[y][x]
+    def at(px, py):
+        return art[py][px] if 0 <= px < 16 and 0 <= py < 16 else '.'
+    factor = 1 + grain
+    if at(x, y - 1) == '.' or at(x - 1, y) == '.':
+        factor *= 1.34
+    elif at(x, y + 1) == '.' or at(x + 1, y) == '.':
+        factor *= 0.6
+    else:
+        if at(x, y - 1) != c:
+            factor *= 1.14
+        if at(x, y + 1) != c:
+            factor *= 0.84
+    return factor
+
+
 def sprite(name, art, palette):
     assert len(art) == 16 and all(len(row) == 16 for row in art), name
     # Icons stay inside 14x14 so a one-pixel margin always separates them from the slot border.
     assert set(art[0] + art[15] + ''.join(row[0] + row[15] for row in art)) == {'.'}, f'{name} touches the 16x16 border'
-    png(f'assets/{MOD}/textures/item/{name}.png', 16, 16,
-        [(0, 0, 0, 0) if c == '.' else rgb(palette[c]) for row in art for c in row])
+    rng = random.Random(zlib.crc32(name.encode()))
+    grain = [[rng.uniform(-0.07, 0.07) for _ in range(16)] for _ in range(16)]
+    glow = GLOWS.get(name, '')
+    frames = FRAMES if glow else 1
+    pixels = []
+    for frame in range(frames):
+        for y, row in enumerate(art):
+            for x, c in enumerate(row):
+                if c == '.':
+                    pixels.append((0, 0, 0, 0))
+                elif c in glow:
+                    # Light runs diagonally across the lit parts, and they are not shaded like metal.
+                    wave = math.sin((frame / FRAMES + (x + y) / 14) * math.tau)
+                    pixels.append(scale_rgb(rgb(palette[c]), 0.92 + 0.16 * wave))
+                else:
+                    pixels.append(scale_rgb(rgb(palette[c]), shade_pixel(art, x, y, grain[y][x])))
+    png(f'assets/{MOD}/textures/item/{name}.png', 16, 16 * frames, pixels)
+    if frames > 1:
+        (ROOT / f'assets/{MOD}/textures/item/{name}.png.mcmeta').write_text(
+            json.dumps({'animation': {'frametime': 3}}, indent=2) + '\n', encoding='utf-8', newline='\n')
 
 
 # A bolt of the woven conductor, seen from its rolled end, with a loose thread of superconductor.
@@ -398,6 +491,120 @@ sprite('tidal_edge', [
     '...TT...........',
     '................',
 ], {'I': 0xE7D8B0, 'S': 0x14121C, 'V': 0x24212E, 'E': 0x3A3648, 's': 0xFFE2A0, 'y': 0xFFD28A, 'T': 0x3A3648})
+# A bit drone: a diamond hull, its sensor eye and two stabilisers.
+sprite('bit_drone_module', [
+    '................',
+    '.......II.......',
+    '......IVVI......',
+    '.....IVVVVI.....',
+    '..F.IVVVVVVI.F..',
+    '.FFIVVccccVVIFF.',
+    '..FIVcWWWWcVIF..',
+    '..FIVcWEEWcVIF..',
+    '..FIVcWEEWcVIF..',
+    '..FIVcWWWWcVIF..',
+    '.FFIVVccccVVIFF.',
+    '..F.IVVVVVVI.F..',
+    '.....IVVVVI.....',
+    '......IVVI......',
+    '.......II.......',
+    '................',
+], {'I': 0xE7D8B0, 'V': 0x3A3648, 'F': 0x8D9AA8, 'c': 0x7CE8FF, 'W': 0xF4FBFF, 'E': 0x14121C})
+# A cell with its terminal on top and charge bars showing through the casing.
+sprite('capacitor_module', [
+    '................',
+    '......IIII......',
+    '......IEEI......',
+    '...IIIIIIIIII...',
+    '...IVVVVVVVVI...',
+    '...IVccccccVI...',
+    '...IVVVVVVVVI...',
+    '...IVccccccVI...',
+    '...IVVVVVVVVI...',
+    '...IVccccccVI...',
+    '...IVVVVVVVVI...',
+    '...IVEEEEEEVI...',
+    '...IVVVVVVVVI...',
+    '...IIIIIIIIII...',
+    '................',
+    '................',
+], {'I': 0xC2CDD9, 'V': 0x3A4656, 'E': 0x1E2530, 'c': 0x7CE8FF})
+# A riveted shield-shaped armor plate with a forged boss at its centre.
+sprite('plating_module', [
+    '................',
+    '...IIIIIIIIII...',
+    '..IPPPPPPPPPPI..',
+    '.IPRPPPPPPPPRPI.',
+    '.IPPPPSSSSPPPPI.',
+    '.IPPPSSEESSPPPI.',
+    '.IPPPSEEEESPPPI.',
+    '.IPPPSEEEESPPPI.',
+    '..IPPSSEESSPPI..',
+    '..IPPPSSSSPPPI..',
+    '...IPPPPPPPPI...',
+    '....IPPPPPPI....',
+    '.....IPRRPI.....',
+    '......IPPI......',
+    '.......II.......',
+    '................',
+], {'I': 0xF2E4BC, 'P': 0x7A7065, 'R': 0xC2AE8C, 'S': 0x9C8F7E, 'E': 0x59524A})
+# A bell nozzle with its exhaust leaving through the bottom.
+sprite('thruster_module', [
+    '................',
+    '.....IIIIII.....',
+    '.....IVVVVI.....',
+    '....IIVVVVII....',
+    '....IVVVVVVI....',
+    '...IIVVEEVVII...',
+    '...IVVVEEVVVI...',
+    '..IIVVVVVVVVII..',
+    '..IVVVVVVVVVVI..',
+    '.IIIIIIIIIIIIII.',
+    '....cWWWWWWc....',
+    '.....cWWWWc.....',
+    '......cWWc......',
+    '.......cc.......',
+    '.......c........',
+    '................',
+], {'I': 0xC2CDD9, 'V': 0x3A3648, 'E': 0x14121C, 'c': 0x8CD2FF, 'W': 0xF4FBFF})
+# A sealed coolant cartridge with a frost crystal showing in its window.
+sprite('coolant_module', [
+    '................',
+    '.....SSSSSS.....',
+    '....IIIIIIII....',
+    '...IWWWWWWWWI...',
+    '...IWWcWWcWWI...',
+    '...IWWWccWWWI...',
+    '...IcWcWWcWcI...',
+    '...IWccWWccWI...',
+    '...IWccWWccWI...',
+    '...IcWcWWcWcI...',
+    '...IWWWccWWWI...',
+    '...IWWcWWcWWI...',
+    '...IWWWWWWWWI...',
+    '....IIIIIIII....',
+    '.....SSSSSS.....',
+    '................',
+], {'S': 0x8D9AA8, 'I': 0xC2CDD9, 'W': 0x2E9BC4, 'c': 0xCFF4FF})
+# A pinned chip with a rising waveform across its die.
+sprite('amplifier_module', [
+    '................',
+    '...P.P.P.P.P....',
+    '..IIIIIIIIIIII..',
+    '..IVVVVVVVVVVI..',
+    '.PIVVVVVVVcVVIP.',
+    '..IVVVVVVcVVVI..',
+    '.PIVVVVVcVVVVIP.',
+    '..IVVcVcVVVVVI..',
+    '.PIVcVcVVVVVVIP.',
+    '..IcVVVVVVVVVI..',
+    '.PIVVVVVVVVVVIP.',
+    '..IVVVVVVVVVVI..',
+    '..IIIIIIIIIIII..',
+    '...P.P.P.P.P....',
+    '................',
+    '................',
+], {'I': 0xC2CDD9, 'V': 0x262430, 'P': 0xE7D8B0, 'c': 0x7CE8FF})
 png(f'assets/{MOD}/textures/misc/white.png', 1, 1, [(255, 255, 255, 255)])
 
 

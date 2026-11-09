@@ -5,6 +5,8 @@ import io.github.genichimaruo.singuloarsenal.core.ArsenalDamage;
 import io.github.genichimaruo.singuloarsenal.core.ArsenalData;
 import io.github.genichimaruo.singuloarsenal.core.Fe;
 import io.github.genichimaruo.singuloarsenal.core.Rules;
+import io.github.genichimaruo.singuloarsenal.module.ModuleType;
+import io.github.genichimaruo.singuloarsenal.module.Modules;
 import io.github.genichimaruo.singuloarsenal.net.FxPayload;
 import io.github.genichimaruo.singuloarsenal.weapon.ArsenalWeapon;
 import java.util.ArrayList;
@@ -29,6 +31,8 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.item.ItemStack;
@@ -65,6 +69,7 @@ public final class SuitEvents {
         NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, SuitEvents::fall);
         NeoForge.EVENT_BUS.addListener(SuitEvents::knockback);
         NeoForge.EVENT_BUS.addListener(SuitEvents::equipment);
+        NeoForge.EVENT_BUS.addListener(SuitEvents::moduleAttributes);
     }
 
     // ---- helpers ------------------------------------------------------------------------------------------------
@@ -132,9 +137,44 @@ public final class SuitEvents {
         ItemStack held = player.getMainHandItem();
         if (held.getItem() instanceof ArsenalWeapon) Fe.accrete(player, held);
 
+        fireBits(player);
         shareCurrent(player);
         filterHelmets(player);
         relaxLining(player);
+    }
+
+    /** Each bit shoots once a second at the nearest hostile thing it can see, paid for by the chestpiece. */
+    public static void fireBits(ServerPlayer player) {
+        ItemStack chest = player.getItemBySlot(EquipmentSlot.CHEST);
+        int bits = Modules.count(chest, ModuleType.BIT_DRONE) * Rules.BITS_PER_MODULE;
+        if (bits == 0) return;
+        List<Mob> targets = new ArrayList<>(player.level().getEntitiesOfClass(Mob.class, player.getBoundingBox().inflate(Rules.BIT_RANGE),
+                e -> e instanceof Enemy && ArsenalDamage.canHit(player, e) && player.distanceTo(e) <= Rules.BIT_RANGE && player.hasLineOfSight(e)));
+        if (targets.isEmpty()) return;
+        targets.sort(java.util.Comparator.comparingDouble(player::distanceToSqr));
+        var source = ArsenalDamage.source(player.serverLevel(), ArsenalDamage.BIT, player);
+        for (int bit = 0; bit < bits; bit++) {
+            if (!Fe.spend(chest, Rules.BIT_FE)) return;
+            Mob target = targets.get(bit % targets.size());
+            target.hurt(source, Rules.BIT_DAMAGE);
+            FxPayload.sendEntity(player.serverLevel(), FxPayload.BIT_SHOT, player, target.getBoundingBox().getCenter(), bit);
+        }
+    }
+
+    private static void moduleAttributes(net.neoforged.neoforge.event.ItemAttributeModifierEvent event) {
+        ItemStack stack = event.getItemStack();
+        if (!(stack.getItem() instanceof SuitItem suit) || !stack.has(ArsenalData.MODULES.get())) return;
+        var slot = net.minecraft.world.entity.EquipmentSlotGroup.bySlot(suit.getEquipmentSlot());
+        int plating = Modules.count(stack, ModuleType.PLATING);
+        if (plating > 0) {
+            event.addModifier(Attributes.ARMOR, new AttributeModifier(SinguloArsenal.id("module_armor_" + suit.getType().getName()), plating * Rules.PLATING_ARMOR, AttributeModifier.Operation.ADD_VALUE), slot);
+            event.addModifier(Attributes.ARMOR_TOUGHNESS, new AttributeModifier(SinguloArsenal.id("module_toughness_" + suit.getType().getName()), plating * Rules.PLATING_TOUGHNESS, AttributeModifier.Operation.ADD_VALUE), slot);
+        }
+        int thrusters = Modules.count(stack, ModuleType.THRUSTER);
+        if (thrusters > 0) {
+            event.addModifier(Attributes.JUMP_STRENGTH, new AttributeModifier(SinguloArsenal.id("module_jump"), thrusters * Rules.THRUSTER_JUMP, AttributeModifier.Operation.ADD_VALUE), slot);
+            event.addModifier(Attributes.STEP_HEIGHT, new AttributeModifier(SinguloArsenal.id("module_step"), thrusters * Rules.THRUSTER_STEP, AttributeModifier.Operation.ADD_VALUE), slot);
+        }
     }
 
     /** Meissner: a persistent current flows without loss, so worn pieces settle to one level. */

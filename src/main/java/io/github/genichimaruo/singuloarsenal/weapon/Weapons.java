@@ -5,6 +5,8 @@ import io.github.genichimaruo.singuloarsenal.core.ArsenalData;
 import io.github.genichimaruo.singuloarsenal.core.Fe;
 import io.github.genichimaruo.singuloarsenal.core.Powered;
 import io.github.genichimaruo.singuloarsenal.core.Rules;
+import io.github.genichimaruo.singuloarsenal.module.ModuleType;
+import io.github.genichimaruo.singuloarsenal.module.Modules;
 import java.util.List;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -36,11 +38,17 @@ public final class Weapons {
         for (int i = 1; i <= 3; i++) {
             lines.add(Component.translatable("tooltip.singulo_arsenal." + id + "." + i).withStyle(ChatFormatting.GRAY));
         }
-        lines.add(Component.translatable("tooltip.singulo_arsenal.energy", Fe.stored(stack), capacity).withStyle(ChatFormatting.AQUA));
+        lines.add(Component.translatable("tooltip.singulo_arsenal.energy", Fe.stored(stack), Fe.capacity(stack)).withStyle(ChatFormatting.AQUA));
         if (stack.getItem() instanceof Powered powered && powered.accretes()) {
             lines.add(Component.translatable("tooltip.singulo_arsenal.accretion").withStyle(ChatFormatting.DARK_AQUA));
         }
         lines.add(Component.translatable("tooltip.singulo_arsenal.charge").withStyle(ChatFormatting.DARK_GRAY));
+        Modules.describe(stack, lines);
+    }
+
+    /** A cooldown after this weapon's coolant modules. */
+    public static int cooled(ItemStack stack, int ticks) {
+        return Rules.cooled(ticks, Modules.count(stack, ModuleType.COOLANT));
     }
 
     /** Starts a reload animation. Stored on the stack, because item cooldowns are only ever sent to their owner. */
@@ -81,6 +89,9 @@ public final class Weapons {
 
     private static void incoming(LivingIncomingDamageEvent event) {
         LivingEntity target = event.getEntity();
+        if (event.getSource().getEntity() instanceof Player wielder && wielder.getMainHandItem().getItem() instanceof ArsenalWeapon) {
+            event.setAmount(event.getAmount() * Rules.amplified(Modules.count(wielder.getMainHandItem(), ModuleType.AMPLIFIER)));
+        }
         int stress = stress(target);
         if (stress > 0) event.setAmount(event.getAmount() * Rules.stressMultiplier(stress));
 

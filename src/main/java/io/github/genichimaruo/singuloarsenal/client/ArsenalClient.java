@@ -9,6 +9,7 @@ import io.github.genichimaruo.singuloarsenal.core.ArsenalData;
 import io.github.genichimaruo.singuloarsenal.core.Fe;
 import io.github.genichimaruo.singuloarsenal.core.Powered;
 import io.github.genichimaruo.singuloarsenal.core.Rules;
+import io.github.genichimaruo.singuloarsenal.module.ModuleContent;
 import io.github.genichimaruo.singuloarsenal.net.AbilityPayload;
 import io.github.genichimaruo.singuloarsenal.weapon.CasimirBladeItem;
 import io.github.genichimaruo.singuloarsenal.weapon.JetLanceItem;
@@ -52,6 +53,8 @@ public final class ArsenalClient {
         bus.addListener(ArsenalClient::extensions);
         bus.addListener(ArsenalClient::layers);
         bus.addListener(JetTube::registerShaders);
+        bus.addListener(ArsenalClient::machineRenderers);
+        bus.addListener(ArsenalClient::screens);
         FxClient.register();
         NeoForge.EVENT_BUS.addListener(ArsenalClient::tick);
         NeoForge.EVENT_BUS.addListener(ArsenalClient::hud);
@@ -80,6 +83,15 @@ public final class ArsenalClient {
             }
         };
         event.registerItem(gear, ArsenalItems.powered().toArray(new Item[0]));
+        event.registerItem(gear, ModuleContent.INTEGRATOR_ITEM.get());
+    }
+
+    private static void machineRenderers(EntityRenderersEvent.RegisterRenderers event) {
+        event.registerBlockEntityRenderer(ModuleContent.INTEGRATOR_ENTITY.get(), IntegratorRenderer::new);
+    }
+
+    private static void screens(net.neoforged.neoforge.client.event.RegisterMenuScreensEvent event) {
+        event.register(ModuleContent.INTEGRATOR_MENU.get(), IntegratorScreen::new);
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})

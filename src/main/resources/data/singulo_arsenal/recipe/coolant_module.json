@@ -1,0 +1,31 @@
+{
+  "type": "singulo:machine",
+  "station": "precision_assembler",
+  "stage": 3,
+  "time": 200,
+  "energy": 400,
+  "ingredients": [
+    {
+      "ingredient": {
+        "item": "singulo:coolant_cartridge"
+      },
+      "count": 2
+    },
+    {
+      "ingredient": {
+        "item": "singulo:heat_exchange_core"
+      },
+      "count": 1
+    },
+    {
+      "ingredient": {
+        "item": "singulo:superconducting_wire"
+      },
+      "count": 2
+    }
+  ],
+  "result": {
+    "id": "singulo_arsenal:coolant_module",
+    "count": 1
+  }
+}
