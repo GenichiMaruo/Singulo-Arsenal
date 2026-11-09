@@ -106,6 +106,7 @@ final class FxClient {
         ACTIVE.clear();
         STRETCHES.clear();
         MUZZLES.clear();
+        FORMATIONS.clear();
         scene = next;
     }
 
@@ -115,6 +116,7 @@ final class FxClient {
         if (mc.level == null) return;
         long now = mc.level.getGameTime();
         ACTIVE.removeIf(fx -> now - fx.born > lifetime(fx.data.kind()));
+        tickFormations(mc.level);
         STRETCHES.values().removeIf(s -> s.heldUntil + Rules.STRETCH_RELAX_TICKS < now && now - s.shearBorn > Rules.STRETCH_RELAX_TICKS);
     }
 
@@ -163,7 +165,7 @@ final class FxClient {
         return TidalReaverItem.focusProgress(player.getMainHandItem(), player.level().getGameTime(), partial);
     }
 
-    /** A small bend of the view round the hole sealed inside a held weapon. The pose and point are the art's own, in model pixels. */
+    /** A small bend of the view round the hole sealed inside a weapon someone else is holding. The pose and point are the art's own, in model pixels. */
     static void heldHole(PoseStack pose, ItemDisplayContext context, float x, float y, float z, float pixels) {
         if (context.firstPerson() || !inLevel) return;
         Vector3f at = pose.last().pose().transformPosition(x, y, z, new Vector3f());
@@ -409,15 +411,54 @@ final class FxClient {
         return Modules.count(player.getItemBySlot(EquipmentSlot.CHEST), ModuleType.BIT_DRONE) * Rules.BITS_PER_MODULE;
     }
 
-    /** Bits hold station in two rows behind the wearer's shoulders, out of their own view. Purely a function of the body's pose, so every client agrees. */
+    /** Where a player's bits are: each eases toward its place in the fan, and the fan turns a little behind the body. Client-side only. */
+    private static final class Formation {
+        float yaw;
+        final Vec3[] now, before;
+
+        Formation(int count, float yaw) {
+            this.yaw = yaw;
+            now = new Vec3[count];
+            before = new Vec3[count];
+        }
+    }
+
+    private static final Map<Integer, Formation> FORMATIONS = new HashMap<>();
+
+    /** A bit's place: a fan behind and above the wearer, the middle highest, each drifting on its own slow cycle, as a Singulo android's bits do. */
+    private static Vec3 bitGoal(Player player, int index, int count, float yaw, float age) {
+        double spread = count <= 1 ? 0 : (index - (count - 1) / 2.0) * (Rules.BIT_FAN_DEGREES / (count - 1));
+        double angle = Math.toRadians(yaw + 180 + spread);
+        double radius = 1.15 + 0.15 * Math.sin(age * 0.07 + index);
+        double height = player.getEyeHeight() + 0.13 + 0.3 * Math.cos(Math.toRadians(spread) * 1.4) + 0.12 * Math.sin(age * 0.11 + index * 1.7);
+        return new Vec3(-Math.sin(angle) * radius, height, Math.cos(angle) * radius);
+    }
+
+    private static void tickFormations(ClientLevel level) {
+        FORMATIONS.keySet().removeIf(id -> !(level.getEntity(id) instanceof Player player) || bitCount(player) == 0);
+        for (Player player : level.players()) {
+            int count = bitCount(player);
+            if (count == 0) continue;
+            Formation formation = FORMATIONS.get(player.getId());
+            if (formation == null || formation.now.length != count) {
+                formation = new Formation(count, player.yBodyRot);
+                FORMATIONS.put(player.getId(), formation);
+            }
+            formation.yaw = net.minecraft.util.Mth.rotLerp(0.14F, formation.yaw, player.yBodyRot);
+            for (int i = 0; i < count; i++) {
+                Vec3 goal = player.position().add(bitGoal(player, i, count, formation.yaw, player.tickCount));
+                // Far from its place means a teleport: arrive there, rather than streak across the world.
+                if (formation.now[i] == null || formation.now[i].distanceToSqr(player.position()) > 64) formation.now[i] = goal;
+                formation.before[i] = formation.now[i];
+                formation.now[i] = formation.now[i].lerp(goal, 0.24);
+            }
+        }
+    }
+
     private static Vec3 bitPosition(Player player, int index, int count, float partial) {
-        double yaw = Math.toRadians(player.getPreciseBodyRotation(partial));
-        Vec3 back = new Vec3(Math.sin(yaw), 0, -Math.cos(yaw)), side = new Vec3(Math.cos(yaw), 0, Math.sin(yaw));
-        int columns = (count + 1) / 2, column = index / 2, row = index % 2;
-        double across = (column - (columns - 1) / 2.0) * 0.46;
-        double t = (player.level().getGameTime() + partial) * 0.09 + index * 1.7;
-        double height = player.getEyeHeight() - 0.02 + (row == 0 ? 0.2 : -0.22) + 0.05 * Math.sin(t);
-        return player.getPosition(partial).add(back.scale(0.9 + 0.1 * Math.abs(across) + 0.03 * Math.cos(t))).add(side.scale(across)).add(0, height, 0);
+        Formation formation = FORMATIONS.get(player.getId());
+        if (formation != null && index < formation.now.length && formation.now[index] != null) return formation.before[index].lerp(formation.now[index], partial);
+        return player.getPosition(partial).add(bitGoal(player, index, count, player.getPreciseBodyRotation(partial), player.tickCount + partial));
     }
 
     private static void drawBits(PoseStack pose, MultiBufferSource.BufferSource buffers, Minecraft mc, float partial) {
@@ -425,13 +466,18 @@ final class FxClient {
         float t = mc.level.getGameTime() + partial;
         for (Player player : mc.level.players()) {
             int count = bitCount(player);
-            if (count == 0 || player.isInvisible()) continue;
+            // A wearer's own bits stay out of their view altogether: a fast turn would otherwise swing the fan across it.
+            if (count == 0 || player.isInvisible() || firstPerson(player)) continue;
+            Formation formation = FORMATIONS.get(player.getId());
+            float yaw = formation != null ? formation.yaw : player.getPreciseBodyRotation(partial);
             any = true;
             for (int i = 0; i < count; i++) {
                 Vec3 at = bitPosition(player, i, count, partial);
                 pose.pushPose();
                 pose.translate(at.x, at.y, at.z);
-                pose.mulPose(com.mojang.math.Axis.YP.rotationDegrees(180 - player.getPreciseBodyRotation(partial)));
+                // Nose along the wearer's facing, raised a little. The hull's front is -Z.
+                pose.mulPose(com.mojang.math.Axis.YP.rotationDegrees(180 - yaw));
+                pose.mulPose(com.mojang.math.Axis.XP.rotationDegrees(25));
                 pose.scale(1F / 16, 1F / 16, 1F / 16);
                 int light = net.minecraft.client.renderer.LevelRenderer.getLightColor(mc.level, net.minecraft.core.BlockPos.containing(at));
                 Canvas.drawFine(pose, buffers, t, light, Canvas.noOverlay(), true, c -> MachineArt.bit(c, false));
@@ -449,7 +495,6 @@ final class FxClient {
             float use = focusOf(player, partial);
             if (use < 0) continue;
             Vec3 focus = TidalReaverItem.focus(player, partial);
-            float use = Math.min(1, (player.getTicksUsingItem() + partial) / Rules.REAVER_MAX_HOLD);
             pose.pushPose();
             pose.translate(focus.x, focus.y, focus.z);
             float scale = 1F / 16;

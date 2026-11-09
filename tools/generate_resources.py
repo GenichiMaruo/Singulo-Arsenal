@@ -292,8 +292,8 @@ weapon_text = {
                      ['攻撃22／攻撃速度1.0。命中で潮汐応力（最大5、被ダメージ+8%／層）。', '右クリック長押しで周囲の敵を引き寄せる（300k FE/秒）。', '離すと応力に応じて16〜66ダメージ。'],
                      ['22 damage, 1.0 speed. Hits add tidal stress (up to 5, +8% damage taken each).', 'Hold use to drag enemies in (300k FE/s).', 'Release for 16-66 damage by stress.']),
     'jet_lance': ('降着ジェット砲', 'Accretion Jet Cannon', '左クリックでジェットを発射', 'Left click fires the jet',
-                  ['チャージ1.4秒の後に発射し2秒照射。前方80ブロックを貫通、56 DPS（防具の6割を無視）。', '4発ごとにリロード（8秒）。1発 1M FE。', '右クリック：地形保護／地形破壊。破壊モードは発射の瞬間に奥まで貫く。'],
-                  ['Charges 1.4s, then burns 2s, piercing 80 blocks. 56 DPS, ignoring 60% of armor.', 'Reloads every 4 shots (8s). 1M FE per shot.', 'Right click: terrain protection or destruction. Destruction drills through at the moment of firing.']),
+                  ['チャージ1.4秒の後に発射し2秒照射。前方80ブロックを貫通、56 DPS（防具の6割を無視）。', '4発ごとにリロード（8秒）。1発 1M FE。', '右クリック：地形保護／地形破壊。破壊モードは発射の瞬間に20ブロック貫く。'],
+                  ['Charges 1.4s, then burns 2s, piercing 80 blocks. 56 DPS, ignoring 60% of armor.', 'Reloads every 4 shots (8s). 1M FE per shot.', 'Right click: terrain protection or destruction. Destruction drills 20 blocks at the moment of firing.']),
 }
 for name, (j, e, sj, se, tj, te) in weapon_text.items():
     ja[f'item.{MOD}.{name}'], en[f'item.{MOD}.{name}'] = j, e
@@ -307,7 +307,7 @@ for name, j, e in [('flux_weave', '磁束織布', 'Flux Weave'), ('pressure_latt
     ja[f'item.{MOD}.{name}'], en[f'item.{MOD}.{name}'] = j, e
 
 for name, j, e, tj, te, dj, de in [
-    ('bit_drone_module', 'ビットドローン・モジュール', 'Bit Drone Module', '胴用：ビット2機が敵を自動射撃', 'Chest: two bits shoot enemies', '背後に滞空し、毎秒5ダメージ（1.5k FE／発）。', 'Hold station behind you. 5 damage per second (1.5k FE per shot).'),
+    ('bit_drone_module', 'ビットドローン・モジュール', 'Bit Drone Module', '胴用：ビット2機が敵を自動射撃', 'Chest: two bits shoot enemies', '背後に扇状に浮かび、毎秒5ダメージ（1.5k FE／発）。', 'Float in a fan behind you. 5 damage per second (1.5k FE per shot).'),
     ('capacitor_module', '拡張コンデンサ', 'Capacitor Module', '全装備：電力容量 +50%', 'Any gear: +50% energy capacity', '重複可。', 'Stacks.'),
     ('plating_module', '追加装甲板', 'Plating Module', '防具：防御力 +2、防具強度 +1', 'Armor: +2 armor, +1 toughness', '重複可。', 'Stacks.'),
     ('thruster_module', '慣性スラスター', 'Inertial Thruster', '靴：ジャンプと段差を強化', 'Boots: higher jumps and steps', '重複可。', 'Stacks.'),
@@ -544,25 +544,25 @@ sprite('tidal_edge', [
     '...TT...........',
     '................',
 ], {'I': 0xE7D8B0, 'S': 0x14121C, 'V': 0x24212E, 'E': 0x3A3648, 's': 0xFFE2A0, 'y': 0xFFD28A, 'T': 0x3A3648})
-# A bit drone: a diamond hull, its sensor eye and two stabilisers.
+# A bit drone from above, nose to the right: stepped hull with its lit core, swept wings, and the exhaust at the tail.
 sprite('bit_drone_module', [
     '................',
-    '.......II.......',
-    '......IVVI......',
-    '.....IVVVVI.....',
-    '..F.IVVVVVVI.F..',
-    '.FFIVVccccVVIFF.',
-    '..FIVcWWWWcVIF..',
-    '..FIVcWEEWcVIF..',
-    '..FIVcWEEWcVIF..',
-    '..FIVcWWWWcVIF..',
-    '.FFIVVccccVVIFF.',
-    '..F.IVVVVVVI.F..',
-    '.....IVVVVI.....',
-    '......IVVI......',
-    '.......II.......',
     '................',
-], {'I': 0xE7D8B0, 'V': 0x3A3648, 'F': 0x8D9AA8, 'c': 0x7CE8FF, 'W': 0xF4FBFF, 'E': 0x14121C})
+    '...FF...........',
+    '....FFF.........',
+    '.....FFFF.......',
+    '...IIIIIIIII....',
+    '.ccEVVccccVVI...',
+    '.cWEVVcWWcVVVTT.',
+    '.ccEVVccccVVI...',
+    '...IIIIIIIII....',
+    '.....FFFF.......',
+    '....FFF.........',
+    '...FF...........',
+    '................',
+    '................',
+    '................',
+], {'T': 0xE7D8B0, 'I': 0x8A84A0, 'V': 0x3A3648, 'F': 0x8D9AA8, 'E': 0x14121C, 'c': 0x7CE8FF, 'W': 0xF4FBFF})
 # A cell with its terminal on top and charge bars showing through the casing.
 sprite('capacitor_module', [
     '................',

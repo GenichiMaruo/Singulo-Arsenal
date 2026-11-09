@@ -257,6 +257,8 @@ public final class Rules {
     public static final float COOLANT_FACTOR = 0.75F;
     public static final float AMPLIFIER_BONUS = 0.15F;
     public static final int BITS_PER_MODULE = 2;
+    /** Width of the fan of bits behind the wearer. */
+    public static final double BIT_FAN_DEGREES = 110;
     public static final double BIT_RANGE = 16;
     public static final float BIT_DAMAGE = 5;
     public static final int BIT_FE = 1_500;
