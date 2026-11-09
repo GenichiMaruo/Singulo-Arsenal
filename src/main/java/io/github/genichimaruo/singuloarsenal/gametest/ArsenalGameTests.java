@@ -244,6 +244,8 @@ public final class ArsenalGameTests {
         near(h, (float) p.getAttributeValue(Attributes.MOVEMENT_SPEED), (float) base, "spaghetti leaves speed alone");
         h.assertTrue(p.getAttributeValue(Attributes.KNOCKBACK_RESISTANCE) >= Rules.SPAGHETTI_KNOCKBACK, "spaghetti knockback");
         chest.set(ArsenalData.LOAD.get(), 90);
+        // Not a full set, so the suit's energy shield stays out of this measurement.
+        p.setItemSlot(EquipmentSlot.HEAD, ItemStack.EMPTY);
         SuitEvents.applyAttributes(p);
         near(h, (float) p.getAttributeValue(Attributes.MOVEMENT_SPEED), (float) (base * (1 + Rules.LASAGNA_SPEED)), "lasagna slows");
         magicHit(p, 10);
@@ -260,10 +262,12 @@ public final class ArsenalGameTests {
         dress(p, ArmorSet.COLLAPSAR);
         ItemStack chest = p.getItemBySlot(EquipmentSlot.CHEST);
         Zombie nearby = target(h, 4.5, 2.5);
+        // Only the horizon's reserve left, which the energy shield must not touch.
+        for (EquipmentSlot slot : ARMOR_SLOTS) Fe.set(p.getItemBySlot(slot), slot == EquipmentSlot.CHEST ? Rules.HORIZON_FE : 0);
         magicHit(p, 100);
         h.assertTrue(p.isAlive(), "lethal hit was not caught");
         near(h, p.getHealth(), 20 * Rules.HORIZON_HEALTH_FRACTION, "health after horizon");
-        h.assertTrue(Fe.stored(chest) == Rules.COLLAPSAR_CAPACITY - Rules.HORIZON_FE, "horizon cost");
+        h.assertTrue(Fe.stored(chest) == 0, "horizon cost");
         h.assertTrue(nearby.getHealth() < 100, "horizon wave missed");
         // During the horizon window nothing lands.
         float during = p.getHealth();
@@ -273,6 +277,43 @@ public final class ArsenalGameTests {
         chest.set(ArsenalData.HORIZON_UNTIL.get(), 0L);
         magicHit(p, 100);
         h.assertTrue(p.isDeadOrDying(), "horizon ignored its cooldown");
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void collapsarSuitPaysForDamageInEnergy(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 2.5);
+        dress(p, ArmorSet.COLLAPSAR);
+        ItemStack head = p.getItemBySlot(EquipmentSlot.HEAD);
+        magicHit(p, 10);
+        near(h, p.getHealth(), 20, "the suit should have paid for the hit");
+        h.assertTrue(Fe.stored(head) == Rules.COLLAPSAR_CAPACITY - 10 * Rules.SHIELD_FE_PER_HP, "the shield's price: " + Fe.stored(head));
+        h.assertTrue(ArsenalData.get(p.getItemBySlot(EquipmentSlot.CHEST), ArsenalData.LOAD) > 0, "a paid hit still strains the lining");
+        // Bare of energy, with the horizon spent, the hit lands.
+        for (EquipmentSlot slot : ARMOR_SLOTS) Fe.set(p.getItemBySlot(slot), 0);
+        magicHit(p, 5);
+        near(h, p.getHealth(), 15, "an empty suit must not shield");
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void metricDriveFliesOnEnergyAlone(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 2.5);
+        var flight = p.getAttribute(net.neoforged.neoforge.common.NeoForgeMod.CREATIVE_FLIGHT);
+        ItemStack chest = charged(ArmorSet.MEISSNER, ArmorItem.Type.CHESTPLATE);
+        Modules.install(chest, List.of(module(ModuleType.METRIC_DRIVE)));
+        Fe.set(chest, Rules.METRIC_FE_PER_10_TICKS * 2);
+        p.setItemSlot(EquipmentSlot.CHEST, chest);
+        p.tickCount = 10;
+        SuitEvents.metricDrive(p);
+        h.assertTrue(flight.getValue() > 0, "no flight from the module");
+        h.assertTrue(Fe.stored(chest) == Rules.METRIC_FE_PER_10_TICKS * 2, "paid while not in the air");
+        p.getAbilities().flying = true;
+        SuitEvents.metricDrive(p);
+        h.assertTrue(Fe.stored(chest) == Rules.METRIC_FE_PER_10_TICKS, "flight is not free");
+        Fe.set(chest, 0);
+        SuitEvents.metricDrive(p);
+        h.assertTrue(flight.getValue() == 0, "flying with an empty tank");
         h.succeed();
     }
 
@@ -419,6 +460,104 @@ public final class ArsenalGameTests {
         hold(p, new ItemStack(ArsenalItems.JET_LANCE.get()));
         JetLanceItem.pulse(p, h.getLevel());
         h.assertTrue(p.getHealth() == p.getMaxHealth(), "self-damage");
+        h.succeed();
+    }
+
+    /** Skips the spool-up: the shot goes off on this call. */
+    private static void ignite(GameTestHelper h, ServerPlayer p, ItemStack cannon) {
+        h.assertTrue(JetLanceItem.tryFire(p), "the shot was refused");
+        cannon.set(ArsenalData.CHARGE_UNTIL.get(), h.getLevel().getGameTime());
+        JetLanceItem.tickShot(cannon, p, h.getLevel());
+    }
+
+    /** Runs one whole shot on a level whose clock the test does not control. */
+    private static void completeShot(GameTestHelper h, ServerPlayer p, ItemStack cannon) {
+        cannon.set(ArsenalData.JET_UNTIL.get(), h.getLevel().getGameTime() - Rules.LANCE_SHOT_GAP);
+        ignite(h, p, cannon);
+        cannon.set(ArsenalData.JET_UNTIL.get(), h.getLevel().getGameTime() + 1);
+        JetLanceItem.tickShot(cannon, p, h.getLevel());
+    }
+
+    @GameTest(template = ARENA)
+    public static void cannonFiresAMagazineThenReloads(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 2.5);
+        ItemStack cannon = hold(p, new ItemStack(ArsenalItems.JET_LANCE.get()));
+        h.assertTrue(JetLanceItem.tryFire(p), "first shot");
+        h.assertTrue(JetLanceItem.jetAge(cannon, h.getLevel().getGameTime(), 0) < 0, "the jet must wait for the spool-up");
+        h.assertTrue(JetLanceItem.chargeProgress(cannon, h.getLevel().getGameTime(), 0) == 0, "the spool-up must start");
+        h.assertTrue(!JetLanceItem.tryFire(p), "started a second charge over the first");
+        h.assertTrue(Fe.stored(cannon) == Rules.LANCE_CAPACITY, "paid before the shot went off");
+        cannon.set(ArsenalData.CHARGE_UNTIL.get(), h.getLevel().getGameTime());
+        JetLanceItem.tickShot(cannon, p, h.getLevel());
+        h.assertTrue(JetLanceItem.jetAge(cannon, h.getLevel().getGameTime(), 0) == 0, "the jet must be lit at the end of the spool-up");
+        h.assertTrue(Fe.stored(cannon) == Rules.LANCE_CAPACITY - Rules.LANCE_SHOT_FE, "shot cost");
+        cannon.remove(ArsenalData.SHOTS.get());
+        for (int i = 0; i < Rules.LANCE_MAGAZINE; i++) {
+            h.assertTrue(JetLanceItem.shotsLeft(cannon) == Rules.LANCE_MAGAZINE - i, "magazine count");
+            completeShot(h, p, cannon);
+        }
+        h.assertTrue(Weapons.reloadProgress(cannon, h.getLevel().getGameTime(), 0) >= 0, "an empty magazine must reload");
+        h.assertTrue(JetLanceItem.shotsLeft(cannon) == Rules.LANCE_MAGAZINE, "the magazine was not refilled");
+        cannon.set(ArsenalData.JET_UNTIL.get(), 0L);
+        h.assertTrue(!JetLanceItem.tryFire(p), "fired during the reload");
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void onlyTheFirstInstantOfAShotDrillsTerrain(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 0.5);
+        ItemStack cannon = hold(p, new ItemStack(ArsenalItems.JET_LANCE.get()));
+        var near = new net.minecraft.core.BlockPos(2, 2, 2);
+        var far = new net.minecraft.core.BlockPos(2, 2, 4);
+        var chest = new net.minecraft.core.BlockPos(3, 2, 3);
+        p.setYRot(0);
+        p.setXRot(0);
+        h.setBlock(near, Blocks.STONE);
+        h.setBlock(far, Blocks.OAK_PLANKS);
+        h.setBlock(chest, Blocks.CHEST);
+        ignite(h, p, cannon);
+        h.assertBlockPresent(Blocks.STONE, near);
+        cannon.remove(ArsenalData.JET_UNTIL.get());
+        cannon.set(ArsenalData.TERRAIN_MODE.get(), 1);
+        ignite(h, p, cannon);
+        h.assertBlockPresent(Blocks.AIR, near);
+        h.assertBlockPresent(Blocks.AIR, far);
+        h.assertBlockPresent(Blocks.CHEST, chest);
+        h.setBlock(near, Blocks.STONE);
+        JetLanceItem.pulse(p, h.getLevel());
+        h.assertBlockPresent(Blocks.STONE, near);
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void meltdownGoesOffTheInstantTheShotLands(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 1.5);
+        ItemStack cannon = hold(p, new ItemStack(ArsenalItems.JET_LANCE.get()));
+        Modules.install(cannon, List.of(module(ModuleType.MELTDOWN)));
+        Fe.set(cannon, Rules.LANCE_CAPACITY);
+        p.setYRot(0);
+        p.setXRot(0);
+        h.setBlock(2, 2, 4, Blocks.STONE);
+        Zombie aside = target(h, 4.5, 4.5);
+        ignite(h, p, cannon);
+        h.assertTrue(aside.getHealth() < 100, "the blast must land with the shot");
+        h.assertBlockPresent(Blocks.STONE, new net.minecraft.core.BlockPos(2, 2, 4));
+        h.assertTrue(p.getHealth() == p.getMaxHealth(), "the blast hurt its owner");
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void platingMergesIntoTheArmorValue(GameTestHelper h) {
+        ItemStack chest = charged(ArmorSet.COLLAPSAR, ArmorItem.Type.CHESTPLATE);
+        Modules.install(chest, List.of(module(ModuleType.PLATING), module(ModuleType.PLATING)));
+        int armorLines = 0, toughnessLines = 0;
+        double armor = 0, toughness = 0;
+        for (var entry : chest.getAttributeModifiers().modifiers()) {
+            if (entry.attribute().equals(Attributes.ARMOR)) { armorLines++; armor += entry.modifier().amount(); }
+            if (entry.attribute().equals(Attributes.ARMOR_TOUGHNESS)) { toughnessLines++; toughness += entry.modifier().amount(); }
+        }
+        h.assertTrue(armorLines == 1 && toughnessLines == 1, "armor shown on several lines: " + armorLines + ", " + toughnessLines);
+        h.assertTrue(armor == 10 + 2 * Rules.PLATING_ARMOR && toughness == ArmorSet.COLLAPSAR.toughness + 2 * Rules.PLATING_TOUGHNESS, "merged totals: " + armor + ", " + toughness);
         h.succeed();
     }
 
@@ -591,7 +730,7 @@ public final class ArsenalGameTests {
             h.assertTrue(recipes.byKey(id).isPresent(), "recipe failed to load: " + id);
             found++;
         }
-        h.assertTrue(found == 28, "unexpected item count " + found);
+        h.assertTrue(found == 30, "unexpected item count " + found);
         var lamina = recipes.byKey(SinguloArsenal.id("collapsar_lamina")).orElseThrow().value();
         h.assertTrue(BuiltInRegistries.RECIPE_SERIALIZER.getKey(lamina.getSerializer()).toString().equals("singulo:machine"), "lamina must be a Singulo machine recipe");
         h.succeed();
