@@ -14,7 +14,7 @@ SETS = ['meissner', 'degeneracy', 'collapsar']
 PARTS = ['helmet', 'chestplate', 'leggings', 'boots']
 WEAPONS = ['quench_saber', 'casimir_blade', 'tidal_reaver', 'jet_lance']
 MATERIALS = ['flux_weave', 'pressure_lattice', 'collapsar_lamina', 'jet_collimator', 'tidal_edge']
-MODULES = ['bit_drone_module', 'capacitor_module', 'plating_module', 'thruster_module', 'coolant_module', 'amplifier_module']
+MODULES = ['bit_drone_module', 'capacitor_module', 'plating_module', 'thruster_module', 'coolant_module', 'amplifier_module', 'metric_drive_module', 'meltdown_module']
 DAMAGE = ['quench', 'collapse', 'jet', 'shear', 'horizon', 'bit']
 MATERIAL_SIZE = 32
 FINE_SIZE = 64
@@ -148,6 +148,9 @@ machine('plating_module', ASSEMBLER, 3, 200, 400, [(s('steel_plate'), 4), (s('wh
 machine('thruster_module', ASSEMBLER, 3, 200, 400, [(s('precision_actuator'), 1), (s('superconducting_coil'), 2), (s('muon_bundle'), 2), (s('steel_plate'), 2)], s('muon_bundle'))
 machine('coolant_module', ASSEMBLER, 3, 200, 400, [(s('coolant_cartridge'), 2), (s('heat_exchange_core'), 1), (s('superconducting_wire'), 2)], s('coolant_cartridge'))
 machine('amplifier_module', ASSEMBLER, 3, 200, 400, [(s('quantum_computing_module'), 1), (s('entangled_element'), 2), (s('optical_lattice_substrate'), 1)], s('quantum_computing_module'))
+# The base mod's drive, reworked to draw on the suit's tank instead of exotic matter.
+machine('metric_drive_module', ASSEMBLER, 5, 400, 200_000, [(s('metric_drive'), 1), (s('gravity_field_stabilizer'), 2), (s('superconducting_coil'), 4), (s('quantum_computing_module'), 1)], s('metric_drive'))
+machine('meltdown_module', ASSEMBLER, 5, 400, 200_000, [(s('jet_condensate'), 4), (s('heat_exchange_core'), 2), (s('entangled_element'), 2), (s('confinement_ring'), 1)], s('jet_condensate'))
 write(f'data/{MOD}/loot_table/blocks/module_integrator.json', {
     'type': 'minecraft:block',
     'pools': [{'rolls': 1, 'entries': [{'type': 'minecraft:item', 'name': own('module_integrator')}], 'conditions': [{'condition': 'minecraft:survives_explosion'}]}],
@@ -191,7 +194,7 @@ LANCE_DISPLAY = {
     'thirdperson_lefthand': {'rotation': [-90, 0, 0], 'translation': [0, 2.1, 0], 'scale': [0.62, 0.62, 0.62]},
 }
 ARMOR_DISPLAY = {
-    'gui': {'rotation': [24, 216, 0], 'scale': [0.72, 0.72, 0.72]},
+    'gui': {'rotation': [20, 28, 0], 'scale': [0.9, 0.9, 0.9]},
     'ground': {'translation': [0, 3, 0], 'scale': [0.5, 0.5, 0.5]},
     'fixed': {'rotation': [0, 180, 0], 'scale': [1, 1, 1]},
     'firstperson_righthand': {'rotation': [0, 150, 0], 'translation': [1.5, 3, 0], 'scale': [0.38, 0.38, 0.38]},
@@ -200,15 +203,43 @@ ARMOR_DISPLAY = {
     'thirdperson_lefthand': {'rotation': [75, 225, 0], 'translation': [0, 2.5, 0], 'scale': [0.34, 0.34, 0.34]},
 }
 # The reaver is far broader than a vanilla sword: same angle and position, drawn a little smaller so it does not fill the first-person view.
+# Measured against a slot in the real client: each icon fills 14 of its 16 pixels and is centred. (x, y, scale)
+GUI_FIT = {
+    'quench_saber': (-0.72, -0.85, 0.913),
+    'casimir_blade': (-0.72, -0.91, 0.808),
+    'tidal_reaver': (-1.10, -0.90, 0.667),
+    'jet_lance': (-3.19, 0.45, 0.443),
+    'meissner_helmet': (-0.00, -1.01, 0.880),
+    'meissner_chestplate': (-0.00, 0.89, 0.754),
+    'meissner_leggings': (-0.00, -1.18, 1.225),
+    'meissner_boots': (-0.20, 1.00, 1.080),
+    'degeneracy_helmet': (-0.00, 0.28, 1.050),
+    'degeneracy_chestplate': (-0.00, -0.00, 0.798),
+    'degeneracy_leggings': (-0.23, -1.15, 1.235),
+    'degeneracy_boots': (-0.20, 0.20, 1.080),
+    'collapsar_helmet': (-0.00, -0.89, 0.906),
+    'collapsar_chestplate': (-0.00, 0.84, 0.859),
+    'collapsar_leggings': (-0.23, -1.15, 1.235),
+    'collapsar_boots': (-0.20, 0.20, 1.080),
+}
+
+
+def fitted(name, display):
+    if name not in GUI_FIT:
+        return display
+    x, y, scale = GUI_FIT[name]
+    return {**display, 'gui': {**display['gui'], 'translation': [x, y, 0], 'scale': [scale, scale, scale]}}
+
+
 REAVER_DISPLAY = {**SWORD_DISPLAY,
                   'firstperson_righthand': {**SWORD_DISPLAY['firstperson_righthand'], 'scale': [0.54, 0.54, 0.54]},
                   'firstperson_lefthand': {**SWORD_DISPLAY['firstperson_lefthand'], 'scale': [0.54, 0.54, 0.54]}}
 DISPLAYS = {'jet_lance': LANCE_DISPLAY, 'tidal_reaver': REAVER_DISPLAY}
 for name in WEAPONS:
-    write(f'assets/{MOD}/models/item/{name}.json', {**BUILTIN, 'display': DISPLAYS.get(name, SWORD_DISPLAY)})
+    write(f'assets/{MOD}/models/item/{name}.json', {**BUILTIN, 'display': fitted(name, DISPLAYS.get(name, SWORD_DISPLAY))})
 for t in SETS:
     for part in PARTS:
-        write(f'assets/{MOD}/models/item/{t}_{part}.json', {**BUILTIN, 'display': ARMOR_DISPLAY})
+        write(f'assets/{MOD}/models/item/{t}_{part}.json', {**BUILTIN, 'display': fitted(f'{t}_{part}', ARMOR_DISPLAY)})
 write(f'assets/{MOD}/models/item/module_integrator.json', {**BUILTIN, 'display': {
     'gui': {'rotation': [28, 225, 0], 'scale': [0.56, 0.56, 0.56]},
     'ground': {'translation': [0, 3, 0], 'scale': [0.25, 0.25, 0.25]},
@@ -232,38 +263,41 @@ names = {
     'collapsar': (['コラプサー観測冠', 'コラプサー炉心甲', 'コラプサー潮汐脚甲', 'コラプサー噴流靴'],
                   ['Collapsar Corona', 'Collapsar Corecase', 'Collapsar Tidal Greaves', 'Collapsar Jet Boots']),
 }
+# Each piece: (summary shown by default, detail shown under Shift).
 tips = {
     'meissner': (
-        ['SQUID磁力計：敵対的なものの位置を壁越しに表示する。', '飛び道具を磁場排除で弾き返す（1,500 FE／発）。', '永久電流：着用中の各部位の電力を均等化する。歩行速度+7%。', '空中でスニーク：磁束ピン止めでゆっくり降下する（30 FE/t）。'],
-        ['SQUID magnetometer: marks hostile creatures through walls.', 'Expels projectiles with the Meissner effect (1,500 FE each).', 'Persistent current: worn pieces share FE evenly. +7% walking speed.', 'Sneak in midair: flux pinning lowers you slowly (30 FE/t).']),
+        [('敵を壁越しに表示', 'SQUID磁力計：24ブロック内の敵対的なものが見える。'), ('飛び道具を反射', '磁場排除で弾き返す（1.5k FE／発）。'), ('各部位の電力を均等化', '永久電流。歩行速度 +7%。'), ('空中スニークで緩降下', '磁束ピン止め（30 FE/t）。')],
+        [('Marks enemies through walls', 'SQUID magnetometer, 24 blocks.'), ('Reflects projectiles', 'Meissner expulsion (1.5k FE each).'), ('Shares FE between pieces', 'Persistent current. +7% walking speed.'), ('Sneak midair to descend slowly', 'Flux pinning (30 FE/t).')]),
     'degeneracy': (
-        ['毒とウィザーを濾過する（2,000 FE）。', 'チャンドラセカール限界：一撃の被ダメージ8を超える分を圧力に変換する。圧力60で崩壊して衝撃波を放ち、30秒間停止する。能力キーで手動で放出できる（圧力15以上）。', '接地中にスニークすると踏ん張る：被ダメージ-30%、ノックバック無効。', '4ブロック以上の落下を衝撃波に変える（500 FE／ブロック）。'],
-        ['Filters poison and wither (2,000 FE).', 'Chandrasekhar limit: damage over 8 per hit becomes pressure. At 60 it collapses in a shockwave and locks for 30s. The ability key vents it early (15+ pressure).', 'Sneak on the ground to brace: -30% damage, no knockback.', 'Turns falls of 4+ blocks into a shockwave (500 FE per block).']),
+        [('毒とウィザーを濾過', '2k FE。'), ('強打を圧力に変換', '1撃8を超える分が圧力になる。60で崩壊して衝撃波、30秒停止。Vで放出（15以上）。'), ('スニークで踏ん張る', '被ダメージ -30%、ノックバック無効。'), ('落下を衝撃波に変換', '4ブロック以上（500 FE／ブロック）。')],
+        [('Filters poison and wither', '2k FE.'), ('Turns heavy hits into pressure', 'Damage over 8 becomes pressure. At 60 it collapses in a shockwave and locks for 30s. V vents it (15+).'), ('Sneak to brace', '-30% damage, no knockback.'), ('Turns falls into a shockwave', '4+ blocks (500 FE per block).')]),
     'collapsar': (
-        ['無毛定理：有害な効果を消し去る（10,000 FE）。', '核パスタの裏地：受けた衝撃で ニョッキ（速度+15%）→ スパゲッティ（間合い+1、ノックバック軽減）→ ラザニア（被ダメージ-30%、速度-10%）と相転移する。脚甲が必要。能力キー：ジェット噴射（靴が必要）。', '胴の核パスタ相転移を駆動する。', '落下ダメージ無効。胴とそろえるとジェット噴射が使える。'],
-        ['No-hair theorem: erases harmful effects (10,000 FE).', 'Nuclear-pasta lining: damage drives it through gnocchi (+15% speed), spaghetti (+1 reach, knockback resistance), lasagna (-30% damage, -10% speed). Needs the greaves. Ability key: Jet Burst (needs the boots).', 'Drives the corecase\'s pasta phase transitions.', 'No fall damage. With the corecase, enables Jet Burst.']),
+        [('有害効果を消去', '無毛定理（10k FE）。'), ('被弾で核パスタが相転移', 'ニョッキ：速度+15% → スパゲッティ：間合い+1 → ラザニア：被ダメージ-30%。Vでジェット噴射（靴が必要）。'), ('核パスタ相転移を駆動', '胴の相転移に必要。'), ('落下無効・ジェット噴射', '胴とそろえるとVで噴射できる。')],
+        [('Erases harmful effects', 'No-hair theorem (10k FE).'), ('Damage shifts its nuclear pasta', 'Gnocchi: +15% speed, spaghetti: +1 reach, lasagna: -30% damage. V: Jet Burst (needs the boots).'), ('Drives the pasta phases', 'Required by the corecase.'), ('No fall damage; Jet Burst', 'With the corecase, V fires a burst.')]),
 }
 for t in SETS:
     for n, part in enumerate(PARTS):
         ja[f'item.{MOD}.{t}_{part}'], en[f'item.{MOD}.{t}_{part}'] = names[t][0][n], names[t][1][n]
-        ja[f'tooltip.{MOD}.{t}.{part}'], en[f'tooltip.{MOD}.{t}.{part}'] = tips[t][0][n], tips[t][1][n]
+        ja[f'tooltip.{MOD}.{t}.{part}.summary'], ja[f'tooltip.{MOD}.{t}.{part}'] = tips[t][0][n]
+        en[f'tooltip.{MOD}.{t}.{part}.summary'], en[f'tooltip.{MOD}.{t}.{part}'] = tips[t][1][n]
 
 weapon_text = {
-    'quench_saber': ('クエンチ・セイバー', 'Quench Saber',
-                     ['攻撃9／攻撃速度1.6。', '命中で電流が溜まり、5発目で超伝導が破れてクエンチする。', '周囲に10ダメージと炎上（8,000 FE）。'],
-                     ['9 damage, 1.6 attack speed.', 'Hits build current; the fifth quenches the superconductor.', 'Dumps 10 damage and fire around the target (8,000 FE).']),
-    'casimir_blade': ('カシミール刃', 'Casimir Blade',
-                      ['攻撃13／攻撃速度1.6。刃は鏡の間の真空で、防具の効果を35%無視する。', '使用長押し（0.8秒）で鏡を閉じる（40,000 FE）。', '次の一撃は防具を完全に無視し、ダメージ1.5倍。'],
-                      ['13 damage, 1.6 attack speed. The blade is the vacuum between its mirrors; ignores 35% of armor.', 'Hold use for 0.8s to close the mirrors (40,000 FE).', 'The next hit ignores armor entirely and deals 1.5x.']),
-    'tidal_reaver': ('潮汐断裁刃', 'Tidal Reaver',
-                     ['攻撃22／攻撃速度1.0。命中で潮汐応力を付与（最大5、被ダメージ+8%／層）。', '使用長押し：ロッシュ焦点が周囲の敵を引き寄せる（300,000 FE/秒）。', '離して断裁：応力に応じて16〜66ダメージを与え、応力を解放する。'],
-                     ['22 damage, 1.0 attack speed. Hits apply tidal stress (up to 5, +8% damage taken each).', 'Hold use: a Roche focus drags nearby enemies in (300,000 FE/s).', 'Release to shear for 16-66 damage by stress, spending it.']),
-    'jet_lance': ('降着ジェット砲', 'Accretion Jet Cannon',
-                  ['使用長押し：点火→3段の収束→照射（最長6秒）。', '前方80ブロックを貫通し、防具の6割を無視して56 DPS（500,000 FE/秒）。', '磁気ミラーが後極を塞いでいて、ジェットは銃身からのみ出る。'],
-                  ['Hold use: ignition, three-ring collimation, then irradiation (up to 6s).', 'Pierces 80 blocks ahead for 56 DPS, ignoring 60% of armor (500,000 FE/s).', 'A magnetic mirror seals the rear pole, so the jet only leaves through the barrel.']),
+    'quench_saber': ('クエンチ・セイバー', 'Quench Saber', '5発目でクエンチ爆発', '5th hit quenches',
+                     ['攻撃9／攻撃速度1.6。', '命中で電流が溜まり、5発目で放電する。', '周囲に10ダメージと炎上（8k FE）。'],
+                     ['9 damage, 1.6 speed.', 'Hits build current; the fifth discharges.', '10 damage and fire around the target (8k FE).']),
+    'casimir_blade': ('カシミール刃', 'Casimir Blade', '鏡を閉じて防具貫通の一撃', 'Close the mirrors to pierce armor',
+                      ['攻撃13／攻撃速度1.6。防具の効果を35%無視。', '右クリック長押し（0.8秒）で鏡を閉じる（40k FE）。', '次の一撃は防具を完全に無視し1.5倍。'],
+                      ['13 damage, 1.6 speed. Ignores 35% of armor.', 'Hold use for 0.8s to close the mirrors (40k FE).', 'The next hit ignores armor and deals 1.5x.']),
+    'tidal_reaver': ('潮汐断裁刃', 'Tidal Reaver', '溜めて引き寄せ、離して断裁', 'Hold to drag in, release to shear',
+                     ['攻撃22／攻撃速度1.0。命中で潮汐応力（最大5、被ダメージ+8%／層）。', '右クリック長押しで周囲の敵を引き寄せる（300k FE/秒）。', '離すと応力に応じて16〜66ダメージ。'],
+                     ['22 damage, 1.0 speed. Hits add tidal stress (up to 5, +8% damage taken each).', 'Hold use to drag enemies in (300k FE/s).', 'Release for 16-66 damage by stress.']),
+    'jet_lance': ('降着ジェット砲', 'Accretion Jet Cannon', '左クリックでジェットを発射', 'Left click fires the jet',
+                  ['チャージ1.4秒の後に発射し2秒照射。前方80ブロックを貫通、56 DPS（防具の6割を無視）。', '4発ごとにリロード（8秒）。1発 1M FE。', '右クリック：地形保護／地形破壊。破壊モードは発射の瞬間に奥まで貫く。'],
+                  ['Charges 1.4s, then burns 2s, piercing 80 blocks. 56 DPS, ignoring 60% of armor.', 'Reloads every 4 shots (8s). 1M FE per shot.', 'Right click: terrain protection or destruction. Destruction drills through at the moment of firing.']),
 }
-for name, (j, e, tj, te) in weapon_text.items():
+for name, (j, e, sj, se, tj, te) in weapon_text.items():
     ja[f'item.{MOD}.{name}'], en[f'item.{MOD}.{name}'] = j, e
+    ja[f'tooltip.{MOD}.{name}.summary'], en[f'tooltip.{MOD}.{name}.summary'] = sj, se
     for n in range(3):
         ja[f'tooltip.{MOD}.{name}.{n + 1}'], en[f'tooltip.{MOD}.{name}.{n + 1}'] = tj[n], te[n]
 
@@ -272,33 +306,52 @@ for name, j, e in [('flux_weave', '磁束織布', 'Flux Weave'), ('pressure_latt
                    ('tidal_edge', '潮汐鍛造刃', 'Tidal Edge')]:
     ja[f'item.{MOD}.{name}'], en[f'item.{MOD}.{name}'] = j, e
 
-for name, j, e, tj, te in [
-    ('bit_drone_module', 'ビットドローン・モジュール', 'Bit Drone Module', '胴用。ビット2機が周囲を巡回し、敵を毎秒自動で撃つ（5ダメージ、1,500 FE／発）。', 'Chestpieces. Two bits orbit you and shoot hostile mobs each second (5 damage, 1,500 FE per shot).'),
-    ('capacitor_module', '拡張コンデンサ', 'Capacitor Module', '防具・武器用。電力容量 +50%。', 'Any gear. +50% energy capacity.'),
-    ('plating_module', '追加装甲板', 'Plating Module', '防具用。防御力 +2、防具強度 +1。', 'Armor. +2 armor, +1 toughness.'),
-    ('thruster_module', '慣性スラスター', 'Inertial Thruster', '靴用。ジャンプ力と段差の乗り越えを強化する。', 'Boots. Higher jumps and step height.'),
-    ('coolant_module', '冷却モジュール', 'Coolant Module', '武器用。再使用時間 -25%（重複可）。', 'Weapons. -25% cooldown (stacks).'),
-    ('amplifier_module', '出力増幅器', 'Output Amplifier', '武器用。与えるダメージ +15%（重複可）。', 'Weapons. +15% damage dealt (stacks).'),
+for name, j, e, tj, te, dj, de in [
+    ('bit_drone_module', 'ビットドローン・モジュール', 'Bit Drone Module', '胴用：ビット2機が敵を自動射撃', 'Chest: two bits shoot enemies', '背後に滞空し、毎秒5ダメージ（1.5k FE／発）。', 'Hold station behind you. 5 damage per second (1.5k FE per shot).'),
+    ('capacitor_module', '拡張コンデンサ', 'Capacitor Module', '全装備：電力容量 +50%', 'Any gear: +50% energy capacity', '重複可。', 'Stacks.'),
+    ('plating_module', '追加装甲板', 'Plating Module', '防具：防御力 +2、防具強度 +1', 'Armor: +2 armor, +1 toughness', '重複可。', 'Stacks.'),
+    ('thruster_module', '慣性スラスター', 'Inertial Thruster', '靴：ジャンプと段差を強化', 'Boots: higher jumps and steps', '重複可。', 'Stacks.'),
+    ('coolant_module', '冷却モジュール', 'Coolant Module', '武器：再使用時間 -25%', 'Weapons: -25% cooldown', '重複可。', 'Stacks.'),
+    ('amplifier_module', '出力増幅器', 'Output Amplifier', '武器：ダメージ +15%', 'Weapons: +15% damage', '重複可。', 'Stacks.'),
+    ('metric_drive_module', 'メトリックドライブ・モジュール', 'Metric Drive Module', '防具：電力で飛行', 'Armor: flight on FE', 'エキゾチック物質は不要。飛行中 400 FE/t、落下ダメージ無効。', 'No exotic matter. 400 FE/t while flying, no fall damage.'),
+    ('meltdown_module', '融解起爆モジュール', 'Meltdown Module', 'ジェット砲：着弾点が大爆発', 'Jet Cannon: first hit detonates', '発射と同時に着弾点が爆発（半径7、最大60ダメージ）。地形破壊モードでは貫通した一番奥で爆発し、石は溶岩になる。', 'Explodes at the impact the moment it fires (radius 7, up to 60 damage). In destruction mode it goes off at the deepest point, and stone turns to lava.'),
 ]:
     ja[f'item.{MOD}.{name}'], en[f'item.{MOD}.{name}'] = j, e
     ja[f'tooltip.{MOD}.{name}'], en[f'tooltip.{MOD}.{name}'] = tj, te
+    ja[f'tooltip.{MOD}.{name}.detail'], en[f'tooltip.{MOD}.{name}.detail'] = dj, de
 
 common = {
     'block.singulo_arsenal.module_integrator': ('モジュール統合台', 'Module Integrator'),
     'screen.singulo_arsenal.integrate': ('統合', 'Integrate'),
-    'tooltip.singulo_arsenal.modules': ('モジュール：%s / %s', 'Modules: %s / %s'),
-    'tooltip.singulo_arsenal.module_hint': ('モジュール統合台で装備に組み込む。', 'Install on gear at a Module Integrator.'),
+    'tooltip.singulo_arsenal.modules': ('モジュール %s / %s', 'Modules %s / %s'),
+    'tooltip.singulo_arsenal.more': ('Shift：詳細', 'Shift: details'),
+    'tooltip.singulo_arsenal.terrain_protect': ('地形保護', 'Terrain protected'),
+    'tooltip.singulo_arsenal.terrain_break': ('地形破壊', 'Terrain destruction'),
+    'message.singulo_arsenal.terrain_protect': ('地形保護モード', 'Terrain protection'),
+    'message.singulo_arsenal.terrain_break': ('地形破壊モード', 'Terrain destruction'),
+    'hud.singulo_arsenal.magazine': ('弾倉 %s / %s  %s', 'Magazine %s / %s  %s'),
+    'hud.singulo_arsenal.terrain_protect': ('保護', 'Protect'),
+    'hud.singulo_arsenal.terrain_break': ('破壊', 'Destroy'),
+    'screen.singulo_arsenal.energy': ('電力 %s / %s FE', 'Energy %s / %s FE'),
+    'screen.singulo_arsenal.cost': ('統合1回の消費電力', 'Energy per run'),
+    'screen.singulo_arsenal.time': ('統合1回の時間', 'Time per run'),
+    'screen.singulo_arsenal.status.empty': ('装備を置いてください', 'Place gear on the bed'),
+    'screen.singulo_arsenal.status.ready': ('統合できます', 'Ready'),
+    'screen.singulo_arsenal.status.running': ('統合中', 'Integrating'),
+    'screen.singulo_arsenal.status.no_power': ('電力が足りません', 'Not enough energy'),
+    'screen.singulo_arsenal.status.invalid': ('この装備に入らないモジュールがあります', 'A module does not fit this gear'),
+    'tooltip.singulo_arsenal.module_hint': ('モジュール統合台で組み込む。', 'Install at a Module Integrator.'),
     'death.attack.singulo_arsenal.bit': ('%1$s は %2$s のビットに撃たれた', '%1$s was shot by %2$s\'s bit drone'),
     'itemGroup.singulo_arsenal': ('Singulo Arsenal', 'Singulo Arsenal'),
     'key.categories.singulo_arsenal': ('Singulo Arsenal', 'Singulo Arsenal'),
     'key.singulo_arsenal.ability': ('装甲の起動機能', 'Armor ability'),
-    'tooltip.singulo_arsenal.stage': ('Singulo 進行段階 %s', 'Singulo progression stage %s'),
-    'tooltip.singulo_arsenal.energy': ('電力：%s / %s FE', 'Energy: %s / %s FE'),
-    'tooltip.singulo_arsenal.charge': ('充電：手に持ち、スニークして電源の出力面に使用。', 'Charge: hold and sneak-use an energy output face.'),
-    'tooltip.singulo_arsenal.accretion': ('降着：持ち物の質量ペレットを自動で電力に変える（1個で500,000 FE）。', 'Accretion: burns mass pellets from your inventory for power (500,000 FE each).'),
-    'tooltip.singulo_arsenal.full_set.meissner': ('全身：レンツの法則で攻撃者を弾き飛ばす。', 'Full set: Lenz\'s law throws melee attackers back.'),
-    'tooltip.singulo_arsenal.full_set.degeneracy': ('各部位の機能は単体で働く。', 'Each piece works on its own.'),
-    'tooltip.singulo_arsenal.full_set.collapsar': ('全身：致死の一撃を事象の地平面で止める。電力8,000,000 FE、再使用10分。', 'Full set: an event horizon stops a lethal hit. 8,000,000 FE, 10-minute cooldown.'),
+    'tooltip.singulo_arsenal.stage': ('段階 %s', 'Stage %s'),
+    'tooltip.singulo_arsenal.energy': ('%s / %s FE', '%s / %s FE'),
+    'tooltip.singulo_arsenal.charge': ('充電：スニークで電源の出力面を右クリック', 'Charge: sneak-use an energy output'),
+    'tooltip.singulo_arsenal.accretion': ('降着：質量ペレットを自動で電力に変換（500k FE）', 'Accretion: burns mass pellets (500k FE each)'),
+    'tooltip.singulo_arsenal.full_set.meissner': ('全身：攻撃者を弾き飛ばす', 'Full set: throws melee attackers back'),
+    'tooltip.singulo_arsenal.full_set.degeneracy': ('各部位が単体で働く', 'Each piece works alone'),
+    'tooltip.singulo_arsenal.full_set.collapsar': ('全身：被ダメージを電力で肩代わり（200k FE／1）。致死の一撃は事象の地平面で止める（8M FE、再使用10分）', 'Full set: FE pays for damage (200k FE per point). An event horizon stops a lethal hit (8M FE, 10 min)'),
     'message.singulo_arsenal.charged': ('%s FE を充電（残量 %s FE）', 'Charged %s FE (%s FE stored)'),
     'message.singulo_arsenal.no_energy': ('電力が不足しています。', 'Not enough energy.'),
     'message.singulo_arsenal.no_ability': ('この胴装備に起動機能はありません。', 'This chestpiece has no ability.'),
@@ -343,7 +396,7 @@ def rgb(value):
     return ((value >> 16) & 255, (value >> 8) & 255, value & 255, 255)
 
 
-GLOWS = {'flux_weave': 'c', 'pressure_lattice': 'a', 'collapsar_lamina': 'oy', 'jet_collimator': 'cW', 'tidal_edge': 'sy',
+GLOWS = {'metric_drive_module': 'cW', 'meltdown_module': 'OyW', 'flux_weave': 'c', 'pressure_lattice': 'a', 'collapsar_lamina': 'oy', 'jet_collimator': 'cW', 'tidal_edge': 'sy',
          'bit_drone_module': 'cW', 'capacitor_module': 'c', 'thruster_module': 'cW', 'coolant_module': 'c', 'amplifier_module': 'c'}
 FRAMES = 8
 
@@ -605,6 +658,44 @@ sprite('amplifier_module', [
     '................',
     '................',
 ], {'I': 0xC2CDD9, 'V': 0x262430, 'P': 0xE7D8B0, 'c': 0x7CE8FF})
+# A warp coil wound round a sealed core of bent space.
+sprite('metric_drive_module', [
+    '................',
+    '.....IIIIII.....',
+    '...IIVVVVVVII...',
+    '..IVVccccccVVI..',
+    '..IVcVVVVVVcVI..',
+    '.IVcVVWWWWVVcVI.',
+    '.IVcVWEEEEWVcVI.',
+    '.IVcVWEEEEWVcVI.',
+    '.IVcVWEEEEWVcVI.',
+    '.IVcVVWWWWVVcVI.',
+    '..IVcVVVVVVcVI..',
+    '..IVVccccccVVI..',
+    '...IIVVVVVVII...',
+    '.....IIIIII.....',
+    '................',
+    '................',
+], {'I': 0xC2CDD9, 'V': 0x262430, 'c': 0x8CD2FF, 'W': 0xE070FF, 'E': 0x0E0D14})
+# A charge seated in a cradle, its molten core about to break out.
+sprite('meltdown_module', [
+    '................',
+    '.......ss.......',
+    '.....s.ss.s.....',
+    '......sOOs......',
+    '...s.sOyyOs.s...',
+    '....sOyWWyOs....',
+    '...sOyWWWWyOs...',
+    '...sOyWWWWyOs...',
+    '....sOyWWyOs....',
+    '.IIIIsOyyOsIIII.',
+    '.IVVVVsOOsVVVVI.',
+    '.IVVVVVssVVVVVI.',
+    '.IVVVVVVVVVVVVI.',
+    '..IIIIIIIIIIII..',
+    '................',
+    '................',
+], {'I': 0xE7D8B0, 'V': 0x3A3648, 's': 0x7A3A1E, 'O': 0xFF8A3C, 'y': 0xFFD28A, 'W': 0xFFF8E8})
 png(f'assets/{MOD}/textures/misc/white.png', 1, 1, [(255, 255, 255, 255)])
 
 
