@@ -9,8 +9,10 @@ import io.github.genichimaruo.singuloarsenal.core.ArsenalData;
 import io.github.genichimaruo.singuloarsenal.core.Fe;
 import io.github.genichimaruo.singuloarsenal.core.Powered;
 import io.github.genichimaruo.singuloarsenal.core.Rules;
+import io.github.genichimaruo.singuloarsenal.core.Tips;
 import io.github.genichimaruo.singuloarsenal.module.ModuleContent;
 import io.github.genichimaruo.singuloarsenal.net.AbilityPayload;
+import io.github.genichimaruo.singuloarsenal.net.FirePayload;
 import io.github.genichimaruo.singuloarsenal.weapon.CasimirBladeItem;
 import io.github.genichimaruo.singuloarsenal.weapon.JetLanceItem;
 import io.github.genichimaruo.singuloarsenal.weapon.TidalReaverItem;
@@ -34,6 +36,7 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
+import net.neoforged.neoforge.client.event.InputEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.event.RenderGuiEvent;
 import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
@@ -48,6 +51,9 @@ public final class ArsenalClient {
     private static final KeyMapping ABILITY = new KeyMapping("key.singulo_arsenal.ability", InputConstants.Type.KEYSYM,
             GLFW.GLFW_KEY_V, "key.categories.singulo_arsenal");
 
+    private static boolean triggerPulled, triggerHeld;
+    private static int triggerWait;
+
     public ArsenalClient(IEventBus bus) {
         bus.addListener(ArsenalClient::keys);
         bus.addListener(ArsenalClient::extensions);
@@ -56,8 +62,10 @@ public final class ArsenalClient {
         bus.addListener(ArsenalClient::machineRenderers);
         bus.addListener(ArsenalClient::screens);
         FxClient.register();
+        Tips.detail = net.minecraft.client.gui.screens.Screen::hasShiftDown;
         NeoForge.EVENT_BUS.addListener(ArsenalClient::tick);
         NeoForge.EVENT_BUS.addListener(ArsenalClient::hud);
+        NeoForge.EVENT_BUS.addListener(ArsenalClient::trigger);
     }
 
     private static void keys(RegisterKeyMappingsEvent event) {
@@ -74,7 +82,7 @@ public final class ArsenalClient {
             @Override public HumanoidModel.ArmPose getArmPose(LivingEntity entity, InteractionHand hand, ItemStack stack) {
                 if (hand != InteractionHand.MAIN_HAND) return null;
                 if (stack.getItem() instanceof JetLanceItem) {
-                    boolean reloading = !entity.isUsingItem() && Weapons.reloadProgress(stack, entity.level().getGameTime(), 0) >= 0;
+                    boolean reloading = Weapons.reloadProgress(stack, entity.level().getGameTime(), 0) >= 0;
                     return reloading ? LanceReloadPose.pose() : HumanoidModel.ArmPose.CROSSBOW_HOLD;
                 }
                 if (entity.isUsingItem() && stack.getItem() instanceof TidalReaverItem) return HumanoidModel.ArmPose.THROW_SPEAR;
@@ -102,10 +110,36 @@ public final class ArsenalClient {
         if (event.getRenderer(EntityType.ARMOR_STAND) instanceof ArmorStandRenderer renderer) renderer.addLayer(new SuitLayer(renderer));
     }
 
+    private static boolean holdingCannon(Minecraft mc) {
+        return mc.player != null && mc.player.getMainHandItem().getItem() instanceof JetLanceItem;
+    }
+
+    /** With the cannon in hand, left click is the trigger: it neither swings, breaks blocks nor hits at arm's length. */
+    private static void trigger(InputEvent.InteractionKeyMappingTriggered event) {
+        if (!event.isAttack() || !holdingCannon(Minecraft.getInstance())) return;
+        event.setCanceled(true);
+        event.setSwingHand(false);
+        // Vanilla repeats this event every tick while the button is held on a block.
+        if (!triggerHeld) triggerPulled = true;
+    }
+
     private static void tick(ClientTickEvent.Post event) {
         var mc = Minecraft.getInstance();
         while (ABILITY.consumeClick()) {
             if (mc.player != null && mc.screen == null && mc.getConnection() != null) PacketDistributor.sendToServer(AbilityPayload.INSTANCE);
+        }
+        ActiveSounds.tick(mc);
+        // One click, one shot: holding the button down does not fire again.
+        boolean down = mc.options.keyAttack.isDown();
+        boolean wanted = triggerPulled || (down && !triggerHeld);
+        triggerPulled = false;
+        triggerHeld = down;
+        if (triggerWait > 0) triggerWait--;
+        if (wanted && triggerWait == 0 && mc.screen == null && holdingCannon(mc) && mc.level != null && mc.getConnection() != null
+                && JetLanceItem.ready(mc.player.getMainHandItem(), mc.level.getGameTime())) {
+            PacketDistributor.sendToServer(FirePayload.INSTANCE);
+            // Long enough for the server's answer to reach this client, so one click is one packet.
+            triggerWait = 4;
         }
     }
 
@@ -142,6 +176,11 @@ public final class ArsenalClient {
         ItemStack held = mc.player.getMainHandItem();
         if (held.getItem() instanceof Powered && !(held.getItem() instanceof SuitItem)) {
             drawBar(gui, 8, y, held.getHoverName(), held, 0xFFC36B);
+            y += 14;
+            if (held.getItem() instanceof JetLanceItem) {
+                Component mode = Component.translatable(JetLanceItem.breaksTerrain(held) ? "hud.singulo_arsenal.terrain_break" : "hud.singulo_arsenal.terrain_protect");
+                gui.drawString(mc.font, Component.translatable("hud.singulo_arsenal.magazine", JetLanceItem.shotsLeft(held), Rules.LANCE_MAGAZINE, mode), 8, y, 0xFFE2A0, true);
+            }
         }
     }
 

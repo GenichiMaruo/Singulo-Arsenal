@@ -5,6 +5,7 @@ import io.github.genichimaruo.singuloarsenal.armor.SuitEvents;
 import io.github.genichimaruo.singuloarsenal.core.ArsenalData;
 import io.github.genichimaruo.singuloarsenal.module.ModuleContent;
 import io.github.genichimaruo.singuloarsenal.net.AbilityPayload;
+import io.github.genichimaruo.singuloarsenal.net.FirePayload;
 import io.github.genichimaruo.singuloarsenal.net.FxPayload;
 import io.github.genichimaruo.singuloarsenal.weapon.Weapons;
 import net.minecraft.resources.ResourceLocation;
@@ -30,8 +31,9 @@ public final class SinguloArsenal {
     }
 
     private static void payloads(RegisterPayloadHandlersEvent event) {
-        var registrar = event.registrar("2");
+        var registrar = event.registrar("3");
         registrar.playToServer(AbilityPayload.TYPE, AbilityPayload.CODEC, AbilityPayload::handle);
+        registrar.playToServer(FirePayload.TYPE, FirePayload.CODEC, FirePayload::handle);
         registrar.playToClient(FxPayload.TYPE, FxPayload.CODEC, FxPayload::handle);
     }
 

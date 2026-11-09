@@ -90,14 +90,21 @@ public final class GearRenderer extends BlockEntityWithoutLevelRenderer {
                 pose.mulPose(Axis.XP.rotationDegrees(-22 * use + 34 * strike));
             }
             Canvas.drawFine(pose, buffers, t, light, overlay, world, c -> WeaponArt.reaver(c, use, reload, t));
+            if (owner != null && world) FxClient.heldHole(pose, context, -2.5F, 6.75F, 0, (1.4F + use * 0.5F) * (reload >= 0 ? Math.min(1, reload * 1.15F) : 1));
         } else if (stack.getItem() instanceof JetLanceItem) {
-            float held = using ? ticks + partial : 0;
-            float ignition = using ? Math.min(1, held / Rules.LANCE_COLLIMATE) : 0;
+            float jet = owner != null && world ? JetLanceItem.jetAge(stack, now, partial) : -1;
+            float charge = owner != null && world ? JetLanceItem.chargeProgress(stack, now, partial) : -1;
+            float ignition = jet >= 0 ? 1 : Math.max(0, charge);
+            boolean leftHanded = context == ItemDisplayContext.FIRST_PERSON_LEFT_HAND || context == ItemDisplayContext.THIRD_PERSON_LEFT_HAND;
             if (owner != null && world) {
                 FxClient.aimLance(owner, pose, context, partial);
                 boolean firstPerson = context.firstPerson();
                 // Recoil runs straight back along the barrel, so the beam stays on its axis.
-                pose.translate(0, -(firstPerson ? 1.6F : 0.8F) * (using ? Rules.lanceKick(held) : 0), 0);
+                pose.translate(0, -(firstPerson ? 1.6F : 0.8F) * Rules.lanceKick(jet), 0);
+                if (reload >= 0 && !firstPerson) {
+                    // Drawn in toward the chest while the support hand works on it: at arm's length the magazine is out of reach.
+                    pose.translate(0, -9 * Rules.reloadReach(reload), 0);
+                }
                 if (reload >= 0) {
                     // Muzzle up and rolled so the magazine well faces the support hand.
                     float tilt = Rules.reloadTilt(reload) * (firstPerson ? 1 : 0.55F);
@@ -105,8 +112,9 @@ public final class GearRenderer extends BlockEntityWithoutLevelRenderer {
                     pose.mulPose(Axis.YP.rotationDegrees((owner.getMainArm() == net.minecraft.world.entity.HumanoidArm.RIGHT ? 30 : -30) * tilt));
                 }
             }
-            Canvas.drawFine(pose, buffers, t, light, overlay, world, c -> WeaponArt.lance(c, ignition, reload, t));
-            if (owner != null) FxClient.lanceRendered(owner, pose, buffers, context, partial);
+            Canvas.drawFine(pose, buffers, t, light, overlay, world, c -> WeaponArt.lance(c, ignition, reload, t, leftHanded ? 1 : -1));
+            if (owner != null && world) FxClient.heldHole(pose, context, 0, 2.25F, 0, 1.5F);
+            if (owner != null) FxClient.lanceRendered(owner, pose, buffers, context, partial, jet);
             FirstPersonHands.drawLance(owner, pose, buffers, light, context, reload);
         }
     }

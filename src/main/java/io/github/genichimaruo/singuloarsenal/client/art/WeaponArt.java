@@ -33,19 +33,19 @@ public final class WeaponArt {
         int ceramic = 0xF4F6FA, shade = 0xC2CDD9, dark = 0x3A4656;
         grip(c, -8, -3.5, 0.75, dark, shade, ceramic);
         // The pommel is the power cell; its strip shows how close the blade is to quenching.
-        c.lit(-1.25, -8.75, -1.3, 1.25, -8.25, -1.25, cold);
-        c.lit(-1.25, -8.75, 1.25, 1.25, -8.25, 1.3, cold);
+        c.lit(-1, -8.75, -1.375, 1, -8.25, -1.25, cold);
+        c.lit(-1, -8.75, 1.25, 1, -8.25, 1.375, cold);
         // Cryostat collar between hand and blade.
         c.box(-1.5, -3.5 - collar, -1.25, 1.5, -3 - collar, 1.25, shade);
         if (collar > 0) c.softBand(0, -3.5, -3, 1.3, 2.5, 0xCFF4FF, (float) collar);
         c.box(-3, -3, -1, 3, -2, 1, ceramic);
         c.box(-2, -2, -0.75, 2, -1.5, 0.75, shade);
-        for (double z : new double[]{-1.05, 1}) c.lit(-1.5, -2.75, z, 1.5, -2.25, z + 0.05, cold);
+        for (double z : new double[]{-1.125, 1}) c.lit(-1.5, -2.75, z, 1.5, -2.25, z + 0.125, cold);
         // Blade: a spine in coil sections, tapering in three steps.
         c.box(-1, -1.5, -0.5, 1, 11, 0.5, ceramic);
         c.box(-0.75, 11, -0.5, 0.75, 12, 0.5, ceramic);
         c.box(-0.5, 12, -0.25, 0.5, 13, 0.25, ceramic);
-        for (int i = 0; i < 4; i++) c.box(-1, 1 + i * 2.75, -0.55, 1, 1.5 + i * 2.75, 0.55, dark);
+        for (int i = 0; i < 4; i++) c.box(-1.125, 1 + i * 2.75, -0.625, 1.125, 1.5 + i * 2.75, 0.625, dark);
         for (int side = -1; side <= 1; side += 2) {
             if (conductor > -1) c.lit(side, -1, -0.25, side * 1.5, conductor, 0.25, cold);
             if (conductor >= 11) c.lit(side * 0.75, 11, -0.25, side * 1.25, 12, 0.25, cold);
@@ -67,7 +67,7 @@ public final class WeaponArt {
         // Actuator housing: this is what moves the mirrors when the use key is held.
         c.box(-3.5, -4, -1.25, 3.5, -2.5, 1.25, frame);
         c.box(-2.5, -4.5, -1, 2.5, -4, 1, mirror);
-        for (double z : new double[]{-1.3, 1.25}) c.lit(-2.5, -3.5, z, 2.5, -3, z + 0.05, vacuum);
+        for (double z : new double[]{-1.375, 1.25}) c.lit(-2.5, -3.5, z, 2.5, -3, z + 0.125, vacuum);
         // Guide rail the mirror carriers ride on, visible where the gap closes.
         c.box(-3, -2.5, -0.5, 3, -2, 0.5, 0x7A8096);
         for (int side = -1; side <= 1; side += 2) {
@@ -77,9 +77,9 @@ public final class WeaponArt {
             c.box(far, -1.5, -0.5, outer, 11.5, 0.5, frame);
             c.box(near, 12, -0.5, far, 13.5, 0.5, mirror);
             // Clamps that hold each mirror flat against its backing.
-            for (int i = 0; i < 3; i++) c.box(far, 1 + i * 4, -1, outer, 2 + i * 4, 1, frame);
+            for (int i = 0; i < 3; i++) c.box(far, 1 + i * 4, -1, outer + side * 0.125, 2 + i * 4, 1, frame);
             double sheen = -1.5 + ((t * 0.18 + side * 3) % 11.5 + 11.5) % 11.5;
-            for (double z : new double[]{-1.02, 1}) c.lit(near, sheen, z, far, Math.min(12, sheen + 2), z + 0.02, 0xFFFFFF);
+            for (double z : new double[]{-1.125, 1}) c.lit(near, sheen, z, far, Math.min(12, sheen + 2), z + 0.125, 0xFFFFFF);
         }
         float glow = (float) ((Math.sin(t * 0.9) * 0.1 + 0.9) * (0.45 + closing * 0.5));
         c.lit(-0.125, -1.5, -0.75, 0.125, 13.5, 0.75, vacuum);
@@ -97,7 +97,7 @@ public final class WeaponArt {
         double[][] steps = {{-2, 3, 2}, {3, 8, 3}, {8, 12.5, 4.5}, {12.5, 14.5, 3.5}};
         for (double[] step : steps) {
             c.box(-2, step[0], -0.75, step[2], step[1], 0.75, VOID);
-            c.box(step[2] - 1, step[0], -0.5, step[2], step[1], 0.5, VOID_EDGE);
+            c.box(step[2] - 1, step[0] + 0.125, -0.875, step[2] - 0.125, step[1] - 0.125, 0.875, VOID_EDGE);
             c.lit(step[2], step[0], -0.25, step[2] + 0.5, step[1], 0.25, THREAD);
             c.softBand(step[2] + 0.25, step[0], step[1], 0.3, 1, THREAD, 0.3F + use * 0.4F);
             c.softBand(step[2] + 0.25, step[0], step[1], -0.3, 1, THREAD, 0.3F + use * 0.4F);
@@ -106,7 +106,7 @@ public final class WeaponArt {
         c.box(-2, 14.5, -0.75, 1.5, 15, 0.75, VOID);
         // Filament bindings holding the focus housing to the blade.
         for (double y : new double[]{1, 10.5, 13}) {
-            for (double z : new double[]{-0.8, 0.75}) c.lit(-2, y, z, 2, y + 0.5, z + 0.05, THREAD);
+            for (double z : new double[]{-1, 0.875}) c.lit(-2, y, z, 2, y + 0.5, z + 0.125, THREAD);
         }
         // The focus housing, with the hole seated in it.
         // The jaws of the housing part while the focus is open.
@@ -128,12 +128,15 @@ public final class WeaponArt {
 
     // ---- Jet lance: a shouldered gun. A magnetic mirror seals the rear pole, so everything leaves through the barrel ---------
 
-    public static void lance(Canvas c, float ignition, float reload, float t) {
+    /** {@code handleSide} is the X side of the charging handle, always toward the support hand so the hand never has to cross the gun. */
+    public static void lance(Canvas c, float ignition, float reload, float t, int handleSide) {
         boolean reloading = reload >= 0;
         int status = ignition > 0 ? WHITE_HOT : reloading ? 0xFFB061 : 0x6A88A8;
         float vent = reloading ? Rules.reloadVent(reload) : 0;
         float cooling = reloading ? (1 - reload) * (1 - reload) : 0;
         boolean spinning = ignition > 0 || cooling > 0.3F;
+        // Eight-sided, so the rings read as machined parts at this scale.
+        c.coarse(8);
         // Short skeleton stock and butt pad, so the recoil of a one-sided jet has somewhere to go.
         c.box(-0.75, -6.5, 1.5, 0.75, -4, 2.5, VOID);
         c.box(-0.75, -6.5, -3, 0.75, -4, -2, VOID);
@@ -145,7 +148,7 @@ public final class WeaponArt {
         c.box(-2.5, -4, -2.5, 2.5, -2.5, 2.5, VOID_DEEP);
         c.hoop(0, -3.75, 0, 1, 3, 0.5, VOID_EDGE);
         c.hoop(0, -2.75, 0, 1, 3, 0.5, IVORY);
-        c.litHoop(0, -4.05, 0, 1, 1.5, 0.25, status);
+        c.litHoop(0, -4.125, 0, 1, 1.5, 0.25, status);
 
         // Containment chamber, open at the sides so the hole can be seen: a top and a bottom plate and four posts.
         // The top plate lifts on its posts to vent the chamber after a burst.
@@ -188,7 +191,8 @@ public final class WeaponArt {
             boolean energised = ignition > (i + 1) / 4F;
             // After firing the rings are still hot, and cool from orange to nothing.
             int ring = energised ? WHITE_HOT : cooling > 0.04F ? 0xFF8A3C : 0x4A5A70;
-            c.litHoop(0, y, 0, 1, radius, 0.25, ring);
+            // A lit band round the outside of the ring.
+            c.litHoop(0, y, 0, 1, radius + 0.5, 0.25, ring);
             if (energised) c.halo(0, y, 0, 1, radius, 1, HOT, 0.55F);
             else if (cooling > 0.04F) c.halo(0, y, 0, 1, radius, 1, 0xFF8A3C, cooling * 0.5F);
         }
@@ -198,8 +202,8 @@ public final class WeaponArt {
         }
         // Muzzle crown with the aperture the jet leaves through.
         c.box(-1.5, 21, -1.5, 1.5, 23, 1.5, VOID_EDGE);
-        c.litHoop(0, 23.02, 0, 1, 1.0, 0.25, status);
-        c.box(-0.5, 22.95, -0.5, 0.5, 23, 0.5, VOID_DEEP);
+        c.litHoop(0, 23.125, 0, 1, 1.0, 0.25, status);
+        c.box(-0.5, 23, -0.5, 0.5, 23.125, 0.5, VOID_DEEP);
 
         // Sight rail and an optic with a lit reticle, at eye height over the chamber.
         c.box(-0.5, -2, 3.5, 0.5, 9, 4, VOID_EDGE);
@@ -221,7 +225,7 @@ public final class WeaponArt {
         c.box(-0.25, 2.5, -5, 0.25, 3, -3.5, IVORY);
 
         // Accretion feed: the magazine that mass pellets are drawn from, with a charge window.
-        c.box(-2, 5, -3.5, 2, 9.5, -3, VOID_EDGE);
+        c.box(-2, 5, -3.625, 2, 9.5, -3, VOID_EDGE);
         if (!reloading || !Rules.reloadMagazineGone(reload)) {
             float out = reloading ? Rules.reloadMagazine(reload) : 0;
             c.pose.pushPose();
@@ -229,14 +233,14 @@ public final class WeaponArt {
             c.pose.mulPose(Axis.XP.rotationDegrees(out * 16));
             c.box(-1.5, -1.75, -4, 1.5, 1.75, 0, VOID);
             c.box(-1.75, -1.75, -4.25, 1.75, 1.75, -4, VOID_EDGE);
-            for (int side = -1; side <= 1; side += 2) c.lit(side * 1.5, -0.75, -3.5, side * 1.55, 0.75, -0.5, status);
+            for (int side = -1; side <= 1; side += 2) c.lit(side * 1.5, -0.75, -3.5, side * 1.625, 0.75, -0.5, status);
             c.pose.popPose();
         }
 
-        // Charging handle on the right of the receiver: racked once to seat the new feed.
+        // Charging handle on the support-hand side of the receiver: racked once to seat the new feed.
         double handle = 5 - (reloading ? Rules.reloadCock(reload) * 4 : 0);
-        c.box(3.5, 0, 0.5, 4, 6, 1.5, VOID_EDGE);
-        c.box(4, handle, 0.25, 5, handle + 1, 1.75, IVORY);
+        c.box(handleSide * 3.5, 0, 0.5, handleSide * 4, 6, 1.5, VOID_EDGE);
+        c.box(handleSide * 4, handle, 0.25, handleSide * 5, handle + 1, 1.75, IVORY);
 
         // Forward grip for the support hand.
         c.pose.pushPose();

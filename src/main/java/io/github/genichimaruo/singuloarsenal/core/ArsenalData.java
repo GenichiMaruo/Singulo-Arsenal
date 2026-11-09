@@ -27,6 +27,14 @@ public final class ArsenalData {
     /** When the current reload animation ends, and how long it runs. On the stack so other players' clients see it too. */
     public static final Supplier<DataComponentType<Long>> RELOAD_UNTIL = time("reload_until");
     public static final Supplier<DataComponentType<Integer>> RELOAD_TICKS = integer("reload_ticks");
+    /** When the cannon's spool-up ends and the shot goes off. */
+    public static final Supplier<DataComponentType<Long>> CHARGE_UNTIL = time("charge_until");
+    /** When the current cannon shot goes out. Other players' clients draw the jet from this. */
+    public static final Supplier<DataComponentType<Long>> JET_UNTIL = time("jet_until");
+    /** Shots fired since the last reload. */
+    public static final Supplier<DataComponentType<Integer>> SHOTS = integer("shots");
+    /** 0 spares the terrain, 1 melts it. */
+    public static final Supplier<DataComponentType<Integer>> TERRAIN_MODE = integer("terrain_mode");
 
     public static final Supplier<DataComponentType<ItemContainerContents>> MODULES = REGISTER.registerComponentType("modules",
             b -> b.persistent(ItemContainerContents.CODEC).networkSynchronized(ItemContainerContents.STREAM_CODEC).cacheEncoding());
