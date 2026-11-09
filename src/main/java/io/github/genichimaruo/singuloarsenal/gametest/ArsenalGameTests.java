@@ -370,8 +370,11 @@ public final class ArsenalGameTests {
         victim.setHealth(100);
         victim.invulnerableTime = 0;
         p.lookAt(net.minecraft.commands.arguments.EntityAnchorArgument.Anchor.EYES, victim.getEyePosition());
+        Vec3 focus = io.github.genichimaruo.singuloarsenal.weapon.TidalReaverItem.focus(p, 1);
+        h.assertTrue(io.github.genichimaruo.singuloarsenal.core.ArsenalDamage.around(p, focus, Rules.REAVER_RANGE).contains(victim),
+                "shear target missing from spatial query: focus=" + focus + " target=" + victim.position() + " health=" + victim.getHealth());
         ((io.github.genichimaruo.singuloarsenal.weapon.TidalReaverItem) reaver.getItem()).shear(p, h.getLevel());
-        h.assertTrue(Weapons.stress(victim) == 0, "shear must spend stress");
+        h.assertTrue(Weapons.stress(victim) == 0, "shear must spend stress: health=" + victim.getHealth() + " alive=" + victim.isAlive());
         h.assertTrue(victim.getHealth() <= 100 - Rules.shearDamage(Rules.STRESS_MAX), "shear damage scales with stress");
         h.succeed();
     }
