@@ -45,6 +45,7 @@ public final class CasimirBladeItem extends PoweredSword {
         if (level instanceof ServerLevel server && entity instanceof Player player && Fe.spend(stack, Rules.CASIMIR_FE)) {
             stack.set(ArsenalData.ARMED_UNTIL.get(), server.getGameTime() + Rules.CASIMIR_ARMED_TICKS);
             player.getCooldowns().addCooldown(this, Rules.CASIMIR_COOLDOWN);
+            Weapons.beginReload(stack, server.getGameTime(), Rules.CASIMIR_COOLDOWN);
             Weapons.sound(player, "casimir_cavity_running", 1, 1.7F);
         }
         return stack;

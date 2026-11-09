@@ -1,6 +1,7 @@
 package io.github.genichimaruo.singuloarsenal.weapon;
 
 import io.github.genichimaruo.singuloarsenal.core.ArsenalDamage;
+import io.github.genichimaruo.singuloarsenal.core.ArsenalData;
 import io.github.genichimaruo.singuloarsenal.core.Fe;
 import io.github.genichimaruo.singuloarsenal.core.Powered;
 import io.github.genichimaruo.singuloarsenal.core.Rules;
@@ -40,6 +41,20 @@ public final class Weapons {
             lines.add(Component.translatable("tooltip.singulo_arsenal.accretion").withStyle(ChatFormatting.DARK_AQUA));
         }
         lines.add(Component.translatable("tooltip.singulo_arsenal.charge").withStyle(ChatFormatting.DARK_GRAY));
+    }
+
+    /** Starts a reload animation. Stored on the stack, because item cooldowns are only ever sent to their owner. */
+    public static void beginReload(ItemStack stack, long now, int ticks) {
+        stack.set(ArsenalData.RELOAD_UNTIL.get(), now + ticks);
+        stack.set(ArsenalData.RELOAD_TICKS.get(), ticks);
+    }
+
+    /** Progress of the running reload from 0 to 1, or -1 when none is running. */
+    public static float reloadProgress(ItemStack stack, long now, float partial) {
+        long until = ArsenalData.time(stack, ArsenalData.RELOAD_UNTIL);
+        int total = ArsenalData.get(stack, ArsenalData.RELOAD_TICKS);
+        if (total <= 0 || until <= now) return -1;
+        return Math.max(0, Math.min(1, 1 - (until - now - partial) / total));
     }
 
     static void sound(Entity at, String singuloEvent, float volume, float pitch) {

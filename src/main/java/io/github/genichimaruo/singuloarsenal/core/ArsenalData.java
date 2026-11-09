@@ -23,6 +23,9 @@ public final class ArsenalData {
     public static final Supplier<DataComponentType<Long>> HORIZON_READY = time("horizon_ready");
     public static final Supplier<DataComponentType<Long>> ARMED_UNTIL = time("armed_until");
     public static final Supplier<DataComponentType<Long>> LAST_HIT = time("last_hit");
+    /** When the current reload animation ends, and how long it runs. On the stack so other players' clients see it too. */
+    public static final Supplier<DataComponentType<Long>> RELOAD_UNTIL = time("reload_until");
+    public static final Supplier<DataComponentType<Integer>> RELOAD_TICKS = integer("reload_ticks");
 
     private ArsenalData() {}
 

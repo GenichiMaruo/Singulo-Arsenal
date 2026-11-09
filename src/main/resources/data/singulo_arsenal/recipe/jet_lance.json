@@ -4,7 +4,7 @@
   "pattern": [
     " J ",
     "LBL",
-    " J "
+    " R "
   ],
   "key": {
     "J": {
@@ -15,6 +15,9 @@
     },
     "B": {
       "item": "singulo:micro_black_hole"
+    },
+    "R": {
+      "item": "singulo:confinement_ring"
     }
   },
   "result": {

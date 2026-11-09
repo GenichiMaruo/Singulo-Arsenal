@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Deterministic generator for every data file, translation and icon. Python 3 stdlib only; run from any directory."""
 import json
+import math
 from pathlib import Path
+import random
 import shutil
 import struct
 import zlib
@@ -13,6 +15,8 @@ PARTS = ['helmet', 'chestplate', 'leggings', 'boots']
 WEAPONS = ['quench_saber', 'casimir_blade', 'tidal_reaver', 'jet_lance']
 MATERIALS = ['flux_weave', 'pressure_lattice', 'collapsar_lamina', 'jet_collimator', 'tidal_edge']
 DAMAGE = ['quench', 'collapse', 'jet', 'shear', 'horizon']
+MATERIAL_SIZE = 32
+FINE_SIZE = 64
 
 
 def write(path, value):
@@ -126,9 +130,9 @@ shaped('casimir_blade', ['M M', 'MEM', ' F '],
        {'M': s('mirror_plate'), 'E': s('exotic_matter'), 'F': s('nihonium_frame')}, s('mirror_plate'))
 shaped('tidal_reaver', [' T ', 'LGL', ' F '],
        {'T': own('tidal_edge'), 'L': own('collapsar_lamina'), 'G': s('gravity_field_stabilizer'), 'F': s('tidal_filament')}, own('tidal_edge'))
-# A contained black hole with a collimator on each pole.
-shaped('jet_lance', [' J ', 'LBL', ' J '],
-       {'J': own('jet_collimator'), 'L': own('collapsar_lamina'), 'B': s('micro_black_hole')}, own('jet_collimator'))
+# The hole in the middle, a collimator on the firing pole, and a confinement ring sealing the other.
+shaped('jet_lance', [' J ', 'LBL', ' R '],
+       {'J': own('jet_collimator'), 'L': own('collapsar_lamina'), 'B': s('micro_black_hole'), 'R': s('confinement_ring')}, own('jet_collimator'))
 
 # ---- Damage types and tags ---------------------------------------------------------------------------------------
 
@@ -144,25 +148,27 @@ write('data/minecraft/tags/item/enchantable/durability.json', {'replace': False,
 
 BUILTIN = {'parent': 'minecraft:builtin/entity', 'textures': {'particle': 'minecraft:block/gray_concrete'}}
 SWORD_DISPLAY = {
-    'gui': {'rotation': [0, 0, -45], 'translation': [0.4, 0.4, 0], 'scale': [0.6, 0.6, 0.6]},
+    'gui': {'rotation': [0, 0, -45], 'translation': [-0.8, -0.8, 0], 'scale': [0.5, 0.5, 0.5]},
     'ground': {'translation': [0, 2, 0], 'scale': [0.38, 0.38, 0.38]},
     'fixed': {'rotation': [0, 0, -45], 'scale': [0.7, 0.7, 0.7]},
-    'firstperson_righthand': {'rotation': [0, 0, 12], 'translation': [1.5, 2, -1], 'scale': [0.46, 0.46, 0.46]},
-    'firstperson_lefthand': {'rotation': [0, 0, -12], 'translation': [1.5, 2, -1], 'scale': [0.46, 0.46, 0.46]},
-    'thirdperson_righthand': {'rotation': [0, 90, 42], 'translation': [0, 4.5, 0.5], 'scale': [0.82, 0.82, 0.82]},
-    'thirdperson_lefthand': {'rotation': [0, -90, -42], 'translation': [0, 4.5, 0.5], 'scale': [0.82, 0.82, 0.82]},
+    # Vanilla item/handheld, with 45 degrees taken out of the Z rotation: vanilla's blade runs up the sprite's diagonal, this one up +Y.
+    'firstperson_righthand': {'rotation': [0, -90, -20], 'translation': [1.13, 3.2, 1.13], 'scale': [0.68, 0.68, 0.68]},
+    'firstperson_lefthand': {'rotation': [0, 90, 20], 'translation': [1.13, 3.2, 1.13], 'scale': [0.68, 0.68, 0.68]},
+    'thirdperson_righthand': {'rotation': [0, -90, 10], 'translation': [0, 4, 0.5], 'scale': [0.85, 0.85, 0.85]},
+    'thirdperson_lefthand': {'rotation': [0, 90, -10], 'translation': [0, 4, 0.5], 'scale': [0.85, 0.85, 0.85]},
 }
+# Carried at the ready in both hands: +Y to the muzzle, +Z up. The translation seats the pistol grip in the fist.
 LANCE_DISPLAY = {
-    'gui': {'rotation': [0, 0, -45], 'scale': [0.46, 0.46, 0.46]},
-    'ground': {'translation': [0, 2, 0], 'scale': [0.3, 0.3, 0.3]},
-    'fixed': {'rotation': [0, 0, -45], 'scale': [0.5, 0.5, 0.5]},
-    'firstperson_righthand': {'rotation': [-58, 0, 22], 'translation': [3, 2, -2], 'scale': [0.42, 0.42, 0.42]},
-    'firstperson_lefthand': {'rotation': [-58, 0, -22], 'translation': [3, 2, -2], 'scale': [0.42, 0.42, 0.42]},
-    'thirdperson_righthand': {'rotation': [75, 0, 0], 'translation': [0, 2.5, 0], 'scale': [0.72, 0.72, 0.72]},
-    'thirdperson_lefthand': {'rotation': [75, 0, 0], 'translation': [0, 2.5, 0], 'scale': [0.72, 0.72, 0.72]},
+    'gui': {'rotation': [-90, 0, -90], 'translation': [-1.9, 0.2, 0], 'scale': [0.36, 0.36, 0.36]},
+    'ground': {'rotation': [-90, 0, -90], 'translation': [0, 3, 0], 'scale': [0.3, 0.3, 0.3]},
+    'fixed': {'rotation': [-90, 0, -90], 'scale': [0.5, 0.5, 0.5]},
+    'firstperson_righthand': {'rotation': [-90, 0, 5], 'translation': [2.5, 3, -7], 'scale': [0.42, 0.42, 0.42]},
+    'firstperson_lefthand': {'rotation': [-90, 0, 5], 'translation': [2.5, 3, -7], 'scale': [0.42, 0.42, 0.42]},
+    'thirdperson_righthand': {'rotation': [-90, 0, 0], 'translation': [0, 2.5, 0], 'scale': [0.72, 0.72, 0.72]},
+    'thirdperson_lefthand': {'rotation': [-90, 0, 0], 'translation': [0, 2.5, 0], 'scale': [0.72, 0.72, 0.72]},
 }
 ARMOR_DISPLAY = {
-    'gui': {'rotation': [16, 208, 0], 'scale': [1, 1, 1]},
+    'gui': {'rotation': [16, 208, 0], 'scale': [0.72, 0.72, 0.72]},
     'ground': {'translation': [0, 3, 0], 'scale': [0.5, 0.5, 0.5]},
     'fixed': {'rotation': [0, 180, 0], 'scale': [1, 1, 1]},
     'firstperson_righthand': {'rotation': [0, 150, 0], 'translation': [1.5, 3, 0], 'scale': [0.38, 0.38, 0.38]},
@@ -170,10 +176,10 @@ ARMOR_DISPLAY = {
     'thirdperson_righthand': {'rotation': [75, 45, 0], 'translation': [0, 2.5, 0], 'scale': [0.34, 0.34, 0.34]},
     'thirdperson_lefthand': {'rotation': [75, 225, 0], 'translation': [0, 2.5, 0], 'scale': [0.34, 0.34, 0.34]},
 }
-# The reaver is the broadest thing here and would otherwise fill a quarter of the first-person view.
+# The reaver is far broader than a vanilla sword: same angle and position, drawn a little smaller so it does not fill the first-person view.
 REAVER_DISPLAY = {**SWORD_DISPLAY,
-                  'firstperson_righthand': {'rotation': [0, 0, 12], 'translation': [2, 1, -1], 'scale': [0.36, 0.36, 0.36]},
-                  'firstperson_lefthand': {'rotation': [0, 0, -12], 'translation': [2, 1, -1], 'scale': [0.36, 0.36, 0.36]}}
+                  'firstperson_righthand': {**SWORD_DISPLAY['firstperson_righthand'], 'scale': [0.54, 0.54, 0.54]},
+                  'firstperson_lefthand': {**SWORD_DISPLAY['firstperson_lefthand'], 'scale': [0.54, 0.54, 0.54]}}
 DISPLAYS = {'jet_lance': LANCE_DISPLAY, 'tidal_reaver': REAVER_DISPLAY}
 for name in WEAPONS:
     write(f'assets/{MOD}/models/item/{name}.json', {**BUILTIN, 'display': DISPLAYS.get(name, SWORD_DISPLAY)})
@@ -220,9 +226,9 @@ weapon_text = {
     'tidal_reaver': ('潮汐断裁刃', 'Tidal Reaver',
                      ['攻撃22／攻撃速度1.0。命中で潮汐応力を付与（最大5、被ダメージ+8%／層）。', '使用長押し：ロッシュ焦点が周囲の敵を引き寄せる（300,000 FE/秒）。', '離して断裁：応力に応じて16〜66ダメージを与え、応力を解放する。'],
                      ['22 damage, 1.0 attack speed. Hits apply tidal stress (up to 5, +8% damage taken each).', 'Hold use: a Roche focus drags nearby enemies in (300,000 FE/s).', 'Release to shear for 16-66 damage by stress, spending it.']),
-    'jet_lance': ('双極ジェット槍', 'Bipolar Jet Lance',
-                  ['使用長押し：点火→3段の収束→照射（最長6秒）。', '前方80ブロックを貫通し、防具の6割を無視して56 DPS（500,000 FE/秒）。', '逆極のジェットは背後14ブロックも焼く。反動はない。'],
-                  ['Hold use: ignition, three-ring collimation, then irradiation (up to 6s).', 'Pierces 80 blocks ahead for 56 DPS, ignoring 60% of armor (500,000 FE/s).', 'The opposite jet burns 14 blocks behind you. There is no recoil.']),
+    'jet_lance': ('ジェットランス', 'Jet Lance',
+                  ['使用長押し：点火→3段の収束→照射（最長6秒）。', '前方80ブロックを貫通し、防具の6割を無視して56 DPS（500,000 FE/秒）。', '磁気ミラーが後極を塞いでいて、ジェットは銃身からのみ出る。'],
+                  ['Hold use: ignition, three-ring collimation, then irradiation (up to 6s).', 'Pierces 80 blocks ahead for 56 DPS, ignoring 60% of armor (500,000 FE/s).', 'A magnetic mirror seals the rear pole, so the jet only leaves through the barrel.']),
 }
 for name, (j, e, tj, te) in weapon_text.items():
     ja[f'item.{MOD}.{name}'], en[f'item.{MOD}.{name}'] = j, e
@@ -291,98 +297,149 @@ def rgb(value):
 
 def sprite(name, art, palette):
     assert len(art) == 16 and all(len(row) == 16 for row in art), name
+    # Icons stay inside 14x14 so a one-pixel margin always separates them from the slot border.
+    assert set(art[0] + art[15] + ''.join(row[0] + row[15] for row in art)) == {'.'}, f'{name} touches the 16x16 border'
     png(f'assets/{MOD}/textures/item/{name}.png', 16, 16,
         [(0, 0, 0, 0) if c == '.' else rgb(palette[c]) for row in art for c in row])
 
 
+# A bolt of the woven conductor, seen from its rolled end, with a loose thread of superconductor.
 sprite('flux_weave', [
     '................',
-    '..wwcwwcwwcwww..',
-    '.wWWcWWcWWcWWsw.',
-    '.wWWcWWcWWcWWsw.',
-    '.ccccccccccccsc.',
-    '.wWWcWWcWWcWWsw.',
-    '.wWWcWWcWWcWWsw.',
-    '.ccccccccccccsc.',
-    '.wWWcWWcWWcWWsw.',
-    '.wWWcWWcWWcWWsw.',
-    '.ccccccccccccsc.',
-    '.wWWcWWcWWcWWsw.',
-    '.wWWcWWcWWcWWsw.',
-    '.sssssssssssss..',
-    '..wwcwwcwwcwww..',
     '................',
-], {'w': 0xB9C5D1, 'W': 0xE7ECF1, 'c': 0x7CE8FF, 's': 0x8D9AA8})
+    '...sssWWcWWcWW..',
+    '..sSSSsWcWWcWWc.',
+    '.sSccSSsccccccc.',
+    '.sSsSScSsWcWWcW.',
+    '.sScSsSSsWcWWcW.',
+    '.sSccSScscccccc.',
+    '.sSSSSSSsWcWWcW.',
+    '..sSSSSsWWcWWcW.',
+    '..ssssWWWcWWcW..',
+    '...cccccccccc...',
+    '.............c..',
+    '...........cc...',
+    '...........c....',
+    '................',
+], {'s': 0x8D9AA8, 'S': 0xB9C5D1, 'W': 0xE7ECF1, 'c': 0x7CE8FF})
+# A thick forged plate with the lattice cut into its face, its compressed layers showing hot along the edges.
 sprite('pressure_lattice', [
     '................',
-    '.DDDDDDDDDDDDDD.',
-    '.DPPPPaPPPaPPPD.',
-    '.DPLLPaPLPaPLPD.',
-    '.DPPPPaPPPaPPPD.',
-    '.DaaaahaaahaaaD.',
-    '.DPPPPaPPPaPPPD.',
-    '.DPLLPaPLPaPLPD.',
-    '.DPPPPaPPPaPPPD.',
-    '.DaaaahaaahaaaD.',
-    '.DPPPPaPPPaPPPD.',
-    '.DPLLPaPLPaPLPD.',
-    '.DPPPPaPPPaPPPD.',
-    '.DDDDDDDDDDDDDD.',
     '................',
+    '.......DD.......',
+    '.....DDPPDD.....',
+    '...DDPaPPaPDD...',
+    '.DDPaPPaaPPaPDD.',
+    '.DPPaPPPPPPaPPD.',
+    '.DDPPaPaaPaPPDD.',
+    '.DLDDPPaPaPPDRD.',
+    '.DLLLDDPPDDRRRD.',
+    '.DaaLLLDDRRRaaD.',
+    '..DDaaLLRRaaDD..',
+    '....DDaLRaDD....',
+    '......DaaD......',
+    '.......DD.......',
     '................',
-], {'D': 0x262220, 'P': 0x3E3936, 'L': 0x59524A, 'a': 0xE08A2E, 'h': 0xFFD27A})
+], {'D': 0x262220, 'P': 0x59524A, 'L': 0x3E3936, 'R': 0x2E2A27, 'a': 0xE08A2E})
+# A slab of collapsar metal in an ivory-edged frame; its cut edge shows the nuclear-pasta strata it was forged around.
 sprite('collapsar_lamina', [
     '................',
-    '..IIIIIIIIIIII..',
-    '.IVVVVVVVVVVVVI.',
-    '.IVoVoVoVoVoVVI.',
-    '.IVVVVVVVVVVVVI.',
-    '.IEEEEEEEEEEEEI.',
-    '.IVyyyyyyyyyyVI.',
-    '.IVVVVVVVVVVVVI.',
-    '.IEEEEEEEEEEEEI.',
-    '.IVwwwwwwwwwwVI.',
-    '.IVVVVVVVVVVVVI.',
-    '.IEEEEEEEEEEEEI.',
-    '.IVVVVVVVVVVVVI.',
-    '..IIIIIIIIIIII..',
     '................',
+    '.......II.......',
+    '.....IIVVII.....',
+    '...IIVVVVVVII...',
+    '.IIVVVEEEEVVVII.',
+    '.IVVVEEEEEEVVVI.',
+    '.IIIVVEEEEVVIII.',
+    '.IDDIIVVVVIIWWI.',
+    '.IooDDIIIIWWooI.',
+    '.IDDooDIIWooWWI.',
+    '.IyyDDoDWoWWyyI.',
+    '..IIyyDDWWyyII..',
+    '....IIyDWyII....',
+    '......IDWI......',
     '................',
-], {'I': 0xE7D8B0, 'V': 0x0E0D14, 'E': 0x24212E, 'o': 0xFFB061, 'y': 0xFFE2A0, 'w': 0xFFFFFF})
+], {'I': 0xE7D8B0, 'V': 0x1E1C26, 'E': 0x3A3648, 'D': 0x14121C, 'W': 0x24212E, 'o': 0xFFB061, 'y': 0xFFE2A0})
+# Three focusing rings stepping down in a line, as on the Jet Forge, with the jet narrowing through their bore.
 sprite('jet_collimator', [
     '................',
-    '.....IIIIII.....',
-    '...IIVVVVVVII...',
-    '..IVVyyyyyyVVI..',
-    '..IVyyEEEEyyVI..',
-    '.IVyyEIIIIEyyVI.',
-    '.IVyEIVVVVIEyVI.',
-    '.IVyEIV..VIEyVI.',
-    '.IVyEIV..VIEyVI.',
-    '.IVyEIVVVVIEyVI.',
-    '.IVyyEIIIIEyyVI.',
-    '..IVyyEEEEyyVI..',
-    '..IVVyyyyyyVVI..',
-    '...IIVVVVVVII...',
-    '.....IIIIII.....',
+    '..II............',
+    '.IVVI...II......',
+    '.IVVI..IVVI..II.',
+    '.IVVIVVIVVIVIVI.',
+    '.IVVIEEIVVIEIVI.',
+    '.cIccIccIccIcIc.',
+    '.WIWWIWWIWWIWIW.',
+    '.cIccIccIccIcIc.',
+    '.IVVIEEIVVIEIVI.',
+    '.IVVIVVIVVIVIVI.',
+    '.IVVI..IVVI..II.',
+    '.IVVI...II......',
+    '..II............',
     '................',
-], {'I': 0xE7D8B0, 'V': 0x24212E, 'E': 0x0E0D14, 'y': 0xFFD28A})
+    '................',
+], {'I': 0xE7D8B0, 'V': 0x24212E, 'E': 0x0E0D14, 'c': 0x8CD2FF, 'W': 0xF4FBFF})
+# The reaver blade blank before it is hilted: broad cleaver head, ivory spine, spun filament binding it, bare tang at the foot.
 sprite('tidal_edge', [
-    '.............yII',
-    '............yVVI',
-    '...........yVVVI',
-    '..........yVVVV.',
-    '.........yVVVV..',
-    '........yVVVV...',
-    '.......yVVVV....',
-    '......yVVVV.....',
-    '.....yVVVV......',
-    '....yVVVV.......',
-    '...yVVVVt.......',
-    '..yVVVVt.t......',
-    '.yVVVVt...t.....',
-    'yVVVVt.....t....',
-    'IVVVt.......t...',
-    'IIIt.........t..',
-], {'I': 0xE7D8B0, 'V': 0x24212E, 'y': 0xFFE2A0, 't': 0xFFD28A})
+    '................',
+    '..ISSVVVVVy.....',
+    '..ISVVVVVVVy....',
+    '..ISVVEEVVVVy...',
+    '..IsssssssVVy...',
+    '..ISVVVVVVVVy...',
+    '..ISVVVVVVVy....',
+    '..ISVVVVVVy.....',
+    '..ISsssssVy.....',
+    '..ISVVVVVy......',
+    '..ISVVVVy.......',
+    '..ISVVVy........',
+    '..ISVVy.........',
+    '..IIIII.........',
+    '...TT...........',
+    '................',
+], {'I': 0xE7D8B0, 'S': 0x14121C, 'V': 0x24212E, 'E': 0x3A3648, 's': 0xFFE2A0, 'y': 0xFFD28A, 'T': 0x3A3648})
 png(f'assets/{MOD}/textures/misc/white.png', 1, 1, [(255, 255, 255, 255)])
+
+
+# ---- Suit materials: tiling greyscale tiles at one texel per model pixel, tinted by each plate's colour -----------------
+
+def grey(value):
+    v = max(0, min(255, int(value)))
+    return (v, v, v, 255)
+
+
+def material(name, seed, shade):
+    rng = random.Random(seed)
+    png(f'assets/{MOD}/textures/misc/material_{name}.png', MATERIAL_SIZE, MATERIAL_SIZE,
+        [grey(shade(x, y, rng)) for y in range(MATERIAL_SIZE) for x in range(MATERIAL_SIZE)])
+
+
+def ceramic(x, y, rng):
+    # Glazed and even, with the occasional fleck.
+    return 226 + rng.randint(-10, 10) - (46 if rng.random() < 0.025 else 0)
+
+
+def hammered(x, y, rng):
+    # Forged plate: broad dents from low-frequency waves, grit, and dark pits.
+    dents = 16 * math.sin(x * math.tau / 8) * math.cos(y * math.tau / 16) + 12 * math.sin((x + y) * math.tau / 32)
+    return 205 + dents + rng.randint(-24, 24) - (70 if rng.random() < 0.05 else 0)
+
+
+streaks = random.Random(7714)
+BRUSH = [streaks.randint(-26, 26) for _ in range(MATERIAL_SIZE)]
+
+
+def brushed(x, y, rng):
+    # Brushed along its length: bands per row, slight grain, a few bright glints off the surface.
+    return 200 + BRUSH[y] + rng.randint(-9, 9) + (48 if rng.random() < 0.012 else 0)
+
+
+material('meissner', 1101, ceramic)
+material('degeneracy', 2202, hammered)
+material('collapsar', 3303, brushed)
+
+fine_rng = random.Random(9090)
+FINE_BANDS = [fine_rng.randint(-16, 16) for _ in range(FINE_SIZE)]
+png(f'assets/{MOD}/textures/misc/material_fine.png', FINE_SIZE, FINE_SIZE,
+    [grey(226 + FINE_BANDS[x] + fine_rng.randint(-6, 6) - (34 if fine_rng.random() < 0.012 else 0))
+     for y in range(FINE_SIZE) for x in range(FINE_SIZE)])

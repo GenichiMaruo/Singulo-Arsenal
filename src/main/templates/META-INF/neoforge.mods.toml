@@ -7,11 +7,12 @@ issueTrackerURL="https://github.com/GenichiMaruo/Singulo-Arsenal/issues"
 modId="${mod_id}"
 version="${mod_version}"
 displayName="${mod_name}"
+enumExtensions="META-INF/enumextensions.json"
 authors="${mod_authors}"
 displayURL="https://github.com/GenichiMaruo/Singulo-Arsenal"
 description='''
-The official Singulo weapons and armor addon, built around its materials and lost civilization technology.
-Four armor tiers: ruin exploration, catalytic circulation, inertial control, and event boundary protection.
+The official Singulo weapons and armor addon: gear built around the physics the base mod makes real.
+Meissner, Degeneracy and Collapsar armor, and four weapons up to Jet Forge endgame equipment.
 '''
 
 [[dependencies.${mod_id}]]

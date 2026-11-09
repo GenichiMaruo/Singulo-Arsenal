@@ -32,10 +32,10 @@ public final class ArsenalDamage {
         return new DamageSource(level.registryAccess().registryOrThrow(Registries.DAMAGE_TYPE).getHolderOrThrow(type), attacker);
     }
 
-    /** The only definition of "may this player's gear hurt that": never themselves, allies, or PvP-protected players. */
+    /** The only definition of "may this player's gear hurt that": never themselves, allies, creative or PvP-protected players. */
     public static boolean canHit(Player attacker, LivingEntity target) {
         return target != attacker && target.isAlive() && !target.isSpectator() && !(target instanceof ArmorStand) && !target.isAlliedTo(attacker)
-                && (!(target instanceof Player other) || attacker.canHarmPlayer(other));
+                && (!(target instanceof Player other) || (!other.isCreative() && attacker.canHarmPlayer(other)));
     }
 
     public static List<LivingEntity> around(Player attacker, Vec3 center, double radius) {

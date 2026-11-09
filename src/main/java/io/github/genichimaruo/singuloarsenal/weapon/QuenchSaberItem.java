@@ -47,6 +47,7 @@ public final class QuenchSaberItem extends PoweredSword {
             target.igniteForSeconds(3);
         }
         player.getCooldowns().addCooldown(this, Rules.QUENCH_COOLDOWN);
+        Weapons.beginReload(player.getMainHandItem(), level.getGameTime(), Rules.QUENCH_COOLDOWN);
         FxPayload.send(level, FxPayload.QUENCH, center, Vec3.ZERO, (float) Rules.QUENCH_RADIUS);
         Weapons.sound(origin, "keraunos_tower.discharge", 1.1F, 1.3F);
     }

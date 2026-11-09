@@ -167,6 +167,8 @@ public final class Rules {
     public static final double REAVER_RANGE = 12;
     public static final double REAVER_FOCUS = 5.5;
     public static final double REAVER_PULL = 0.34;
+    /** Bodies stop this far from the focus: nothing is pulled through the hole itself. */
+    public static final double REAVER_STOP = 1.2;
     public static final double REAVER_HEAVY_PULL = 0.08;
     public static final float REAVER_HEAVY_HEALTH = 200;
     public static final float SHEAR_BASE = 16;
@@ -197,9 +199,7 @@ public final class Rules {
     public static final int LANCE_PULSE = 5;
     public static final float LANCE_DAMAGE = 14;
     public static final float LANCE_ARMOR_KEPT = 0.4F;
-    public static final float LANCE_REAR_FACTOR = 0.5F;
     public static final double LANCE_RANGE = 80;
-    public static final double LANCE_REAR_RANGE = 14;
     public static final int LANCE_FE_PER_10_TICKS = 250_000;
     public static final int LANCE_COOLDOWN = 160;
     public static final int LANCE_SHORT_COOLDOWN = 20;
@@ -214,6 +214,50 @@ public final class Rules {
         if (heldTicks < LANCE_IGNITE) return LANCE_IGNITING;
         if (heldTicks < LANCE_COLLIMATE) return LANCE_COLLIMATING;
         return LANCE_FIRING;
+    }
+
+    // ---- Reload choreography: each curve is 0 at rest and runs over reload progress 0..1 --------------------------------------
+
+    private static float ramp(float p, float from, float to) {
+        float k = Math.max(0, Math.min(1, (p - from) / (to - from)));
+        return k * k * (3 - 2 * k);
+    }
+
+    /** Weapon turned over to reach the magazine. */
+    public static float reloadTilt(float p) {
+        return ramp(p, 0.06F, 0.22F) * (1 - ramp(p, 0.84F, 0.98F));
+    }
+
+    /** Heat vents raised, right after firing. */
+    public static float reloadVent(float p) {
+        return ramp(p, 0, 0.08F) * (1 - ramp(p, 0.76F, 0.86F));
+    }
+
+    /** How far the magazine has left its well. */
+    public static float reloadMagazine(float p) {
+        return p < 0.48F ? ramp(p, 0.14F, 0.3F) : 1 - ramp(p, 0.48F, 0.68F);
+    }
+
+    /** Between dropping the old magazine and bringing up the new one there is none attached. */
+    public static boolean reloadMagazineGone(float p) {
+        return p > 0.3F && p < 0.48F;
+    }
+
+    /** Support hand down at the magazine well. */
+    public static float reloadReach(float p) {
+        return ramp(p, 0.1F, 0.24F) * (1 - ramp(p, 0.66F, 0.76F));
+    }
+
+    /** Charging handle pulled back and released. */
+    public static float reloadCock(float p) {
+        return ramp(p, 0.72F, 0.8F) * (1 - ramp(p, 0.82F, 0.9F));
+    }
+
+    /** Recoil of one damage pulse, 1 as it fires and easing to 0 before the next. */
+    public static float lanceKick(float held) {
+        if (held < LANCE_COLLIMATE) return 0;
+        float phase = ((held - LANCE_COLLIMATE) % LANCE_PULSE) / LANCE_PULSE;
+        return (1 - phase) * (1 - phase);
     }
 
     /** The beam is narrowed by three rings, stepping down exactly as the Accretion Jet Forge's does. */

@@ -373,7 +373,7 @@ public final class ArsenalGameTests {
     }
 
     @GameTest(template = ARENA)
-    public static void lanceBurnsBothPolesAndStopsAtWalls(GameTestHelper h) {
+    public static void lanceFiresForwardOnlyAndStopsAtWalls(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 2.5);
         hold(p, new ItemStack(ArsenalItems.JET_LANCE.get()));
         p.setYRot(0);
@@ -381,8 +381,8 @@ public final class ArsenalGameTests {
         Zombie front = target(h, 2.5, 4.2);
         Zombie rear = target(h, 2.5, 1);
         JetLanceItem.pulse(p, h.getLevel());
-        near(h, 100 - front.getHealth(), Rules.LANCE_DAMAGE, "front jet");
-        near(h, 100 - rear.getHealth(), Rules.LANCE_DAMAGE * Rules.LANCE_REAR_FACTOR, "rear jet");
+        near(h, 100 - front.getHealth(), Rules.LANCE_DAMAGE, "jet");
+        h.assertTrue(rear.getHealth() == 100, "the rear pole is sealed: nothing behind the wielder may be hurt");
         JetLanceItem.pulse(p, h.getLevel());
         near(h, 100 - front.getHealth(), Rules.LANCE_DAMAGE * 2, "pulses must not be blocked by hurt cooldown");
         h.setBlock(2, 3, 3, Blocks.IRON_BLOCK);

@@ -91,6 +91,20 @@ public final class RulesTest {
             check(radius <= previous, "beam must narrow monotonically");
             previous = radius;
         }
+        for (int i = 0; i <= 1000; i++) {
+            float p = i / 1000F;
+            for (float v : new float[]{Rules.reloadTilt(p), Rules.reloadVent(p), Rules.reloadMagazine(p), Rules.reloadReach(p), Rules.reloadCock(p)}) {
+                check(v >= 0 && v <= 1, "reload curve out of range");
+            }
+        }
+        for (float v : new float[]{Rules.reloadTilt(0), Rules.reloadVent(0), Rules.reloadMagazine(0), Rules.reloadReach(0), Rules.reloadCock(0),
+                Rules.reloadTilt(1), Rules.reloadVent(1), Rules.reloadMagazine(1), Rules.reloadReach(1), Rules.reloadCock(1)}) {
+            check(v == 0, "a reload must start and end at rest");
+        }
+        check(Rules.reloadMagazine(0.4F) == 1 && Rules.reloadMagazineGone(0.4F), "magazine is out mid-reload");
+        check(!Rules.reloadMagazineGone(0) && !Rules.reloadMagazineGone(1), "magazine is present at rest");
+        check(Rules.lanceKick(Rules.LANCE_COLLIMATE - 1) == 0, "no recoil before firing");
+        check(Rules.lanceKick(Rules.LANCE_COLLIMATE) == 1, "recoil on the pulse");
         int fullBurst = (Rules.LANCE_MAX_HOLD - Rules.LANCE_COLLIMATE) / 10 + 1;
         check(fullBurst * Rules.LANCE_FE_PER_10_TICKS <= Rules.LANCE_CAPACITY, "a full tank must cover one full burst");
         System.out.println("Rules: " + checks + " checks passed");

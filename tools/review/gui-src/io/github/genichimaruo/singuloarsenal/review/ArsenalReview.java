@@ -1,24 +1,32 @@
 package io.github.genichimaruo.singuloarsenal.review;
 
+import com.mojang.authlib.GameProfile;
 import io.github.genichimaruo.singuloarsenal.ArsenalItems;
 import io.github.genichimaruo.singuloarsenal.SinguloArsenal;
 import io.github.genichimaruo.singuloarsenal.armor.ArmorSet;
 import io.github.genichimaruo.singuloarsenal.core.ArsenalData;
 import io.github.genichimaruo.singuloarsenal.core.Fe;
-import io.github.genichimaruo.singuloarsenal.core.Rules;
+import io.netty.channel.embedded.EmbeddedChannel;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
 import net.minecraft.core.BlockPos;
+import net.minecraft.network.Connection;
+import net.minecraft.network.protocol.PacketFlow;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.network.CommonListenerCookie;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.HumanoidArm;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.decoration.ArmorStand;
-import net.minecraft.world.entity.monster.Zombie;
+import net.minecraft.world.entity.monster.Husk;
 import net.minecraft.world.item.ArmorItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -29,16 +37,24 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.RenderFrameEvent;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
-/** Drives a disposable world through every visual state and saves screenshots. Never part of the distributed JAR. */
+/**
+ * Drives a disposable world and saves screenshots of the gear as the wearer and as another player sees it. The "other player" is a
+ * real server player on a mock connection, so this client receives and renders it exactly as it would a remote person.
+ */
 @EventBusSubscriber(modid = SinguloArsenal.MOD_ID, value = Dist.CLIENT)
 public final class ArsenalReview {
-    private static final double[][] STANDS = {{-3, 4}, {0, 4}, {3, 4}};
-    private static int total, ticks;
+    private static final double OX = 0.5, OZ = 8.5;
+    private record Step(int tick, Runnable action) {}
+    private static final List<Step> STEPS = new ArrayList<>();
+    private static int total, ticks, cursor, at;
     private static boolean preparing;
     private static volatile boolean prepared;
+    private static volatile ServerPlayer other;
+    private static Husk dummy;
     private static String capture;
-    private static int inventoryFrames;
+    private static boolean done;
 
     private static ItemStack charged(Item item) {
         ItemStack stack = new ItemStack(item);
@@ -46,78 +62,61 @@ public final class ArsenalReview {
         return stack;
     }
 
-    private static void dress(ArmorStand stand, ArmorSet set, int load) {
+    private static List<Item> weapons() {
+        return List.of(ArsenalItems.QUENCH_SABER.get(), ArsenalItems.CASIMIR_BLADE.get(), ArsenalItems.TIDAL_REAVER.get(), ArsenalItems.JET_LANCE.get());
+    }
+
+    private static void dress(LivingEntity who, ArmorSet set, int load) {
         var pieces = ArsenalItems.SUITS.get(set);
-        stand.setItemSlot(EquipmentSlot.HEAD, charged(pieces.get(ArmorItem.Type.HELMET).get()));
+        who.setItemSlot(EquipmentSlot.HEAD, charged(pieces.get(ArmorItem.Type.HELMET).get()));
         ItemStack chest = charged(pieces.get(ArmorItem.Type.CHESTPLATE).get());
         chest.set(ArsenalData.LOAD.get(), load);
-        stand.setItemSlot(EquipmentSlot.CHEST, chest);
-        stand.setItemSlot(EquipmentSlot.LEGS, charged(pieces.get(ArmorItem.Type.LEGGINGS).get()));
-        stand.setItemSlot(EquipmentSlot.FEET, charged(pieces.get(ArmorItem.Type.BOOTS).get()));
+        who.setItemSlot(EquipmentSlot.CHEST, chest);
+        who.setItemSlot(EquipmentSlot.LEGS, charged(pieces.get(ArmorItem.Type.LEGGINGS).get()));
+        who.setItemSlot(EquipmentSlot.FEET, charged(pieces.get(ArmorItem.Type.BOOTS).get()));
     }
 
     private static void prepare(Minecraft mc) {
         var server = mc.getSingleplayerServer();
         ServerPlayer p = server.getPlayerList().getPlayer(mc.player.getUUID());
-        var level = p.serverLevel();
+        ServerLevel level = p.serverLevel();
         level.setDayTime(6000);
         level.setWeatherParameters(6000, 0, false, false);
-        for (int x = -14; x <= 14; x++) for (int z = -14; z <= 26; z++) {
+        for (int x = -22; x <= 22; x++) for (int z = -22; z <= 40; z++) {
             level.setBlock(new BlockPos(x, 80, z), Blocks.SMOOTH_STONE.defaultBlockState(), 3);
             for (int y = 81; y <= 95; y++) level.setBlock(new BlockPos(x, y, z), Blocks.AIR.defaultBlockState(), 3);
         }
-        for (int x = -14; x <= 14; x++) for (int y = 81; y <= 90; y++) {
-            level.setBlock(new BlockPos(x, y, 26), Blocks.DEEPSLATE_TILES.defaultBlockState(), 3);
-        }
-        ArmorSet[] sets = ArmorSet.values();
+        for (int x = -22; x <= 22; x++) for (int y = 81; y <= 92; y++) level.setBlock(new BlockPos(x, y, 40), Blocks.DEEPSLATE_TILES.defaultBlockState(), 3);
+        ArmorStand stand = EntityType.ARMOR_STAND.create(level);
+        stand.moveTo(-6.5, 81, 4.5, 180, 0);
+        dress(stand, ArmorSet.COLLAPSAR, 50);
+        level.addFreshEntity(stand);
         for (int i = 0; i < 3; i++) {
-            ArmorStand stand = EntityType.ARMOR_STAND.create(level);
-            stand.moveTo(STANDS[i][0] + 0.5, 81, STANDS[i][1] + 0.5, 180, 0);
-            stand.setShowArms(true);
-            dress(stand, sets[i], 0);
-            level.addFreshEntity(stand);
+            Husk husk = EntityType.HUSK.create(level);
+            husk.moveTo(new double[]{OX + 2.3, OX - 2.3, OX}[i], 81, OZ + 5.5, 180, 0);
+            husk.setNoAi(true);
+            husk.setPersistenceRequired();
+            husk.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.MAX_HEALTH).setBaseValue(1000);
+            husk.setHealth(1000);
+            level.addFreshEntity(husk);
+            if (i == 0) dummy = husk;
         }
-        ArmorStand gnocchi = EntityType.ARMOR_STAND.create(level);
-        gnocchi.moveTo(-3.5, 81, 9.5, 180, 0);
-        dress(gnocchi, ArmorSet.COLLAPSAR, 10);
-        level.addFreshEntity(gnocchi);
-        ArmorStand spaghetti = EntityType.ARMOR_STAND.create(level);
-        spaghetti.moveTo(0.5, 81, 9.5, 180, 0);
-        dress(spaghetti, ArmorSet.COLLAPSAR, 50);
-        level.addFreshEntity(spaghetti);
-        ArmorStand lasagna = EntityType.ARMOR_STAND.create(level);
-        lasagna.moveTo(4.5, 81, 9.5, 180, 0);
-        dress(lasagna, ArmorSet.COLLAPSAR, 95);
-        level.addFreshEntity(lasagna);
-        ArmorStand hot = EntityType.ARMOR_STAND.create(level);
-        hot.moveTo(8.5, 81, 9.5, 180, 0);
-        dress(hot, ArmorSet.DEGENERACY, Rules.PRESSURE_MAX);
-        level.addFreshEntity(hot);
-        for (int i = 0; i < 3; i++) {
-            Zombie zombie = EntityType.HUSK.create(level);
-            zombie.moveTo(new int[]{-5, 3, 6}[i] + 0.5, 81, 20.5, 180, 0);
-            zombie.setNoAi(true);
-            zombie.setPersistenceRequired();
-            zombie.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.MAX_HEALTH).setBaseValue(1000);
-            zombie.setHealth(1000);
-            level.addFreshEntity(zombie);
-        }
+        var cookie = CommonListenerCookie.createInitial(new GameProfile(UUID.randomUUID(), "Other"), false);
+        ServerPlayer o = new ServerPlayer(server, level, cookie.gameProfile(), cookie.clientInformation());
+        Connection connection = new Connection(PacketFlow.SERVERBOUND);
+        new EmbeddedChannel(connection);
+        server.getPlayerList().placeNewPlayer(connection, o, cookie);
+        o.setGameMode(GameType.SURVIVAL);
+        o.teleportTo(level, OX, 81, OZ, 0, 0);
+        o.setYHeadRot(0);
+        o.setInvulnerable(true);
+        other = o;
         p.setGameMode(GameType.CREATIVE);
         p.getInventory().clearContent();
-        List<Item> weapons = List.of(ArsenalItems.QUENCH_SABER.get(), ArsenalItems.CASIMIR_BLADE.get(), ArsenalItems.TIDAL_REAVER.get(), ArsenalItems.JET_LANCE.get());
-        for (int i = 0; i < 4; i++) p.getInventory().setItem(i, charged(weapons.get(i)));
-        List<Item> all = new ArrayList<>(ArsenalItems.powered());
-        for (int i = 0; i < all.size(); i++) p.getInventory().setItem(9 + i, charged(all.get(i)));
-        p.getInventory().selected = 3;
-        p.teleportTo(0.5, 81, -3.5);
-        p.setYRot(0);
-        p.setXRot(8);
+        for (int i = 0; i < 4; i++) p.getInventory().setItem(i, charged(weapons().get(i)));
+        p.getInventory().setItem(4, new ItemStack(net.minecraft.world.item.Items.DIAMOND_SWORD));
+        p.teleportTo(OX, 81, OZ - 10);
         prepared = true;
-    }
-
-    private static void holdSlot(Minecraft mc, int slot) {
-        mc.player.getInventory().selected = slot;
-        mc.getSingleplayerServer().execute(() -> mc.getSingleplayerServer().getPlayerList().getPlayer(mc.player.getUUID()).getInventory().selected = slot);
     }
 
     private static void teleport(Minecraft mc, double x, double z, float yaw, float pitch) {
@@ -127,10 +126,249 @@ public final class ArsenalReview {
         });
     }
 
+    /** Stand {@code distance} away from the other player at {@code bearing} degrees off their facing (+Z), and look at them. */
+    private static void watch(Minecraft mc, double bearing, double distance) {
+        double a = Math.toRadians(bearing);
+        double x = OX + Math.sin(a) * distance, z = OZ + Math.cos(a) * distance;
+        float yaw = (float) Math.toDegrees(Math.atan2(-(OX - x), OZ - z));
+        teleport(mc, x, z, yaw, 6);
+    }
+
+    private static void server(Minecraft mc, java.util.function.Consumer<ServerPlayer> action) {
+        mc.getSingleplayerServer().execute(() -> action.accept(other));
+    }
+
+    private static void local(Minecraft mc, java.util.function.Consumer<ServerPlayer> action) {
+        mc.getSingleplayerServer().execute(() -> action.accept(mc.getSingleplayerServer().getPlayerList().getPlayer(mc.player.getUUID())));
+    }
+
+    private static void hold(ServerPlayer who, Item item) {
+        who.setItemSlot(EquipmentSlot.MAINHAND, charged(item));
+    }
+
+    private static void step(int wait, Runnable action) {
+        at += wait;
+        STEPS.add(new Step(at, action));
+    }
+
+    private static void shot(String name) {
+        step(0, () -> capture = name);
+        at += 3;
+    }
+
+    private static void selectSlot(Minecraft mc, int slot) {
+        mc.player.getInventory().selected = slot;
+        local(mc, p -> p.getInventory().selected = slot);
+    }
+
+    private static void press(Minecraft mc) {
+        mc.options.keyUse.setDown(true);
+        mc.gameMode.useItem(mc.player, InteractionHand.MAIN_HAND);
+    }
+
+    /** Enlarged inventory for inspecting every icon against its slot. Enabled by the marker file build/gui-review/icons-only. */
+    private static void iconScript(Minecraft mc) {
+        step(60, () -> {
+            local(mc, p -> {
+                p.setGameMode(GameType.SURVIVAL);
+                p.getInventory().clearContent();
+                List<Item> all = new ArrayList<>(ArsenalItems.powered());
+                all.add(ArsenalItems.FLUX_WEAVE.get());
+                all.add(ArsenalItems.PRESSURE_LATTICE.get());
+                all.add(ArsenalItems.COLLAPSAR_LAMINA.get());
+                all.add(ArsenalItems.JET_COLLIMATOR.get());
+                all.add(ArsenalItems.TIDAL_EDGE.get());
+                for (int i = 0; i < all.size(); i++) p.getInventory().setItem(9 + i, charged(all.get(i)));
+            });
+        });
+        step(20, () -> {
+            mc.options.guiScale().set(4);
+            mc.resizeDisplay();
+            mc.setScreen(new net.minecraft.client.gui.screens.inventory.InventoryScreen(mc.player));
+            // Park the cursor in the corner so no tooltip covers the icons.
+            org.lwjgl.glfw.GLFW.glfwSetCursorPos(mc.getWindow().getWindow(), 0, 0);
+        });
+        at += 10;
+        shot("icons");
+        step(4, () -> done = true);
+    }
+
+    private static void script(Minecraft mc) {
+        if (Files.exists(mc.gameDirectory.toPath().resolve("icons-only"))) {
+            iconScript(mc);
+            return;
+        }
+        String[] names = {"quench", "casimir", "reaver", "lance"};
+        step(90, () -> mc.options.setCameraType(CameraType.FIRST_PERSON));
+
+        // Another player, idle, from three sides.
+        for (int w = 0; w < 4; w++) {
+            int index = w;
+            step(2, () -> server(mc, o -> hold(o, weapons().get(index))));
+            step(2, () -> watch(mc, -55, 3.2));
+            at += 12;
+            shot("other-" + names[w] + "-idle-right");
+            step(2, () -> watch(mc, -100, 3.2));
+            at += 8;
+            shot("other-" + names[w] + "-idle-side");
+            step(2, () -> watch(mc, 60, 3.2));
+            at += 8;
+            shot("other-" + names[w] + "-idle-left");
+        }
+
+        // A vanilla sword from the same angles, to compare the grip against.
+        step(2, () -> server(mc, o -> hold(o, net.minecraft.world.item.Items.DIAMOND_SWORD)));
+        step(2, () -> watch(mc, -55, 3.2));
+        at += 12;
+        shot("other-vanilla-idle-right");
+        step(2, () -> watch(mc, -100, 3.2));
+        at += 8;
+        shot("other-vanilla-idle-side");
+
+        // Another player's effects.
+        step(2, () -> server(mc, o -> hold(o, weapons().get(1))));
+        step(2, () -> watch(mc, -55, 3.2));
+        step(6, () -> server(mc, o -> o.startUsingItem(InteractionHand.MAIN_HAND)));
+        at += 12;
+        shot("other-casimir-closing");
+        at += 12;
+        step(2, () -> server(mc, ServerPlayer::stopUsingItem));
+
+        step(2, () -> server(mc, o -> hold(o, weapons().get(0))));
+        step(10, () -> server(mc, o -> {
+            ItemStack saber = o.getMainHandItem();
+            for (int i = 0; i < 5; i++) saber.getItem().hurtEnemy(saber, dummy, o);
+            o.swing(InteractionHand.MAIN_HAND, true);
+        }));
+        at += 3;
+        shot("other-quench-burst");
+
+        step(30, () -> server(mc, o -> hold(o, weapons().get(2))));
+        step(2, () -> watch(mc, -100, 5));
+        step(12, () -> server(mc, o -> o.startUsingItem(InteractionHand.MAIN_HAND)));
+        at += 35;
+        shot("other-reaver-focus");
+        step(2, () -> server(mc, ServerPlayer::releaseUsingItem));
+        at += 3;
+        shot("other-reaver-shear");
+
+        step(40, () -> server(mc, o -> hold(o, weapons().get(3))));
+        step(2, () -> watch(mc, -100, 6));
+        step(10, () -> server(mc, o -> o.startUsingItem(InteractionHand.MAIN_HAND)));
+        at += 16;
+        shot("other-lance-collimating");
+        at += 22;
+        shot("other-lance-firing-side");
+        step(2, () -> watch(mc, -40, 6));
+        at += 8;
+        shot("other-lance-firing-right");
+        step(2, () -> watch(mc, 165, 6));
+        at += 8;
+        shot("other-lance-firing-behind");
+        step(2, () -> watch(mc, 30, 5));
+        at += 8;
+        shot("other-lance-firing-front");
+        step(2, () -> server(mc, ServerPlayer::releaseUsingItem));
+        step(2, () -> watch(mc, -70, 3.2));
+        for (int[] cue : new int[][]{{20, 1}, {22, 2}, {26, 3}, {30, 4}, {22, 5}}) {
+            at += cue[0];
+            shot("other-lance-reload-" + cue[1]);
+        }
+        at += 45;
+
+        // Left-handed other player.
+        step(10, () -> server(mc, o -> { o.setMainArm(HumanoidArm.LEFT); hold(o, weapons().get(2)); }));
+        step(2, () -> watch(mc, 55, 3.2));
+        at += 12;
+        shot("other-left-handed-reaver");
+        step(2, () -> server(mc, o -> { o.setMainArm(HumanoidArm.RIGHT); o.setItemSlot(EquipmentSlot.MAINHAND, ItemStack.EMPTY); }));
+
+        // The player's own view.
+        step(4, () -> teleport(mc, OX, OZ - 4, 0, 4));
+        step(2, () -> server(mc, o -> o.setGameMode(GameType.CREATIVE)));
+        for (int w = 0; w < 4; w++) {
+            int slot = w;
+            step(4, () -> selectSlot(mc, slot));
+            at += 26;
+            shot("self-" + names[w] + "-first-person");
+        }
+        step(4, () -> selectSlot(mc, 4));
+        at += 26;
+        shot("self-vanilla-first-person");
+        step(2, () -> selectSlot(mc, 1));
+        at += 26;
+        step(2, () -> press(mc));
+        at += 18;
+        shot("self-casimir-closing");
+        step(10, () -> mc.options.keyUse.setDown(false));
+
+        step(2, () -> selectSlot(mc, 2));
+        at += 26;
+        step(2, () -> press(mc));
+        at += 30;
+        shot("self-reaver-focus");
+        step(2, () -> mc.options.keyUse.setDown(false));
+        at += 3;
+        shot("self-reaver-shear");
+
+        step(10, () -> selectSlot(mc, 3));
+        at += 26;
+        step(2, () -> press(mc));
+        at += 16;
+        shot("self-lance-collimating");
+        at += 22;
+        shot("self-lance-firing");
+        step(2, () -> mc.options.setCameraType(CameraType.THIRD_PERSON_BACK));
+        at += 8;
+        shot("self-lance-firing-third-back");
+        step(2, () -> mc.options.setCameraType(CameraType.THIRD_PERSON_FRONT));
+        at += 8;
+        shot("self-lance-firing-third-front");
+        step(2, () -> { mc.options.keyUse.setDown(false); mc.options.setCameraType(CameraType.FIRST_PERSON); });
+        for (int[] cue : new int[][]{{20, 1}, {22, 2}, {26, 3}, {30, 4}, {22, 5}}) {
+            at += cue[0];
+            shot("self-lance-reload-" + cue[1]);
+        }
+        at += 45;
+
+        // Left-handed self.
+        step(4, () -> { mc.options.mainHand().set(HumanoidArm.LEFT); mc.options.broadcastOptions(); });
+        step(4, () -> selectSlot(mc, 0));
+        at += 26;
+        shot("self-left-handed-quench");
+        step(2, () -> selectSlot(mc, 3));
+        at += 26;
+        shot("self-left-handed-lance");
+        step(2, () -> { mc.options.mainHand().set(HumanoidArm.RIGHT); mc.options.broadcastOptions(); });
+
+        // Black holes on the suits, close up, front and back.
+        step(10, () -> local(mc, p -> dress(p, ArmorSet.COLLAPSAR, 10)));
+        step(2, () -> server(mc, o -> dress(o, ArmorSet.COLLAPSAR, 50)));
+        step(2, () -> watch(mc, 0, 2.6));
+        at += 14;
+        shot("suit-hole-front");
+        step(2, () -> watch(mc, 180, 2.6));
+        at += 10;
+        shot("suit-hole-back");
+        step(2, () -> watch(mc, 130, 2.6));
+        at += 10;
+        shot("suit-hole-back-oblique");
+        step(6, () -> mc.setScreen(new net.minecraft.client.gui.screens.inventory.InventoryScreen(mc.player)));
+        at += 6;
+        shot("zz-inventory");
+        step(4, () -> done = true);
+    }
+
+    @SubscribeEvent
+    public static void serverTick(ServerTickEvent.Post event) {
+        // A mock connection has nothing to pump this player, so step it the way a real connection would.
+        if (other != null) other.doTick();
+    }
+
     @SubscribeEvent
     public static void tick(ClientTickEvent.Post event) {
         var mc = Minecraft.getInstance();
-        if (++total > 4800) throw new IllegalStateException("Arsenal review timed out: " + mc.screen);
+        if (++total > 9000) throw new IllegalStateException("Arsenal review timed out: " + mc.screen);
         if (mc.screen instanceof net.minecraft.client.gui.screens.BackupConfirmScreen) {
             for (var child : mc.screen.children()) {
                 if (child instanceof net.minecraft.client.gui.components.Button b
@@ -145,73 +383,24 @@ public final class ArsenalReview {
             return;
         }
         if (!prepared || mc.getOverlay() != null) return;
+        if (STEPS.isEmpty()) script(mc);
         if (mc.screen != null && !(mc.screen instanceof net.minecraft.client.gui.screens.inventory.InventoryScreen)) return;
         ticks++;
-        switch (ticks) {
-            case 100 -> capture = "01-suits-front";
-            case 104 -> teleport(mc, 0.5, 13.5, 180, 12);
-            case 130 -> capture = "02-suits-back";
-            case 134 -> teleport(mc, 2.5, 5.5, 0, 6);
-            case 165 -> capture = "03-pasta-phases";
-            case 170 -> teleport(mc, 0.5, 15.5, 0, 0);
-            case 195 -> holdSlot(mc, 0);
-            case 208 -> capture = "04-quench-first-person";
-            case 215 -> holdSlot(mc, 1);
-            case 228 -> capture = "05-casimir-first-person";
-            case 235 -> holdSlot(mc, 2);
-            case 248 -> capture = "06-reaver-first-person";
-            case 255 -> holdSlot(mc, 3);
-            case 268 -> capture = "07-lance-first-person";
-            case 275 -> { mc.options.keyUse.setDown(true); mc.gameMode.useItem(mc.player, InteractionHand.MAIN_HAND); }
-            case 290 -> capture = "08-lance-collimating";
-            case 320 -> capture = "09-lance-firing";
-            case 330 -> mc.options.setCameraType(CameraType.THIRD_PERSON_BACK);
-            case 352 -> capture = "10-lance-third-person";
-            case 356 -> { mc.options.keyUse.setDown(false); mc.options.setCameraType(CameraType.FIRST_PERSON); }
-            case 530 -> { holdSlot(mc, 2); }
-            case 545 -> { mc.options.keyUse.setDown(true); mc.gameMode.useItem(mc.player, InteractionHand.MAIN_HAND); }
-            case 585 -> capture = "11-reaver-focus";
-            case 590 -> mc.options.keyUse.setDown(false);
-            case 596 -> capture = "12-reaver-shear";
-            case 610 -> { mc.options.setCameraType(CameraType.THIRD_PERSON_FRONT); holdSlot(mc, 3); }
-            case 630 -> capture = "13-hold-lance-third-person";
-            case 634 -> holdSlot(mc, 2);
-            case 650 -> capture = "14-hold-reaver-third-person";
-            case 654 -> mc.getSingleplayerServer().execute(() -> {
-                ServerPlayer p = mc.getSingleplayerServer().getPlayerList().getPlayer(mc.player.getUUID());
-                var pieces = ArsenalItems.SUITS.get(ArmorSet.COLLAPSAR);
-                p.setItemSlot(EquipmentSlot.HEAD, charged(pieces.get(ArmorItem.Type.HELMET).get()));
-                p.setItemSlot(EquipmentSlot.CHEST, charged(pieces.get(ArmorItem.Type.CHESTPLATE).get()));
-                p.setItemSlot(EquipmentSlot.LEGS, charged(pieces.get(ArmorItem.Type.LEGGINGS).get()));
-                p.setItemSlot(EquipmentSlot.FEET, charged(pieces.get(ArmorItem.Type.BOOTS).get()));
-            });
-            case 680 -> capture = "15-worn-third-person";
-            case 684 -> { mc.options.setCameraType(CameraType.THIRD_PERSON_BACK); teleport(mc, 0.5, 15.5, 0, -5); }
-            case 700 -> net.neoforged.neoforge.network.PacketDistributor.sendToServer(io.github.genichimaruo.singuloarsenal.net.AbilityPayload.INSTANCE);
-            case 703 -> capture = "16-jet-burst";
-            case 720 -> {
-                mc.options.setCameraType(CameraType.FIRST_PERSON);
-                mc.getSingleplayerServer().execute(() -> mc.getSingleplayerServer().getPlayerList().getPlayer(mc.player.getUUID()).setGameMode(GameType.SURVIVAL));
-            }
-            case 740 -> {
-                mc.setScreen(new net.minecraft.client.gui.screens.inventory.InventoryScreen(mc.player));
-                capture = "17-inventory";
-            }
-        }
+        while (cursor < STEPS.size() && STEPS.get(cursor).tick <= ticks) STEPS.get(cursor++).action.run();
     }
 
     @SubscribeEvent
     public static void render(RenderFrameEvent.Post event) throws Exception {
         var mc = Minecraft.getInstance();
-        if (capture == null) return;
-        if (capture.equals("17-inventory") && inventoryFrames++ < 5) return;
-        var directory = mc.gameDirectory.toPath().resolve("screenshots");
-        Files.createDirectories(directory);
-        try (var shot = Screenshot.takeScreenshot(mc.getMainRenderTarget())) {
-            shot.writeToFile(directory.resolve(capture + ".png"));
+        if (capture != null) {
+            var directory = mc.gameDirectory.toPath().resolve("screenshots");
+            Files.createDirectories(directory);
+            try (var shot = Screenshot.takeScreenshot(mc.getMainRenderTarget())) {
+                shot.writeToFile(directory.resolve(capture + ".png"));
+            }
+            System.out.println("ARSENAL_REVIEW_CAPTURE " + capture);
+            capture = null;
         }
-        System.out.println("ARSENAL_REVIEW_CAPTURE " + capture);
-        if (capture.equals("17-inventory")) mc.stop();
-        capture = null;
+        if (done) mc.stop();
     }
 }

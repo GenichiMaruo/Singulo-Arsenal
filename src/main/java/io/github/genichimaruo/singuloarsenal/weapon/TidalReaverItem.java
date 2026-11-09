@@ -64,7 +64,7 @@ public final class TidalReaverItem extends PoweredSword {
         Vec3 focus = focus(player, 1);
         for (LivingEntity target : ArsenalDamage.around(player, focus, Rules.REAVER_RANGE)) {
             Vec3 toward = focus.subtract(target.getBoundingBox().getCenter());
-            if (toward.lengthSqr() < 0.3) continue;
+            if (toward.lengthSqr() < Rules.REAVER_STOP * Rules.REAVER_STOP) continue;
             double strength = target.getMaxHealth() >= Rules.REAVER_HEAVY_HEALTH ? Rules.REAVER_HEAVY_PULL : Rules.REAVER_PULL;
             target.setDeltaMovement(target.getDeltaMovement().scale(0.7).add(toward.normalize().scale(strength)));
             target.hurtMarked = true;
@@ -98,6 +98,7 @@ public final class TidalReaverItem extends PoweredSword {
             }
         }
         player.getCooldowns().addCooldown(this, Rules.REAVER_COOLDOWN);
+        Weapons.beginReload(player.getMainHandItem(), level.getGameTime(), Rules.REAVER_COOLDOWN);
         FxPayload.send(level, FxPayload.SHEAR, focus, player.getLookAngle(), (float) Rules.REAVER_RANGE);
         Weapons.sound(player, "black_hole.devour", 1.8F, 1.1F);
     }

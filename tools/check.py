@@ -69,6 +69,11 @@ for weapon in WEAPONS:
     for line in (1, 2, 3):
         assert f'tooltip.singulo_arsenal.{weapon}.{line}' in locales[0], weapon
 
+# Materials tile at one texel per model pixel; Canvas.MATERIAL_SIZE assumes 32.
+for suit in SETS:
+    data = (RES / f'assets/singulo_arsenal/textures/misc/material_{suit}.png').read_bytes()
+    assert data[1:4] == b'PNG' and struct.unpack('>II', data[16:24]) == (32, 32), f'bad material {suit}'
+
 damage_dir = RES / 'data/singulo_arsenal/damage_type'
 for path in damage_dir.glob('*.json'):
     message = json.loads(path.read_text(encoding='utf-8'))['message_id']

@@ -23,10 +23,15 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.decoration.ArmorStand;
 import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
+import io.github.genichimaruo.singuloarsenal.client.art.WeaponArt;
+import org.joml.Matrix4f;
+import org.joml.Quaternionf;
+import org.joml.Vector3f;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
@@ -37,9 +42,13 @@ import net.neoforged.neoforge.common.NeoForge;
 final class FxClient {
     private record Fx(FxPayload data, long born) {}
     private record Stretch(float held, long heldUntil, long shearBorn, float shear) {}
+    private record Muzzle(Vec3 position, long frame) {}
 
     private static final List<Fx> ACTIVE = new ArrayList<>();
     private static final Map<Integer, Stretch> STRETCHES = new HashMap<>();
+    private static final Map<Integer, Muzzle> MUZZLES = new HashMap<>();
+    /** Counts world passes, so a muzzle remembered from an earlier frame (its owner now culled) is not trusted. */
+    private static long frame;
     private static ClientLevel scene;
 
     private FxClient() {}
@@ -89,6 +98,7 @@ final class FxClient {
     private static void clear(ClientLevel next) {
         ACTIVE.clear();
         STRETCHES.clear();
+        MUZZLES.clear();
         scene = next;
     }
 
@@ -145,12 +155,14 @@ final class FxClient {
             drawFx(pose, glow, fx.data, age, 1 - age / life);
         }
         for (Player player : mc.level.players()) {
-            if (player.isUsingItem() && player.getUseItem().getItem() instanceof JetLanceItem) drawJets(pose, glow, player, partial);
+            if (player.isUsingItem() && player.getUseItem().getItem() instanceof JetLanceItem) drawImpact(pose, glow, player, partial);
             if (player.isUsingItem() && player.getUseItem().getItem() instanceof TidalReaverItem) drawThreads(pose, glow, mc.level, player, partial, now);
         }
         buffers.endBatch(ArsenalRenderTypes.GLOW);
+        drawWorldJets(pose, buffers, mc, partial, camera);
         drawSquid(pose, buffers, mc, partial);
         pose.popPose();
+        frame++;
     }
 
     private static void drawFx(PoseStack pose, VertexConsumer glow, FxPayload fx, float age, float fade) {
@@ -183,12 +195,8 @@ final class FxClient {
                 Canvas.worldRing(pose, glow, at, new Vec3(0, 1, 0), radius * 0.6, 0.6, 0xFFFFFF, fade);
             }
             case FxPayload.JET_BURST -> {
-                Vec3 end = at.lerp(fx.b(), Math.min(1, age / 3));
-                Canvas.tube(pose, glow, at, end, 0.55 * fade, 0xFF9A4A, strength * 0.45F);
-                Canvas.tube(pose, glow, at, end, 0.26 * fade, 0xFFD28A, strength * 0.7F);
-                Canvas.tube(pose, glow, at, end, 0.1 * fade, 0xFFF8EA, strength);
                 Vec3 thrust = at.subtract(fx.b()).normalize();
-                Canvas.worldRing(pose, glow, at, thrust, 0.5 + age * 0.3, 0.2, 0xFFE2A0, strength);
+                Canvas.worldRing(pose, glow, at, thrust, 0.5 + age * 0.3, 0.2, 0xBFE6FF, strength);
             }
             case FxPayload.RUPTURE -> {
                 Canvas.worldRing(pose, glow, at, fx.b(), 0.2 + age * 0.14, 0.16, 0xB8A8FF, strength);
@@ -203,56 +211,108 @@ final class FxClient {
         }
     }
 
-    private static Vec3 muzzle(Player player, float partial) {
-        Vec3 look = player.getViewVector(partial);
-        Vec3 side = look.cross(new Vec3(0, 1, 0)).normalize();
-        boolean firstPerson = firstPerson(player);
-        // In first person a beam starting at the eye would fill the screen, so it starts where the lance's tip is seen.
-        return player.getEyePosition(partial).add(look.scale(firstPerson ? 2.4 : 0.5)).add(side.scale(firstPerson ? 0.34 : 0.15)).add(0, firstPerson ? -0.26 : -0.3, 0);
-    }
-
     private static boolean firstPerson(Player player) {
         return player == Minecraft.getInstance().player && Minecraft.getInstance().options.getCameraType().isFirstPerson();
     }
 
-    private static void drawJets(PoseStack pose, VertexConsumer glow, Player player, float partial) {
-        float held = JetLanceItem.held(player.getUseItem(), player) + partial;
-        Vec3 look = player.getViewVector(partial).normalize();
-        Vec3 from = muzzle(player, partial);
-        var level = player.level();
-        Vec3 frontEnd = level.clip(new ClipContext(from, from.add(look.scale(Rules.LANCE_RANGE)), ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, player)).getLocation();
-        var rearHit = level.clip(new ClipContext(from, from.subtract(look.scale(Rules.LANCE_REAR_RANGE)), ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, player));
-        Vec3 rearEnd = rearHit.getLocation();
-        float scale = firstPerson(player) ? 0.34F : 0.7F;
-        float radius = Rules.lanceRadius((int) held) * scale;
-        if (held < Rules.LANCE_IGNITE) {
-            float grow = held / Rules.LANCE_IGNITE;
-            Canvas.tube(pose, glow, from, from.add(look.scale(grow * 2)), radius * grow, 0xFF9A4A, 0.5F);
-            Canvas.tube(pose, glow, from, from.subtract(look.scale(grow * 1.4)), radius * grow, 0xFF9A4A, 0.4F);
+    /** Where the jet lands: the same eye-ray the server damages along, so the beam always meets what it is hitting. */
+    private static net.minecraft.world.phys.BlockHitResult aim(Player player, float partial) {
+        Vec3 eye = player.getEyePosition(partial);
+        return player.level().clip(new ClipContext(eye, eye.add(player.getViewVector(partial).scale(Rules.LANCE_RANGE)), ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, player));
+    }
+
+    private static float focus(float held) {
+        return Math.max(0, Math.min(1, (held - Rules.LANCE_IGNITE) / (Rules.LANCE_COLLIMATE - Rules.LANCE_IGNITE)));
+    }
+
+    /**
+     * Turns the lance on its grip so the barrel points exactly at what the player is aiming at. The beam then leaves the muzzle
+     * along the barrel's own axis, instead of merely starting at the muzzle. Run before anything else moves the art.
+     */
+    static void aimLance(Player owner, PoseStack pose, ItemDisplayContext context, float partial) {
+        var mc = Minecraft.getInstance();
+        // The inventory's paper doll is drawn in GUI space, where world directions mean nothing.
+        if (!context.firstPerson() && mc.screen instanceof net.minecraft.client.gui.screens.inventory.EffectRenderingInventoryScreen) return;
+        Vec3 eye = owner.getEyePosition(partial);
+        Vec3 look = owner.getViewVector(partial);
+        boolean firing = owner.isUsingItem() && owner.getUseItem().getItem() instanceof JetLanceItem;
+        // Never closer than a few blocks, or a wall at arm's length would wrench the gun sideways.
+        double distance = firing ? Math.max(3, eye.distanceTo(aim(owner, partial).getLocation())) : 40;
+        Vec3 camera = mc.gameRenderer.getMainCamera().getPosition();
+        Vec3 target = eye.add(look.scale(distance)).subtract(camera);
+        Matrix4f matrix = pose.last().pose();
+        Vector3f origin = matrix.transformPosition(0, 0, 0, new Vector3f());
+        Vector3f direction = new Vector3f((float) target.x, (float) target.y, (float) target.z).sub(origin).normalize();
+        new Matrix4f(matrix).invert().transformDirection(direction).normalize();
+        pose.mulPose(new Quaternionf().rotationTo(0, 1, 0, direction.x, direction.y, direction.z));
+    }
+
+    /**
+     * Called from the item renderer with the pose of the lance actually on screen. In third person the muzzle is remembered for the
+     * world pass. First-person hands are drawn later with their own projection and a cleared depth buffer, so the jet is drawn here.
+     */
+    static void lanceRendered(Player owner, PoseStack pose, MultiBufferSource buffers, ItemDisplayContext context, float partial) {
+        Vector3f tip = new Matrix4f(pose.last().pose()).transformPosition(0, (float) WeaponArt.LANCE_MUZZLE, 0, new Vector3f());
+        var mc = Minecraft.getInstance();
+        if (!context.firstPerson()) {
+            Vec3 camera = mc.gameRenderer.getMainCamera().getPosition();
+            MUZZLES.put(owner.getId(), new Muzzle(camera.add(tip.x, tip.y, tip.z), frame));
             return;
         }
+        if (!owner.isUsingItem() || !(owner.getUseItem().getItem() instanceof JetLanceItem)) return;
+        float held = JetLanceItem.held(owner.getUseItem(), owner) + partial;
+        double distance = owner.getEyePosition(partial).distanceTo(aim(owner, partial).getLocation());
+        // The hand pose starts from the inverse of the view rotation, so this space has world axes centred on the camera.
+        drawJet(new PoseStack(), buffers, Vec3.ZERO, new Vec3(tip.x, tip.y, tip.z), owner.getViewVector(partial).scale(distance), held, 0.55F);
+    }
+
+    /** One jet: a short plasma plume while igniting, then narrowing through the three rings into a tight beam. */
+    private static void drawJet(PoseStack pose, MultiBufferSource buffers, Vec3 camera, Vec3 from, Vec3 to, float held, float scale) {
+        float radius = Rules.lanceRadius((int) held) * scale;
+        float pulse = 1 + 0.1F * (float) Math.sin(held * 1.3);
+        if (held < Rules.LANCE_IGNITE) {
+            float grow = held / Rules.LANCE_IGNITE;
+            Vec3 axis = to.subtract(from).normalize();
+            JetTube.draw(pose, buffers, camera, from, from.add(axis.scale(0.4 + grow * 3)), radius * grow, 0, 0.8F * grow, 0.6F);
+            return;
+        }
+        JetTube.draw(pose, buffers, camera, from, to, radius * pulse, focus(held), 1, 1.1F);
+    }
+
+    /** Jets of everyone drawn in the world. The local first-person jet is drawn with the hand instead. */
+    private static void drawWorldJets(PoseStack pose, MultiBufferSource.BufferSource buffers, Minecraft mc, float partial, Vec3 camera) {
+        for (Player player : mc.level.players()) {
+            if (!player.isUsingItem() || !(player.getUseItem().getItem() instanceof JetLanceItem)) continue;
+            if (firstPerson(player) && !mc.options.hideGui) continue;
+            Muzzle known = MUZZLES.get(player.getId());
+            Vec3 from;
+            if (known != null && known.frame == frame) {
+                from = known.position;
+            } else {
+                Vec3 look = player.getViewVector(partial);
+                from = player.getEyePosition(partial).add(look.scale(1.5)).add(0, -0.4, 0);
+            }
+            drawJet(pose, buffers, camera, from, aim(player, partial).getLocation(), JetLanceItem.held(player.getUseItem(), player) + partial, 0.85F);
+        }
+        long now = mc.level.getGameTime();
+        for (Fx fx : ACTIVE) {
+            if (fx.data.kind() != FxPayload.JET_BURST) continue;
+            float age = now - fx.born + partial, fade = 1 - age / lifetime(FxPayload.JET_BURST);
+            if (age < 0 || fade <= 0) continue;
+            JetTube.draw(pose, buffers, camera, fx.data.a(), fx.data.a().lerp(fx.data.b(), Math.min(1, age / 3)), 0.5F * fade, 0.2F, fade, 0.4F);
+        }
+        buffers.endBatch(JetTube.type());
+    }
+
+    private static void drawImpact(PoseStack pose, VertexConsumer glow, Player player, float partial) {
+        float held = JetLanceItem.held(player.getUseItem(), player) + partial;
+        if (held < Rules.LANCE_COLLIMATE) return;
+        var hit = aim(player, partial);
+        if (hit.getType() != HitResult.Type.BLOCK) return;
+        Vec3 normal = Vec3.atLowerCornerOf(hit.getDirection().getNormal());
         float pulse = 0.85F + 0.15F * (float) Math.sin(held * 1.3);
-        float collimating = held < Rules.LANCE_COLLIMATE ? 1 : 0;
-        for (var pair : new Vec3[][]{{from, frontEnd}, {from, rearEnd}}) {
-            float flare = 1 + 0.6F * collimating;
-            Canvas.tube(pose, glow, pair[0], pair[1], radius * 1.9 * flare, 0xFF7A2E, 0.1F * pulse);
-            Canvas.tube(pose, glow, pair[0], pair[1], radius * 1.3 * flare, 0xFFB45E, 0.42F * pulse);
-            Canvas.tube(pose, glow, pair[0], pair[1], radius * 0.5, 0xFFFBF0, pulse);
-        }
-        // Three rings ahead of the muzzle close down in turn as the beam is collimated.
-        int rings = held < Rules.LANCE_IGNITE + 7 ? 1 : held < Rules.LANCE_IGNITE + 14 ? 2 : 3;
-        for (int i = 0; i < rings; i++) {
-            double distance = 0.7 + i * 0.55;
-            double ring = (3 - i) * 0.17 * scale * (1 + 0.1 * Math.sin(held * 0.7 + i));
-            Canvas.worldRing(pose, glow, from.add(look.scale(distance)), look, ring, 0.05, 0xFFE2A0, 0.85F);
-            Canvas.worldRing(pose, glow, from.subtract(look.scale(distance)), look, ring, 0.05, 0xFFE2A0, 0.7F);
-        }
-        if (held >= Rules.LANCE_COLLIMATE && frontEnd.distanceToSqr(from) < Rules.LANCE_RANGE * Rules.LANCE_RANGE - 1) {
-            Canvas.worldRing(pose, glow, frontEnd.subtract(look.scale(0.08)), look, 0.55 * pulse, 0.25, 0xFFD28A, 0.8F);
-        }
-        if (held >= Rules.LANCE_COLLIMATE && rearHit.getType() == HitResult.Type.BLOCK) {
-            Canvas.worldRing(pose, glow, rearEnd.add(look.scale(0.08)), look, 0.4 * pulse, 0.2, 0xFFD28A, 0.7F);
-        }
+        Canvas.worldRing(pose, glow, hit.getLocation().add(normal.scale(0.05)), normal, 0.5 * pulse, 0.25, 0x8CD2FF, 0.8F);
+        Canvas.worldRing(pose, glow, hit.getLocation().add(normal.scale(0.06)), normal, 0.22 * pulse, 0.14, 0xFFFFFF, 0.9F);
     }
 
     private static void drawHoles(PoseStack pose, MultiBufferSource.BufferSource buffers, Minecraft mc, float partial) {
@@ -269,10 +329,9 @@ final class FxClient {
             pose.scale(scale, scale, scale);
             float t = mc.level.getGameTime() + partial;
             Canvas.draw(pose, buffers, t, 0xF000F0, Canvas.noOverlay(), c -> {
-                c.sphere(0, 0, 0, 4 + use * 5, 0x000000);
-                c.litHoop(0, 0, 0, 1, 5 + use * 6, 0.25, 0xFFF8EA);
-                c.halo(0, 0, 0, 1, 7 + use * 8, 3, 0xFFD28A, 0.6F);
-                c.halo(0, 0, 0, 1, 13 + use * 10, 4, 0xFF9A4A, 0.35F);
+                c.faceCamera();
+                c.pose.mulPose(com.mojang.math.Axis.ZP.rotationDegrees(-14));
+                c.blackHole(4 + use * 5, 3.4, 0.7F + use * 0.3F);
             });
             pose.popPose();
         }
@@ -283,7 +342,7 @@ final class FxClient {
     private static void drawThreads(PoseStack pose, VertexConsumer glow, ClientLevel level, Player player, float partial, long now) {
         Vec3 focus = TidalReaverItem.focus(player, partial);
         double range = Rules.REAVER_RANGE;
-        for (LivingEntity target : level.getEntitiesOfClass(LivingEntity.class, new AABB(focus, focus).inflate(range), e -> e != player && e.isAlive() && !(e instanceof ArmorStand))) {
+        for (LivingEntity target : level.getEntitiesOfClass(LivingEntity.class, new AABB(focus, focus).inflate(range), e -> e != player && e.isAlive() && !(e instanceof ArmorStand) && !(e instanceof Player p && p.isCreative()))) {
             Vec3 center = target.getPosition(partial).add(0, target.getBbHeight() / 2, 0);
             if (center.distanceTo(focus) > range) continue;
             Vec3 delta = center.subtract(focus);

@@ -10,7 +10,10 @@ import io.github.genichimaruo.singuloarsenal.core.Fe;
 import io.github.genichimaruo.singuloarsenal.core.Powered;
 import io.github.genichimaruo.singuloarsenal.core.Rules;
 import io.github.genichimaruo.singuloarsenal.net.AbilityPayload;
+import io.github.genichimaruo.singuloarsenal.weapon.CasimirBladeItem;
 import io.github.genichimaruo.singuloarsenal.weapon.JetLanceItem;
+import io.github.genichimaruo.singuloarsenal.weapon.TidalReaverItem;
+import io.github.genichimaruo.singuloarsenal.weapon.Weapons;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -48,6 +51,7 @@ public final class ArsenalClient {
         bus.addListener(ArsenalClient::keys);
         bus.addListener(ArsenalClient::extensions);
         bus.addListener(ArsenalClient::layers);
+        bus.addListener(JetTube::registerShaders);
         FxClient.register();
         NeoForge.EVENT_BUS.addListener(ArsenalClient::tick);
         NeoForge.EVENT_BUS.addListener(ArsenalClient::hud);
@@ -65,8 +69,14 @@ public final class ArsenalClient {
                 return renderer;
             }
             @Override public HumanoidModel.ArmPose getArmPose(LivingEntity entity, InteractionHand hand, ItemStack stack) {
-                return stack.getItem() instanceof JetLanceItem && entity.isUsingItem() && hand == InteractionHand.MAIN_HAND
-                        ? HumanoidModel.ArmPose.CROSSBOW_HOLD : null;
+                if (hand != InteractionHand.MAIN_HAND) return null;
+                if (stack.getItem() instanceof JetLanceItem) {
+                    boolean reloading = !entity.isUsingItem() && Weapons.reloadProgress(stack, entity.level().getGameTime(), 0) >= 0;
+                    return reloading ? LanceReloadPose.pose() : HumanoidModel.ArmPose.CROSSBOW_HOLD;
+                }
+                if (entity.isUsingItem() && stack.getItem() instanceof TidalReaverItem) return HumanoidModel.ArmPose.THROW_SPEAR;
+                if (entity.isUsingItem() && stack.getItem() instanceof CasimirBladeItem) return HumanoidModel.ArmPose.BLOCK;
+                return null;
             }
         };
         event.registerItem(gear, ArsenalItems.powered().toArray(new Item[0]));

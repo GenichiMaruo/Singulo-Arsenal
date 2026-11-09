@@ -70,7 +70,9 @@ public final class SuitLayer<T extends LivingEntity, M extends HumanoidModel<T>>
         pose.pushPose();
         anchor.translateAndRotate(pose);
         pose.scale(1F / 16, 1F / 16, 1F / 16);
-        Canvas.draw(pose, buffers, t, light, overlay, canvas -> SuitArt.draw(canvas, set, piece, state));
+        // The inventory's paper doll is drawn in GUI space, where there is no camera to turn toward.
+        boolean world = !(net.minecraft.client.Minecraft.getInstance().screen instanceof net.minecraft.client.gui.screens.inventory.EffectRenderingInventoryScreen);
+        Canvas.drawMaterial(pose, buffers, t, light, overlay, SuitArt.material(set), world, canvas -> SuitArt.draw(canvas, set, piece, state));
         pose.popPose();
     }
 }
