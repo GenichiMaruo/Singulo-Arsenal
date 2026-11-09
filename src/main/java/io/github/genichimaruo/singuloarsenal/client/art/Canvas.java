@@ -37,6 +37,8 @@ public final class Canvas {
     private final int overlay;
     private int pass;
     private int coarseSides;
+    private int hoopGapFrom = -1, hoopGapTo = -1;
+    private int vertexAlpha = 255;
     private VertexConsumer out;
 
     private final boolean textured;
@@ -215,7 +217,7 @@ public final class Canvas {
     }
 
     private void vertex(float x, float y, float z, float u, float v, float nx, float ny, float nz, int rgb, int lightmap) {
-        out.addVertex(pose.last().pose(), x, y, z).setColor((rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255, 255)
+        out.addVertex(pose.last().pose(), x, y, z).setColor((rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255, vertexAlpha)
                 .setUv(u, v).setOverlay(overlay).setLight(lightmap).setNormal(pose.last(), nx, ny, nz);
     }
 
@@ -231,6 +233,23 @@ public final class Canvas {
         if (pass == SOLID_PASS) torus(cx, cy, cz, axis, radius, half, rgb, light);
     }
 
+    /** A hoop with a run of facets left out, so something inside it can be seen from that side. */
+    public void hoop(double cx, double cy, double cz, int axis, double radius, double half, int rgb, int openFrom, int openTo) {
+        hoopGapFrom = openFrom;
+        hoopGapTo = openTo;
+        hoop(cx, cy, cz, axis, radius, half, rgb);
+        hoopGapFrom = -1;
+        hoopGapTo = -1;
+    }
+
+    /** A pane of tinted glass. Like everything self-lit it writes no depth, so what lies behind it is still drawn. */
+    public void glass(double x0, double y0, double z0, double x1, double y1, double z1, int rgb, float alpha) {
+        if (pass != LIT_PASS) return;
+        vertexAlpha = Math.round(alpha * 255);
+        cuboid(x0, y0, z0, x1, y1, z1, rgb, LightTexture.FULL_BRIGHT);
+        vertexAlpha = 255;
+    }
+
     public void litHoop(double cx, double cy, double cz, int axis, double radius, double half, int rgb) {
         if (pass == LIT_PASS) torus(cx, cy, cz, axis, radius, half, rgb, LightTexture.FULL_BRIGHT);
     }
@@ -242,6 +261,7 @@ public final class Canvas {
         double start = coarseSides > 0 ? Math.PI / segments : 0;
         float step = (float) (2 * radius * Math.sin(Math.PI / segments));
         for (int i = 0; i < segments; i++) {
+            if (i >= hoopGapFrom && i <= hoopGapTo && hoopGapFrom >= 0) continue;
             double a = start + i * Math.PI * 2 / segments, b = start + (i + 1) * Math.PI * 2 / segments;
             float u = i * step;
             quadOnRing(cx, cy, cz, axis, a, b, in, -half, in, half, rgb, lightmap, -1, u, step, (float) (2 * half));

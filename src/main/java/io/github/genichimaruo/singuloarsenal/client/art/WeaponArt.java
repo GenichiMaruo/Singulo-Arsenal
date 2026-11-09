@@ -96,7 +96,15 @@ public final class WeaponArt {
         // Stepped cleaver, broad at the tip, cutting edge on +X, with a ground bevel toward it.
         double[][] steps = {{-2, 3, 2}, {3, 8, 3}, {8, 12.5, 4.5}, {12.5, 14.5, 3.5}};
         for (double[] step : steps) {
-            c.box(-2, step[0], -0.75, step[2], step[1], 0.75, VOID);
+            if (step[0] == 3) {
+                // This section is cut through for the chamber the hole sits in.
+                c.box(-2, 3, -0.75, -1.25, 8, 0.75, VOID);
+                c.box(1.25, 3, -0.75, step[2], 8, 0.75, VOID);
+                c.box(-1.25, 3, -0.75, 1.25, 4.25, 0.75, VOID);
+                c.box(-1.25, 7.75, -0.75, 1.25, 8, 0.75, VOID);
+            } else {
+                c.box(-2, step[0], -0.75, step[2], step[1], 0.75, VOID);
+            }
             c.box(step[2] - 1, step[0] + 0.125, -0.875, step[2] - 0.125, step[1] - 0.125, 0.875, VOID_EDGE);
             c.lit(step[2], step[0], -0.25, step[2] + 0.5, step[1], 0.25, THREAD);
             c.softBand(step[2] + 0.25, step[0], step[1], 0.3, 1, THREAD, 0.3F + use * 0.4F);
@@ -108,21 +116,23 @@ public final class WeaponArt {
         for (double y : new double[]{1, 10.5, 13}) {
             for (double z : new double[]{-1, 0.875}) c.lit(-2, y, z, 2, y + 0.5, z + 0.125, THREAD);
         }
-        // The focus housing, with the hole seated in it.
-        // The jaws of the housing part while the focus is open.
-        double open = use * 0.75;
-        c.box(-3.5, 4.5, -1.25 - open, -1.5, 9, -0.75 - open, IVORY);
-        c.box(-3.5, 4.5, 0.75 + open, -1.5, 9, 1.25 + open, IVORY);
-        c.box(-3.5, 4.5, -0.75, -3, 9, 0.75, IVORY);
-        c.box(-1.5, 4.5, -1, 1, 5, 1, IVORY);
-        c.box(-1.5, 8.5, -1, 1, 9, 1, IVORY);
+        // A window through the middle of the blade on both faces, framed in ivory, with the hole held in the chamber behind the glass.
+        for (int side = -1; side <= 1; side += 2) {
+            double near = side * 0.75, far = side;
+            c.box(-1.75, 3.75, near, -1.25, 8.25, far, IVORY);
+            c.box(1.25, 3.75, near, 1.75, 8.25, far, IVORY);
+            c.box(-1.25, 7.75, near, 1.25, 8.25, far, IVORY);
+            c.box(-1.25, 3.75, near, 1.25, 4.25, far, IVORY);
+            // The pane's edges run inside the frame, so none of them shares a plane with it.
+            c.glass(-1.375, 4.125, side * 0.8125, 1.375, 7.875, side * 0.9375, 0xFFE2A0, 0.12F);
+        }
         c.pose.pushPose();
-        c.pose.translate(-2.5, 6.75, 0);
+        c.pose.translate(0, 6, 0);
         c.faceCamera();
         c.pose.mulPose(Axis.ZP.rotationDegrees(-16));
         // A shear spends the focus; it re-forms from nothing during the cooldown.
         float formed = reload >= 0 ? Math.min(1, reload * 1.15F) : 1;
-        c.blackHole((1.4 + use * 0.5) * formed, 2.8, (0.75F + use * 0.25F) * formed);
+        c.blackHole((0.55 + use * 0.25) * formed, 2, (0.75F + use * 0.25F) * formed);
         c.pose.popPose();
     }
 
@@ -147,12 +157,19 @@ public final class WeaponArt {
         // Rear pole: a stack of magnetic mirror coils that closes this end of the hole.
         c.box(-2.5, -4, -2.5, 2.5, -2.5, 2.5, VOID_DEEP);
         c.hoop(0, -3.75, 0, 1, 3, 0.5, VOID_EDGE);
-        c.hoop(0, -2.75, 0, 1, 3, 0.5, IVORY);
+        // The facet between the shoulder and the hole is left out, or this ring would hide it from whoever holds the gun.
+        int sightFacet = handleSide < 0 ? 2 : 0;
+        c.hoop(0, -2.75, 0, 1, 3, 0.5, IVORY, sightFacet, sightFacet);
         c.litHoop(0, -4.125, 0, 1, 1.5, 0.25, status);
 
         // Containment chamber, open at the sides so the hole can be seen: a top and a bottom plate and four posts.
         // The top plate lifts on its posts to vent the chamber after a burst.
-        c.box(-3.5, -2.5, 2.5 + vent * 1.5, 3.5, 7, 3.5 + vent * 1.5, VOID);
+        // It is a frame round a window running to the rear edge: seen from the shoulder, the hole lies just behind the plate's middle.
+        double lid = 2.5 + vent * 1.5;
+        c.box(-3.5, 5.25, lid, 3.5, 7, lid + 1, VOID);
+        for (int side = -1; side <= 1; side += 2) c.box(side * 2.25, -2.5, lid, side * 3.5, 5.25, lid + 1, VOID);
+        // The pane runs into the frame on three sides and stops short of the open end, so none of its edges lies in a plane of the frame.
+        c.glass(-2.5, -2.375, lid + 0.25, 2.5, 5.5, lid + 0.75, 0x9CC8FF, 0.16F);
         if (vent > 0) {
             for (int side = -1; side <= 1; side += 2) c.box(side * 3, 0, 2.5, side * 3.5, 4, 2.5 + vent * 1.5, VOID_EDGE);
             c.softBand(0, -1, 6, 3.2, 4, 0xFFB061, vent * 0.45F);
@@ -162,7 +179,8 @@ public final class WeaponArt {
         for (double y : new double[]{-2.5, 6}) {
             for (int side = -1; side <= 1; side += 2) c.box(side * 2.5, y, -2.5, side * 3.5, y + 1, 2.5, VOID_EDGE);
         }
-        c.hoop(0, 2.25, 0, 0, 2.75, 0.25, IVORY);
+        // Open across the top and the rear of the top, along the line of sight through the window.
+        c.hoop(0, 2.25, 0, 0, 2.75, 0.25, IVORY, 1, 2);
         c.pose.pushPose();
         c.pose.translate(0, 2.25, 0);
         c.faceCamera();
@@ -173,7 +191,7 @@ public final class WeaponArt {
         // Throat, barrel and three collimation rings stepping down toward the muzzle, as on the Jet Forge.
         c.box(-2.5, 7, -2.5, 2.5, 8.5, 2.5, VOID_EDGE);
         c.box(-1, 8.5, -1, 1, 21, 1, VOID);
-        for (int side = -1; side <= 1; side += 2) c.box(side * 0.5 - 0.25, 8.5, side * 2 - 0.25, side * 0.5 + 0.25, 20, side * 2 + 0.25, VOID_EDGE);
+        for (int side = -1; side <= 1; side += 2) c.box(side * 0.5 - 0.25, 8.5, side * 2 - 0.25, side * 0.5 + 0.25, 17.5, side * 2 + 0.25, VOID_EDGE);
         double[][] rings = {{11, 3}, {15, 2.5}, {19, 2}};
         for (int i = 0; i < rings.length; i++) {
             double y = rings[i][0], radius = rings[i][1];
@@ -185,7 +203,8 @@ public final class WeaponArt {
             if (spinning) c.pose.mulPose(Axis.YP.rotationDegrees((i % 2 == 0 ? 1 : -1) * t * 11));
             for (int k = 0; k < 3; k++) {
                 c.pose.mulPose(Axis.YP.rotationDegrees(120));
-                c.box(radius - 1, -0.25, -0.5, radius + 1, 0.25, 0.5, VOID_EDGE);
+                // Thicker than the lit band they cross, so their faces never share its plane.
+                c.box(radius - 1, -0.375, -0.5, radius + 1, 0.375, 0.5, VOID_EDGE);
             }
             c.pose.popPose();
             boolean energised = ignition > (i + 1) / 4F;
@@ -205,12 +224,12 @@ public final class WeaponArt {
         c.litHoop(0, 23.125, 0, 1, 1.0, 0.25, status);
         c.box(-0.5, 23, -0.5, 0.5, 23.125, 0.5, VOID_DEEP);
 
-        // Sight rail and an optic with a lit reticle, at eye height over the chamber.
-        c.box(-0.5, -2, 3.5, 0.5, 9, 4, VOID_EDGE);
-        c.box(-1.25, 0.5, 4, -0.75, 3, 6, VOID);
-        c.box(0.75, 0.5, 4, 1.25, 3, 6, VOID);
-        c.box(-1.25, 0.5, 6, 1.25, 3, 6.5, VOID);
-        c.lit(-0.25, 1.5, 4.75, 0.25, 1.55, 5.25, 0x7CFFB0);
+        // Sight rail ahead of the window, and an optic with a lit reticle on it.
+        c.box(-0.5, 5.25, 3.5, 0.5, 9, 4, VOID_EDGE);
+        c.box(-1.25, 6, 4, -0.75, 8.5, 6, VOID);
+        c.box(0.75, 6, 4, 1.25, 8.5, 6, VOID);
+        c.box(-1.25, 6, 6, 1.25, 8.5, 6.5, VOID);
+        c.lit(-0.25, 7, 4.75, 0.25, 7.05, 5.25, 0x7CFFB0);
 
         // Rear pistol grip, raked back the way a wrist sits, with a trigger inside a guard.
         c.pose.pushPose();
