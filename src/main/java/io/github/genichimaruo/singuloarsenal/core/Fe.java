@@ -68,7 +68,7 @@ public final class Fe {
             int wanted = own.receiveEnergy(Rules.chargeRequest(capacity(stack)), true);
             int got = source.extractEnergy(wanted, false);
             own.receiveEnergy(got, false);
-            player.displayClientMessage(Component.translatable("message.singulo_arsenal.charged", got, stored(stack)), true);
+            player.displayClientMessage(Component.translatable("message.singulo_arsenal.charged", Rules.compactEnergy(got), Rules.compactEnergy(stored(stack))), true);
         }
         return InteractionResult.sidedSuccess(context.getLevel().isClientSide);
     }
