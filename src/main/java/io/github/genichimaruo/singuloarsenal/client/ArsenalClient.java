@@ -85,7 +85,7 @@ public final class ArsenalClient {
                     boolean reloading = Weapons.reloadProgress(stack, entity.level().getGameTime(), 0) >= 0;
                     return reloading ? LanceReloadPose.pose() : HumanoidModel.ArmPose.CROSSBOW_HOLD;
                 }
-                if (entity.isUsingItem() && stack.getItem() instanceof TidalReaverItem) return HumanoidModel.ArmPose.THROW_SPEAR;
+                if (stack.getItem() instanceof TidalReaverItem && TidalReaverItem.focusProgress(stack, entity.level().getGameTime(), 0) >= 0) return HumanoidModel.ArmPose.THROW_SPEAR;
                 if (entity.isUsingItem() && stack.getItem() instanceof CasimirBladeItem) return HumanoidModel.ArmPose.BLOCK;
                 return null;
             }

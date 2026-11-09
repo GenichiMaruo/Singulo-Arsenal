@@ -93,7 +93,7 @@ final class ActiveSounds {
     }
 
     private static boolean focusing(Player player) {
-        return player.isAlive() && player.isUsingItem() && player.getUseItem().getItem() instanceof TidalReaverItem;
+        return player.isAlive() && TidalReaverItem.focusProgress(player.getMainHandItem(), player.level().getGameTime(), 0) >= 0;
     }
 
     /** The jet is a long source: it is heard from the point along it closest to the listener, as the Jet Forge's is. */

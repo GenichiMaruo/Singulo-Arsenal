@@ -142,8 +142,6 @@ final class FxClient {
 
     /** True while the world is being drawn: the paper doll in the inventory also draws held weapons, but not anywhere in the world. */
     private static boolean inLevel;
-    /** Where a first-person hole was last seen: screen x and y, its apparent radius, and the frame. First-person weapons are drawn after the lens pass. */
-    private static float[] heldSeen;
 
     private static void lenses(RenderLevelStageEvent event) {
         if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_SKY) inLevel = true;
@@ -153,41 +151,23 @@ final class FxClient {
         if (mc.level == null) return;
         float partial = event.getPartialTick().getGameTimeDeltaPartialTick(true);
         for (Player player : mc.level.players()) {
-            if (!player.isUsingItem() || !(player.getUseItem().getItem() instanceof TidalReaverItem)) continue;
-            float shadow = focusRadius(player, partial) / 16;
+            float use = focusOf(player, partial);
+            if (use < 0) continue;
+            float shadow = (4 + use * 5) / 16;
             Lensing.hole(TidalReaverItem.focus(player, partial), shadow, shadow * 4.5F);
-        }
-        if (heldSeen != null && heldSeen[3] >= frame - 2) {
-            // Back from the screen position to the world point that shows there under this frame's field of view.
-            var camera = event.getCamera();
-            var projection = event.getProjectionMatrix();
-            float depth = 1;
-            Vec3 tip = camera.getPosition().add(new Vec3(camera.getLookVector()).scale(depth))
-                    .add(new Vec3(camera.getLeftVector()).scale(-heldSeen[0] * depth / projection.m00()))
-                    .add(new Vec3(camera.getUpVector()).scale(heldSeen[1] * depth / projection.m11()));
-            float block = 2 * depth / projection.m11();
-            Lensing.distortion(tip, heldSeen[2] * 0.8F * block, 0.8F, heldSeen[2] * 2.4F * block);
         }
     }
 
-    private static float focusRadius(Player player, float partial) {
-        float use = Math.min(1, (player.getTicksUsingItem() + partial) / Rules.REAVER_MAX_HOLD);
-        return 4 + use * 5;
+    /** The Roche focus held by this player, from 0 to 1, or -1 if none is open. */
+    private static float focusOf(Player player, float partial) {
+        return TidalReaverItem.focusProgress(player.getMainHandItem(), player.level().getGameTime(), partial);
     }
 
     /** A small bend of the view round the hole sealed inside a held weapon. The pose and point are the art's own, in model pixels. */
     static void heldHole(PoseStack pose, ItemDisplayContext context, float x, float y, float z, float pixels) {
+        if (context.firstPerson() || !inLevel) return;
         Vector3f at = pose.last().pose().transformPosition(x, y, z, new Vector3f());
         float orb = pixels * pose.last().pose().getScale(new Vector3f()).y;
-        if (context.firstPerson()) {
-            org.joml.Vector4f clip = new org.joml.Vector4f(at, 1);
-            com.mojang.blaze3d.systems.RenderSystem.getModelViewMatrix().transform(clip);
-            Matrix4f projection = com.mojang.blaze3d.systems.RenderSystem.getProjectionMatrix();
-            projection.transform(clip);
-            if (clip.w > 0.05F) heldSeen = new float[]{clip.x / clip.w, clip.y / clip.w, projection.m11() * orb / clip.w * 0.5F, frame};
-            return;
-        }
-        if (!inLevel) return;
         Vec3 camera = Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
         Lensing.distortion(camera.add(at.x, at.y, at.z), orb * 1.4F, 0.8F, orb * 4.3F);
     }
@@ -220,7 +200,7 @@ final class FxClient {
         for (Player player : mc.level.players()) {
             float jet = JetLanceItem.jetAge(player.getMainHandItem(), now, partial);
             if (jet >= 0) drawImpact(pose, glow, player, partial, jet, camera);
-            if (player.isUsingItem() && player.getUseItem().getItem() instanceof TidalReaverItem) drawThreads(pose, glow, mc.level, player, partial, now);
+            if (focusOf(player, partial) >= 0) drawThreads(pose, glow, mc.level, player, partial, now);
         }
         buffers.endBatch(ArsenalRenderTypes.GLOW);
         drawWorldJets(pose, buffers, mc, partial, camera);
@@ -463,10 +443,11 @@ final class FxClient {
 
     private static void drawHoles(PoseStack pose, MultiBufferSource.BufferSource buffers, Minecraft mc, float partial) {
         boolean any = false;
-        for (Player player : mc.level.players()) any |= player.isUsingItem() && player.getUseItem().getItem() instanceof TidalReaverItem;
+        for (Player player : mc.level.players()) any |= focusOf(player, partial) >= 0;
         if (!any) return;
         for (Player player : mc.level.players()) {
-            if (!player.isUsingItem() || !(player.getUseItem().getItem() instanceof TidalReaverItem)) continue;
+            float use = focusOf(player, partial);
+            if (use < 0) continue;
             Vec3 focus = TidalReaverItem.focus(player, partial);
             float use = Math.min(1, (player.getTicksUsingItem() + partial) / Rules.REAVER_MAX_HOLD);
             pose.pushPose();

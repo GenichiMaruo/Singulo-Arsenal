@@ -83,14 +83,14 @@ public final class GearRenderer extends BlockEntityWithoutLevelRenderer {
             float closing = armed ? 1 : Math.max(use, reload >= 0 ? 1 - reload : 0);
             Canvas.drawFine(pose, buffers, t, light, overlay, world, c -> WeaponArt.casimir(c, closing, armed, t));
         } else if (stack.getItem() instanceof TidalReaverItem) {
-            float use = using ? Math.min(1, (ticks + partial) / Rules.REAVER_MAX_HOLD) : 0;
+            float use = Math.max(0, owner != null ? TidalReaverItem.focusProgress(stack, now, partial) : 0);
             if (context.firstPerson()) {
                 // Drawn back while the focus builds, and snapped through on the shear.
                 float strike = reload >= 0 && reload < 0.1F ? 1 - reload / 0.1F : 0;
                 pose.mulPose(Axis.XP.rotationDegrees(-22 * use + 34 * strike));
             }
             Canvas.drawFine(pose, buffers, t, light, overlay, world, c -> WeaponArt.reaver(c, use, reload, t));
-            if (owner != null && world) FxClient.heldHole(pose, context, -2.5F, 6.75F, 0, (1.4F + use * 0.5F) * (reload >= 0 ? Math.min(1, reload * 1.15F) : 1));
+            if (owner != null && world) FxClient.heldHole(pose, context, 0, 6, 0, (0.55F + use * 0.25F) * (reload >= 0 ? Math.min(1, reload * 1.15F) : 1));
         } else if (stack.getItem() instanceof JetLanceItem) {
             float jet = owner != null && world ? JetLanceItem.jetAge(stack, now, partial) : -1;
             float charge = owner != null && world ? JetLanceItem.chargeProgress(stack, now, partial) : -1;
@@ -113,7 +113,6 @@ public final class GearRenderer extends BlockEntityWithoutLevelRenderer {
                 }
             }
             Canvas.drawFine(pose, buffers, t, light, overlay, world, c -> WeaponArt.lance(c, ignition, reload, t, leftHanded ? 1 : -1));
-            if (owner != null && world) FxClient.heldHole(pose, context, 0, 2.25F, 0, 1.5F);
             if (owner != null) FxClient.lanceRendered(owner, pose, buffers, context, partial, jet);
             FirstPersonHands.drawLance(owner, pose, buffers, light, context, reload);
         }

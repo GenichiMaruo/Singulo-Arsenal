@@ -27,6 +27,8 @@ public final class ArsenalData {
     /** When the current reload animation ends, and how long it runs. On the stack so other players' clients see it too. */
     public static final Supplier<DataComponentType<Long>> RELOAD_UNTIL = time("reload_until");
     public static final Supplier<DataComponentType<Integer>> RELOAD_TICKS = integer("reload_ticks");
+    /** When the reaver's Roche focus opened; absent when it is closed. On the stack, so every client sees the same focus. */
+    public static final Supplier<DataComponentType<Long>> FOCUS_START = time("focus_start");
     /** When the cannon's spool-up ends and the shot goes off. */
     public static final Supplier<DataComponentType<Long>> CHARGE_UNTIL = time("charge_until");
     /** When the current cannon shot goes out. Other players' clients draw the jet from this. */
