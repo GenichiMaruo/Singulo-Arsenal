@@ -57,7 +57,6 @@ public final class TidalReaverItem extends PoweredSword {
             return;
         }
         if (held % 2 == 0) pull(player);
-        if (held % 20 == 0) Weapons.sound(player, "tidal_spindle_running", 0.9F, 0.8F);
     }
 
     private void pull(Player player) {
@@ -100,7 +99,7 @@ public final class TidalReaverItem extends PoweredSword {
         player.getCooldowns().addCooldown(this, Weapons.cooled(player.getMainHandItem(), Rules.REAVER_COOLDOWN));
         Weapons.beginReload(player.getMainHandItem(), level.getGameTime(), Weapons.cooled(player.getMainHandItem(), Rules.REAVER_COOLDOWN));
         FxPayload.send(level, FxPayload.SHEAR, focus, player.getLookAngle(), (float) Rules.REAVER_RANGE);
-        Weapons.sound(player, "black_hole.devour", 1.8F, 1.1F);
+        Weapons.soundAt(level, focus, "jet_forge.pulse", 2F, 1.3F);
     }
 
     @Override
