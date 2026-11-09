@@ -485,6 +485,85 @@ public final class ArsenalGameTests {
         h.succeed();
     }
 
+    @GameTest(template = ARENA)
+    public static void fluxPinConsumesTheLastPartialCharge(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 2.5);
+        ItemStack boots = charged(ArmorSet.MEISSNER, ArmorItem.Type.BOOTS);
+        Fe.set(boots, 1);
+        p.setItemSlot(EquipmentSlot.FEET, boots);
+        p.setOnGround(false);
+        p.setShiftKeyDown(true);
+        p.tickCount = 10;
+        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(new net.neoforged.neoforge.event.tick.PlayerTickEvent.Pre(p));
+        h.assertTrue(Fe.stored(boots) == 0, "partial charge allowed indefinite free pinning");
+        h.assertTrue(!SuitEvents.pinned(p), "empty boots still pin");
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void balancingDifferentCapacitiesConservesEnergy(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 2.5);
+        ItemStack head = charged(ArmorSet.MEISSNER, ArmorItem.Type.HELMET);
+        Modules.install(head, List.of(module(ModuleType.CAPACITOR)));
+        Fe.set(head, Fe.capacity(head));
+        ItemStack legs = charged(ArmorSet.MEISSNER, ArmorItem.Type.LEGGINGS);
+        p.setItemSlot(EquipmentSlot.HEAD, head);
+        p.setItemSlot(EquipmentSlot.LEGS, legs);
+        int before = Fe.stored(head) + Fe.stored(legs);
+        SuitEvents.upkeep(p);
+        h.assertTrue(Fe.stored(head) + Fe.stored(legs) == before, "balancing discarded charge at a smaller tank's limit");
+        Fe.set(legs, 0);
+        int available = Fe.stored(head);
+        SuitEvents.upkeep(p);
+        h.assertTrue(Fe.stored(head) == available / 2 && Fe.stored(legs) == available / 2, "unequal tanks did not share available energy");
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void integratorChargingMarksTheChunkForSaving(GameTestHelper h) {
+        IntegratorBlockEntity entity = integrator(h);
+        var chunk = h.getLevel().getChunkAt(entity.getBlockPos());
+        entity.energy().deserializeNBT(h.getLevel().registryAccess(), net.minecraft.nbt.IntTag.valueOf(0));
+        chunk.setUnsaved(false);
+        entity.energy().receiveEnergy(1000, true);
+        h.assertTrue(!chunk.isUnsaved(), "simulated charging dirtied the chunk");
+        entity.energy().receiveEnergy(1000, false);
+        h.assertTrue(chunk.isUnsaved(), "received FE may disappear after a chunk reload");
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void holdingArmedBladeDoesNotModifyDroneDamage(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 2.5);
+        ItemStack blade = hold(p, new ItemStack(ArsenalItems.CASIMIR_BLADE.get()));
+        Modules.install(blade, List.of(module(ModuleType.AMPLIFIER)));
+        long armedUntil = h.getLevel().getGameTime() + 100;
+        blade.set(ArsenalData.ARMED_UNTIL.get(), armedUntil);
+        ItemStack chest = charged(ArmorSet.COLLAPSAR, ArmorItem.Type.CHESTPLATE);
+        Modules.install(chest, List.of(module(ModuleType.BIT_DRONE)));
+        p.setItemSlot(EquipmentSlot.CHEST, chest);
+        Zombie mob = target(h, 2.5, 4.5);
+        SuitEvents.fireBits(p);
+        near(h, 100 - mob.getHealth(), Rules.BIT_DAMAGE * Rules.BITS_PER_MODULE, "weapon bonuses leaked into drones");
+        h.assertTrue(ArsenalData.time(blade, ArsenalData.ARMED_UNTIL) == armedUntil, "a drone consumed the charged blade strike");
+        mob.invulnerableTime = 0;
+        mob.setHealth(100);
+        mob.hurt(p.damageSources().playerAttack(p), 10);
+        near(h, 100 - mob.getHealth(), 10 * Rules.amplified(1) * Rules.CASIMIR_ARMED_BONUS, "actual blade strike lost its bonuses");
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void cannonPulseUsesItsAmplifier(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 2.5);
+        ItemStack cannon = hold(p, new ItemStack(ArsenalItems.JET_LANCE.get()));
+        Modules.install(cannon, List.of(module(ModuleType.AMPLIFIER)));
+        Zombie mob = target(h, 2.5, 4.5);
+        JetLanceItem.pulse(p, h.getLevel());
+        near(h, 100 - mob.getHealth(), Rules.LANCE_DAMAGE * Rules.amplified(1), "cannon amplification");
+        h.succeed();
+    }
+
     // ---- Recipes against the real base mod ---------------------------------------------------------------------------
 
     @GameTest(template = ARENA)

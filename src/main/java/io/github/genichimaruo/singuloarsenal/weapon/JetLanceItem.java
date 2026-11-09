@@ -105,7 +105,8 @@ public final class JetLanceItem extends Item implements ArsenalWeapon {
         Vec3 look = player.getLookAngle().normalize();
         Vec3 end = level.clip(new ClipContext(eye, eye.add(look.scale(Rules.LANCE_RANGE)), ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, player)).getLocation();
         var source = ArsenalDamage.source(level, ArsenalDamage.JET, player);
-        for (LivingEntity target : ArsenalDamage.along(player, eye, end, Rules.LANCE_HIT_WIDTH)) burn(target, source, Rules.LANCE_DAMAGE);
+        float damage = Weapons.amplified(player.getMainHandItem(), Rules.LANCE_DAMAGE);
+        for (LivingEntity target : ArsenalDamage.along(player, eye, end, Rules.LANCE_HIT_WIDTH)) burn(target, source, damage);
     }
 
     private static void burn(LivingEntity target, net.minecraft.world.damagesource.DamageSource source, float damage) {

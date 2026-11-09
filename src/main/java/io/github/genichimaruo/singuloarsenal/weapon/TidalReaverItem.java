@@ -92,7 +92,7 @@ public final class TidalReaverItem extends PoweredSword {
         var source = ArsenalDamage.source(level, ArsenalDamage.SHEAR, player);
         for (LivingEntity target : ArsenalDamage.around(player, focus, Rules.REAVER_RANGE)) {
             int stress = Weapons.stress(target);
-            if (target.hurt(source, Rules.shearDamage(stress))) {
+            if (target.hurt(source, Weapons.amplified(player.getMainHandItem(), Rules.shearDamage(stress)))) {
                 Weapons.setStress(target, 0);
                 FxPayload.sendEntity(level, FxPayload.STRETCH, target, focus, stress);
             }

@@ -51,9 +51,16 @@ public final class IntegratorBlockEntity extends BlockEntity implements MenuProv
     private boolean working;
     private ItemStack seen = ItemStack.EMPTY;
 
-    private static final class Energy extends EnergyStorage {
+    private final class Energy extends EnergyStorage {
         Energy() {
             super(Rules.INTEGRATOR_CAPACITY, Rules.INTEGRATOR_CAPACITY, 0);
+        }
+
+        @Override
+        public int receiveEnergy(int amount, boolean simulate) {
+            int received = super.receiveEnergy(amount, simulate);
+            if (!simulate && received > 0) setChanged();
+            return received;
         }
 
         boolean take(int amount) {

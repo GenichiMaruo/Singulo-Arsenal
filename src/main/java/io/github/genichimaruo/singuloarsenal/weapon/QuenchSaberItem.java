@@ -30,7 +30,7 @@ public final class QuenchSaberItem extends PoweredSword {
             stack.set(ArsenalData.LAST_HIT.get(), now);
             if (next >= Rules.QUENCH_MAX_CURRENT && Fe.spend(stack, Rules.QUENCH_FE)) {
                 stack.set(ArsenalData.CURRENT.get(), 0);
-                quench(player, level, target);
+                quench(player, level, target, stack);
             } else {
                 stack.set(ArsenalData.CURRENT.get(), Math.min(next, Rules.QUENCH_MAX_CURRENT - 1));
             }
@@ -38,12 +38,12 @@ public final class QuenchSaberItem extends PoweredSword {
         return super.hurtEnemy(stack, target, attacker);
     }
 
-    private void quench(Player player, ServerLevel level, LivingEntity origin) {
+    private void quench(Player player, ServerLevel level, LivingEntity origin, ItemStack stack) {
         Vec3 center = origin.getBoundingBox().getCenter();
         var source = ArsenalDamage.source(level, ArsenalDamage.QUENCH, player);
         for (LivingEntity target : ArsenalDamage.around(player, center, Rules.QUENCH_RADIUS)) {
             target.invulnerableTime = 0;
-            target.hurt(source, Rules.QUENCH_DAMAGE);
+            target.hurt(source, Weapons.amplified(stack, Rules.QUENCH_DAMAGE));
             target.igniteForSeconds(3);
         }
         player.getCooldowns().addCooldown(this, Weapons.cooled(player.getMainHandItem(), Rules.QUENCH_COOLDOWN));

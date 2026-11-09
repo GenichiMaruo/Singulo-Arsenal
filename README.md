@@ -51,12 +51,12 @@ Windows は `gradlew.bat build`。`build` の検査には Python 3 も必要で�
 python3 tools/check.py
 # 本体の素材IDも照合する場合
 SINGULO_SOURCE=/absolute/path/to/Singulo python3 tools/check.py
-# 本体と同時ロードする実際の GameTest（18テスト）
+# 本体と同時ロードする実際の GameTest（27テスト）
 ./gradlew runGameTestServer -PsinguloJar=/absolute/path/Singulo-0.16.0-1.21.1N.jar
 ```
 
 CI はビルドとオフライン検査に加え、固定した本体コミットを別途ビルドして GameTest を実行します。
-GameTest は、電力、保存・読み込み、降着、飛び道具の反発、チャンドラセカール限界、核パスタ相、事象の地平面、ジェット噴射、武器の能力、レシピの読み込みを検証します。
+GameTest は、電力、保存・読み込み、降着、飛び道具の反発、チャンドラセカール限界、核パスタ相、事象の地平面、ジェット噴射、武器の能力、モジュール統合、容量の違う装備の電力分配、武器とドローンの効果分離、レシピの読み込みを検証します。
 テストクラスとテスト用構造物は配布 JAR から除外します。
 
 ## 開発起動

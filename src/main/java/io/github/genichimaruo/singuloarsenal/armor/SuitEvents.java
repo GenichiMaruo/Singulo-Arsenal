@@ -119,7 +119,8 @@ public final class SuitEvents {
         }
         player.resetFallDistance();
         if (!player.level().isClientSide && player.tickCount % 10 == 0) {
-            Fe.spend(player.getItemBySlot(EquipmentSlot.FEET), Rules.PIN_FE_PER_10_TICKS);
+            ItemStack boots = player.getItemBySlot(EquipmentSlot.FEET);
+            Fe.spend(boots, Math.min(Fe.stored(boots), Rules.PIN_FE_PER_10_TICKS));
         }
     }
 
@@ -191,9 +192,15 @@ public final class SuitEvents {
             even &= Fe.stored(piece) == Fe.stored(pieces.getFirst());
         }
         if (even) return;
-        int level = Rules.balanced(total, pieces.size());
-        int remainder = total - level * pieces.size();
-        for (int i = 0; i < pieces.size(); i++) Fe.set(pieces.get(i), level + (i == 0 ? remainder : 0));
+        // Fill smaller tanks first so capacitor upgrades cannot discard excess charge.
+        pieces.sort(java.util.Comparator.comparingInt(Fe::capacity));
+        int remaining = total;
+        for (int i = 0; i < pieces.size(); i++) {
+            ItemStack piece = pieces.get(i);
+            int share = Math.min(Fe.capacity(piece), remaining / (pieces.size() - i));
+            Fe.set(piece, share);
+            remaining -= share;
+        }
     }
 
     private static void filterHelmets(ServerPlayer player) {

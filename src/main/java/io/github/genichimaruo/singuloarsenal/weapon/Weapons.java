@@ -16,6 +16,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -49,6 +50,10 @@ public final class Weapons {
     /** A cooldown after this weapon's coolant modules. */
     public static int cooled(ItemStack stack, int ticks) {
         return Rules.cooled(ticks, Modules.count(stack, ModuleType.COOLANT));
+    }
+
+    public static float amplified(ItemStack stack, float damage) {
+        return damage * Rules.amplified(Modules.count(stack, ModuleType.AMPLIFIER));
     }
 
     /** Starts a reload animation. Stored on the stack, because item cooldowns are only ever sent to their owner. */
@@ -89,8 +94,9 @@ public final class Weapons {
 
     private static void incoming(LivingIncomingDamageEvent event) {
         LivingEntity target = event.getEntity();
-        if (event.getSource().getEntity() instanceof Player wielder && wielder.getMainHandItem().getItem() instanceof ArsenalWeapon) {
-            event.setAmount(event.getAmount() * Rules.amplified(Modules.count(wielder.getMainHandItem(), ModuleType.AMPLIFIER)));
+        if (event.getSource().is(DamageTypes.PLAYER_ATTACK) && event.getSource().getEntity() instanceof Player wielder
+                && wielder.getMainHandItem().getItem() instanceof ArsenalWeapon) {
+            event.setAmount(amplified(wielder.getMainHandItem(), event.getAmount()));
         }
         int stress = stress(target);
         if (stress > 0) event.setAmount(event.getAmount() * Rules.stressMultiplier(stress));
@@ -99,7 +105,7 @@ public final class Weapons {
             event.addReductionModifier(DamageContainer.Reduction.ARMOR, (container, reduction) -> reduction * Rules.LANCE_ARMOR_KEPT);
             return;
         }
-        if (event.getSource().getDirectEntity() instanceof Player attacker
+        if (event.getSource().is(DamageTypes.PLAYER_ATTACK) && event.getSource().getDirectEntity() instanceof Player attacker
                 && attacker.getMainHandItem().getItem() instanceof CasimirBladeItem blade
                 && event.getSource().getEntity() == attacker) {
             if (blade.consumeArmed(attacker, attacker.getMainHandItem(), target)) {
