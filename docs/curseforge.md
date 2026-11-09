@@ -14,6 +14,14 @@
 | Java | 21 |
 | 必須依存 | Singulo（申請後、実際の CF プロジェクトを指定） |
 | リリース種別 | 初期開発版は暫定 Beta |
+| アイコン | `docs/curseforge/logo.png`（512×512）、`logo_400.png`（400×400） |
+
+アイコンはM案（極ジェット付きのブラックホール）を使用します。
+本体と共通の光線追跡式に、解析式で表したジェットの発光を加え、光の分布を色面へ整理しています。
+数値設定は `docs/branding/logo-settings.json`、再生成は `python tools/arsenal_logo.py`（NumPy・Pillowが必要）。
+MOD一覧用の画像は `src/main/resources/singulo_arsenal_logo.png` に同時出力します。
+K・L案も同じ設定ファイルに保存しています。`python tools/arsenal_logo.py --variant K`、
+`python tools/arsenal_logo.py --variant L` で `docs/branding/variants/` に512・400・64px版を出力できます。
 
 申請後、実際のプロジェクト ID と本体の依存先を確定してください。
 公開を自動化する場合は GitHub Secrets に CF トークンを保存し、手動実行と公開環境の承認を用意します。
