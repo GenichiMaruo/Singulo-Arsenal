@@ -1,8 +1,14 @@
-# CurseForge 公開準備（暫定）
+# 公開・配布手順
 
-プロジェクト未申請。現段階では CI のビルド成果物で開発し、アップロードしません。
+## 配布方針
 
-0.1.0 の初回公開に使う値:
+GitHub Releases への MOD JAR 添付は初回の `v0.1.0` に限定します。
+CurseForge の審査通過後は CurseForge で MOD ファイルを配布し、以後の GitHub Releases には変更履歴・対応環境・CurseForge の配布リンクを掲載します。
+GitHub Releases の後続リリースには MOD JAR を添付しません。GitHub が自動表示するソースコードアーカイブと、開発用の Actions 成果物は通常どおり利用できます。
+
+CurseForge のプロジェクト ID と公開 URL は未設定です。審査通過後に README とこの文書へ実際の URL を反映します。
+
+## 初回 0.1.0 の公開情報
 
 | 項目 | 値 |
 | --- | --- |
@@ -13,7 +19,10 @@
 | ローダー | NeoForge |
 | Java | 21 |
 | 必須依存 | Singulo（申請後、実際の CF プロジェクトを指定） |
-| リリース種別 | 初期開発版は暫定 Beta |
+| リリース種別 | Beta（GitHub では Pre-release） |
+| GitHub タグ | `v0.1.0` |
+| GitHub リリース名 | `Singulo Arsenal 0.1.0 — Minecraft 1.21.1 / NeoForge (Beta)` |
+| 言語 | 日本語・英語 |
 | アイコン | `docs/curseforge/logo.png`（512×512）、`logo_400.png`（400×400） |
 
 アイコンはM案（極ジェット付きのブラックホール）を使用します。
@@ -23,8 +32,18 @@ MOD一覧用の画像は `src/main/resources/singulo_arsenal_logo.png` に同時
 K・L案も同じ設定ファイルに保存しています。`python tools/arsenal_logo.py --variant K`、
 `python tools/arsenal_logo.py --variant L` で `docs/branding/variants/` に512・400・64px版を出力できます。
 
-申請後、実際のプロジェクト ID と本体の依存先を確定してください。
-公開を自動化する場合は GitHub Secrets に CF トークンを保存し、手動実行と公開環境の承認を用意します。
-このリポジトリにはトークンや架空の CF プロジェクト ID を保存しません。
-公開前に本体との同時起動、クライアント・専用サーバー、追加装備・レシピの動作を検証してください。
-1.20.1 N/F は別対応が必要で、この成果物を流用しません。
+## GitHub 初回リリース
+
+1. README・装備仕様・公開手順を更新し、PR のレビューと CI の build / integration の成功を確認します。
+2. PR を `1.21.1` にマージし、マージ後のコミットでも CI の成功を確認します。
+3. そのコミットの build ジョブが生成した `Singulo-Arsenal-0.1.0-1.21.1N.jar` を取得します。
+4. JAR の MOD バージョン・依存関係・ロゴを確認します。配布対象はアドオン本体で、検証用クラスと Singulo 本体はビルド設定で除外しています。
+5. マージコミットに `v0.1.0` を付け、Beta の Pre-release を作成します。JAR を添付し、リリースノートへ対応環境、導入手順、変更内容、SHA-256 を記載して公開します。
+
+## CurseForge 審査通過後
+
+1. 実際のプロジェクト ID・公開 URL と、必須依存である Singulo 本体のプロジェクトを確定します。
+2. Minecraft 1.21.1 / NeoForge / Java 21 向けのファイルとして公開し、README と GitHub リリースノートから案内します。
+3. 次回以降の GitHub リリースでは、タグと変更履歴を公開し、CurseForge の該当バージョンへのリンクを記載します。添付アセットへ MOD JAR を追加しない運用とします。
+
+現在の CI は検証と開発用成果物の保存を行います。公開は手動操作で実施します。将来自動化するときも、GitHub Releases への JAR 添付を初回限定とする方針を維持してください。
