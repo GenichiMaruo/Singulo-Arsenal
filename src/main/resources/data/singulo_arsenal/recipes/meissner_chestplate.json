@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    "W W",
+    "CKC",
+    "CWC"
+  ],
+  "key": {
+    "W": {
+      "item": "singulo_arsenal:flux_weave"
+    },
+    "C": {
+      "item": "singulo:white_ceramic_composite"
+    },
+    "K": {
+      "item": "singulo:coolant_cartridge"
+    }
+  },
+  "result": {
+    "item": "singulo_arsenal:meissner_chestplate",
+    "count": 1
+  }
+}

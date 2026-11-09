@@ -1,0 +1,31 @@
+{
+  "type": "singulo:machine",
+  "station": "precision_assembler",
+  "stage": 3,
+  "time": 200,
+  "energy": 400,
+  "ingredients": [
+    {
+      "ingredient": {
+        "item": "singulo:superconducting_wire"
+      },
+      "count": 4
+    },
+    {
+      "ingredient": {
+        "item": "singulo:ceramic_substrate"
+      },
+      "count": 2
+    },
+    {
+      "ingredient": {
+        "item": "singulo:nihonium_plate"
+      },
+      "count": 1
+    }
+  ],
+  "result": {
+    "item": "singulo_arsenal:capacitor_module",
+    "count": 1
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "selected": "M",
+  "variants": {
+    "K": {
+      "concept": "K-expanded",
+      "elevation_degrees": 7,
+      "fov_degrees": 23,
+      "roll_degrees": 0,
+      "disk_outer_radius": 6.8,
+      "resolution": 720,
+      "analytic_jets": false
+    },
+    "L": {
+      "concept": "L-tilted",
+      "elevation_degrees": 12,
+      "fov_degrees": 24,
+      "roll_degrees": 25,
+      "disk_outer_radius": 7.0,
+      "resolution": 720,
+      "analytic_jets": false
+    },
+    "M": {
+      "concept": "M-polar-jets",
+      "elevation_degrees": 9,
+      "fov_degrees": 27,
+      "roll_degrees": -15,
+      "disk_outer_radius": 6.8,
+      "resolution": 720,
+      "analytic_jets": true
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "type": "singulo:machine",
+  "station": "tidal_spindle",
+  "stage": 5,
+  "time": 1200,
+  "energy": 20000000,
+  "ingredients": [
+    {
+      "ingredient": {
+        "item": "singulo:collapsar_ingot"
+      },
+      "count": 2
+    },
+    {
+      "ingredient": {
+        "item": "singulo:tidal_filament"
+      },
+      "count": 8
+    }
+  ],
+  "fluid_ingredients": [
+    {
+      "fluid": "singulo:liquid_helium",
+      "amount": 500
+    }
+  ],
+  "result": {
+    "item": "singulo_arsenal:tidal_edge",
+    "count": 1
+  }
+}

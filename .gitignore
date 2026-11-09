@@ -1,0 +1,12 @@
+.gradle/
+build/
+run/
+libs/
+.idea/
+*.iml
+.vscode/
+__pycache__/
+*.pyc
+/tmp/pdfs/
+.local/
+/Singulo-*.jar

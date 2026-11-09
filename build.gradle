@@ -1,0 +1,95 @@
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev.legacyforge' version '2.0.148'
+}
+
+def selectedLoader = providers.gradleProperty('loader').getOrElse('neoforge')
+if (!(selectedLoader in ['forge', 'neoforge'])) throw new GradleException('Use -Ploader=forge or -Ploader=neoforge')
+def selectedSuffix = selectedLoader == 'forge' ? 'F' : 'N'
+def selectedVersion = selectedLoader == 'forge' ? forge_version : neoforge_version
+layout.buildDirectory = layout.projectDirectory.dir("build/${selectedLoader}")
+version = mod_version
+group = mod_group_id
+base { archivesName = mod_name }
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+sourceSets {
+    gameTest {
+        java.srcDir('src/main/java')
+        java.include('**/gametest/**')
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+}
+configurations {
+    gameTestImplementation.extendsFrom implementation
+    gameTestRuntimeOnly.extendsFrom runtimeOnly, localRuntime
+}
+
+tasks.withType(net.neoforged.moddevgradle.legacyforge.tasks.RemapJar).configureEach {
+    archiveFileName = "${mod_name}-${mod_version}-${minecraft_version}${selectedSuffix}.jar"
+}
+tasks.named('jar', Jar) {
+    exclude 'io/github/genichimaruo/singuloarsenal/gametest/**'
+    exclude 'io/github/genichimaruo/singuloarsenal/review/**'
+    exclude 'data/singulo_arsenal/structures/empty.nbt'
+    manifest.attributes('MixinConfigs': 'singulo_arsenal.mixins.json')
+}
+
+if (providers.gradleProperty('singuloJar').isPresent()) {
+    def singuloFile = file(providers.gradleProperty('singuloJar').get())
+    if (!singuloFile.isFile()) throw new GradleException("Singulo JAR does not exist: ${singuloFile}")
+    repositories { flatDir { dirs singuloFile.parentFile } }
+    dependencies { modRuntimeOnly "local.singulo:${singuloFile.name.substring(0, singuloFile.name.length() - 4)}:local" }
+}
+def requireSingulo = tasks.register('requireSingulo') {
+    doLast {
+        if (!providers.gradleProperty('singuloJar').isPresent()) throw new GradleException('Specify -PsinguloJar=/absolute/path/to/the matching Singulo 1.20.1 JAR')
+    }
+}
+legacyForge {
+    if (selectedLoader == 'forge') version = "${minecraft_version}-${selectedVersion}"
+    else enable { neoForgeVersion = "${minecraft_version}-${selectedVersion}" }
+    addModdingDependenciesTo(sourceSets.gameTest)
+    runs {
+        configureEach { gameDirectory = layout.projectDirectory.dir("run/${selectedLoader}") }
+        client { client() }
+        server { server(); programArgument '--nogui' }
+        gameTestServer {
+            type = 'gameTestServer'
+            gameDirectory = layout.buildDirectory.dir('gametest')
+            systemProperty 'forge.enabledGameTestNamespaces', project.mod_id
+        }
+    }
+    mods { "${mod_id}" { sourceSet(sourceSets.main); sourceSet(sourceSets.gameTest) } }
+}
+sourceSets.main.java.exclude('**/gametest/**')
+tasks.matching { it.name in ['runClient', 'runServer', 'runGameTestServer'] }.configureEach { dependsOn requireSingulo }
+tasks.named('runGameTestServer') {
+    doFirst { delete layout.buildDirectory.file('gametest/logs/latest.log') }
+    doLast {
+        def log = layout.buildDirectory.file('gametest/logs/latest.log').get().asFile
+        if (!log.isFile() || !log.text.contains('All 29 required tests passed')) {
+            throw new GradleException('Expected all 29 required Arsenal GameTests to pass. Inspect the GameTest server log.')
+        }
+    }
+}
+def generateModMetadata = tasks.register('generateModMetadata', ProcessResources) {
+    def values = [minecraft_version_range: minecraft_version_range, loader_version_range: loader_version_range,
+                  loader_id: 'forge', loader_version: selectedVersion,
+                  mod_id: mod_id, mod_name: mod_name, mod_version: mod_version,
+                  mod_license: mod_license, mod_authors: mod_authors, singulo_version_range: singulo_version_range]
+    inputs.properties values
+    expand values
+    from 'src/main/templates'
+    into layout.buildDirectory.dir('generated/modMetadata')
+}
+sourceSets.main.resources.srcDir generateModMetadata
+legacyForge.ideSyncTask generateModMetadata
+tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8'; options.compilerArgs += ['-Xmaxerrs', '1000'] }
+tasks.register('offlineTest', Exec) {
+    environment 'JAVA_HOME', javaToolchains.launcherFor(java.toolchain).get().metadata.installationPath.asFile.absolutePath
+    commandLine providers.gradleProperty('pythonExecutable').getOrElse('python3'), '-X', 'utf8', 'tools/check.py'
+}
+tasks.named('check') { dependsOn 'offlineTest' }
+mixin { add sourceSets.main, 'singulo_arsenal.refmap.json'; config 'singulo_arsenal.mixins.json' }
+dependencies { annotationProcessor 'org.spongepowered:mixin:0.8.5:processor' }
