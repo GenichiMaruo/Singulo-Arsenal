@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    "G G",
+    "GDG",
+    "NGN"
+  ],
+  "key": {
+    "G": {
+      "item": "singulo_arsenal:pressure_lattice"
+    },
+    "D": {
+      "item": "singulo:degenerate_matter_shell"
+    },
+    "N": {
+      "item": "singulo:nihonium_plate"
+    }
+  },
+  "result": {
+    "id": "singulo_arsenal:degeneracy_chestplate",
+    "count": 1
+  }
+}

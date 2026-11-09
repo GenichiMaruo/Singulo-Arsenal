@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    "CSC",
+    "W W",
+    "C C"
+  ],
+  "key": {
+    "C": {
+      "item": "singulo:white_ceramic_composite"
+    },
+    "S": {
+      "item": "singulo:superconducting_coil"
+    },
+    "W": {
+      "item": "singulo_arsenal:flux_weave"
+    }
+  },
+  "result": {
+    "id": "singulo_arsenal:meissner_leggings",
+    "count": 1
+  }
+}

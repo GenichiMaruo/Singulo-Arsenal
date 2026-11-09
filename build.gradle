@@ -1,0 +1,79 @@
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev' version '2.0.148'
+}
+
+version = mod_version
+group = mod_group_id
+base { archivesName = mod_name }
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+tasks.named('jar', Jar) {
+    archiveFileName = "${mod_name}-${mod_version}-${minecraft_version}${mod_loader_suffix}.jar"
+    exclude 'io/github/genichimaruo/singuloarsenal/gametest/**'
+    exclude 'io/github/genichimaruo/singuloarsenal/review/**'
+    exclude 'data/singulo_arsenal/structure/empty.nbt'
+}
+
+// 本体は未公開のため、開発用 JAR を -PsinguloJar=/absolute/path/to.jar で指定する。
+// 本体クラスへの直接依存は、必要な API が決まるまで追加しない。
+if (providers.gradleProperty('singuloJar').isPresent()) {
+    def singuloJar = file(providers.gradleProperty('singuloJar').get())
+    if (!singuloJar.isFile()) {
+        throw new GradleException("Singulo JAR does not exist: ${singuloJar}")
+    }
+    dependencies { runtimeOnly files(singuloJar) }
+}
+
+def requireSingulo = tasks.register('requireSingulo') {
+    doLast {
+        if (!providers.gradleProperty('singuloJar').isPresent()) {
+            throw new GradleException('Starting the addon requires -PsinguloJar=/absolute/path/to/Singulo-0.16.0-1.21.1N.jar')
+        }
+    }
+}
+
+neoForge {
+    version = project.neo_version
+    runs {
+        client { client() }
+        server {
+            server()
+            programArgument '--nogui'
+        }
+        gameTestServer {
+            type = 'gameTestServer'
+            gameDirectory = project.file('build/gametest')
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+    }
+    mods {
+        "${mod_id}" { sourceSet(sourceSets.main) }
+    }
+}
+tasks.matching { it.name in ['runClient', 'runServer', 'runGameTestServer'] }.configureEach {
+    dependsOn requireSingulo
+}
+
+def generateModMetadata = tasks.register('generateModMetadata', ProcessResources) {
+    def values = [minecraft_version_range: minecraft_version_range,
+                  neo_version: neo_version, loader_version_range: loader_version_range,
+                  mod_id: mod_id, mod_name: mod_name, mod_version: mod_version,
+                  mod_license: mod_license, mod_authors: mod_authors,
+                  singulo_version_range: singulo_version_range]
+    inputs.properties values
+    expand values
+    from 'src/main/templates'
+    into layout.buildDirectory.dir('generated/modMetadata')
+}
+sourceSets.main.resources.srcDir generateModMetadata
+neoForge.ideSyncTask generateModMetadata
+
+tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
+
+tasks.register('offlineTest', Exec) {
+    workingDir projectDir
+    environment 'JAVA_HOME', javaToolchains.launcherFor(java.toolchain).get().metadata.installationPath.asFile.absolutePath
+    commandLine providers.gradleProperty('pythonExecutable').getOrElse('python3'), '-X', 'utf8', 'tools/check.py'
+}
+tasks.named('check') { dependsOn 'offlineTest' }

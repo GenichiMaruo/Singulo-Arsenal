@@ -1,0 +1,30 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    "ATA",
+    "QFQ",
+    "SSS"
+  ],
+  "key": {
+    "A": {
+      "item": "singulo:precision_actuator"
+    },
+    "T": {
+      "item": "singulo:optical_lattice_substrate"
+    },
+    "Q": {
+      "item": "singulo:quantum_computing_module"
+    },
+    "F": {
+      "item": "singulo:nihonium_frame"
+    },
+    "S": {
+      "item": "singulo:steel_plate"
+    }
+  },
+  "result": {
+    "id": "singulo_arsenal:module_integrator",
+    "count": 1
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    "GNG",
+    "G G",
+    "N N"
+  ],
+  "key": {
+    "G": {
+      "item": "singulo_arsenal:pressure_lattice"
+    },
+    "N": {
+      "item": "singulo:nihonium_plate"
+    }
+  },
+  "result": {
+    "id": "singulo_arsenal:degeneracy_leggings",
+    "count": 1
+  }
+}
