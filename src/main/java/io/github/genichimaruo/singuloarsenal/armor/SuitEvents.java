@@ -39,6 +39,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.EventPriority;
+import net.neoforged.neoforge.common.NeoForgeMod;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.entity.ProjectileImpactEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
@@ -54,6 +55,8 @@ public final class SuitEvents {
     private static final ResourceLocation SPEED = SinguloArsenal.id("suit_speed");
     private static final ResourceLocation REACH = SinguloArsenal.id("suit_reach");
     private static final ResourceLocation KNOCKBACK = SinguloArsenal.id("suit_knockback");
+    private static final ResourceLocation METRIC_FLIGHT = SinguloArsenal.id("metric_flight");
+    private static final ResourceLocation METRIC_FALL = SinguloArsenal.id("metric_fall");
     private static final String LAST_DEFLECT = "singulo_arsenal.last_deflect";
     private static final String LAST_ABILITY = "singulo_arsenal.last_ability";
 
@@ -129,6 +132,7 @@ public final class SuitEvents {
     private static void serverTick(PlayerTickEvent.Post event) {
         if (!(event.getEntity() instanceof ServerPlayer player) || !player.isAlive() || player.isSpectator()) return;
         if (player.tickCount % 10 == 0) applyAttributes(player);
+        metricDrive(player);
         if (player.tickCount % 20 == 0) upkeep(player);
     }
 
@@ -162,20 +166,46 @@ public final class SuitEvents {
         }
     }
 
+    /** Flight from electricity alone: the metric-drive module grants what Singulo's item does in zero-g mode, paid for only while airborne under power. */
+    public static void metricDrive(ServerPlayer player) {
+        ItemStack drive = ItemStack.EMPTY;
+        for (EquipmentSlot slot : SLOTS) {
+            ItemStack piece = player.getItemBySlot(slot);
+            if (Modules.count(piece, ModuleType.METRIC_DRIVE) > 0 && Fe.stored(piece) >= Rules.METRIC_FE_PER_10_TICKS) {
+                drive = piece;
+                break;
+            }
+        }
+        modifier(player, NeoForgeMod.CREATIVE_FLIGHT, METRIC_FLIGHT, drive.isEmpty() ? 0 : 1, AttributeModifier.Operation.ADD_VALUE);
+        modifier(player, Attributes.FALL_DAMAGE_MULTIPLIER, METRIC_FALL, drive.isEmpty() ? 0 : -1, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
+        if (!drive.isEmpty() && player.getAbilities().flying && !player.getAbilities().instabuild && player.tickCount % 10 == 0) Fe.spend(drive, Rules.METRIC_FE_PER_10_TICKS);
+    }
+
     private static void moduleAttributes(net.neoforged.neoforge.event.ItemAttributeModifierEvent event) {
         ItemStack stack = event.getItemStack();
         if (!(stack.getItem() instanceof SuitItem suit) || !stack.has(ArsenalData.MODULES.get())) return;
         var slot = net.minecraft.world.entity.EquipmentSlotGroup.bySlot(suit.getEquipmentSlot());
         int plating = Modules.count(stack, ModuleType.PLATING);
         if (plating > 0) {
-            event.addModifier(Attributes.ARMOR, new AttributeModifier(SinguloArsenal.id("module_armor_" + suit.getType().getName()), plating * Rules.PLATING_ARMOR, AttributeModifier.Operation.ADD_VALUE), slot);
-            event.addModifier(Attributes.ARMOR_TOUGHNESS, new AttributeModifier(SinguloArsenal.id("module_toughness_" + suit.getType().getName()), plating * Rules.PLATING_TOUGHNESS, AttributeModifier.Operation.ADD_VALUE), slot);
+            addToBase(event, Attributes.ARMOR, plating * Rules.PLATING_ARMOR, slot, "module_armor_" + suit.getType().getName());
+            addToBase(event, Attributes.ARMOR_TOUGHNESS, plating * Rules.PLATING_TOUGHNESS, slot, "module_toughness_" + suit.getType().getName());
         }
         int thrusters = Modules.count(stack, ModuleType.THRUSTER);
         if (thrusters > 0) {
             event.addModifier(Attributes.JUMP_STRENGTH, new AttributeModifier(SinguloArsenal.id("module_jump"), thrusters * Rules.THRUSTER_JUMP, AttributeModifier.Operation.ADD_VALUE), slot);
             event.addModifier(Attributes.STEP_HEIGHT, new AttributeModifier(SinguloArsenal.id("module_step"), thrusters * Rules.THRUSTER_STEP, AttributeModifier.Operation.ADD_VALUE), slot);
         }
+    }
+
+    /** Raises the armor piece's own modifier, so the tooltip shows one armor value and not the base plus a second line for the plating. */
+    private static void addToBase(net.neoforged.neoforge.event.ItemAttributeModifierEvent event, Holder<Attribute> attribute, double extra, net.minecraft.world.entity.EquipmentSlotGroup slot, String fallbackId) {
+        for (var entry : event.getModifiers()) {
+            if (entry.attribute().equals(attribute) && entry.modifier().operation() == AttributeModifier.Operation.ADD_VALUE) {
+                event.replaceModifier(attribute, new AttributeModifier(entry.modifier().id(), entry.modifier().amount() + extra, AttributeModifier.Operation.ADD_VALUE), entry.slot());
+                return;
+            }
+        }
+        event.addModifier(attribute, new AttributeModifier(SinguloArsenal.id(fallbackId), extra, AttributeModifier.Operation.ADD_VALUE), slot);
     }
 
     /** Meissner: a persistent current flows without loss, so worn pieces settle to one level. */
@@ -268,7 +298,7 @@ public final class SuitEvents {
         projectile.hurtMarked = true;
         projectile.setOwner(player);
         FxPayload.send(player.serverLevel(), FxPayload.RIPPLE, projectile.position(), away, 1);
-        sound(player, SoundEvents.AMETHYST_BLOCK_RESONATE, 1, 1.6F);
+        sound(player, SoundEvents.SHIELD_BLOCK, 0.8F, 1.3F);
     }
 
     // ---- damage -------------------------------------------------------------------------------------------------
@@ -325,6 +355,7 @@ public final class SuitEvents {
                     && Rules.phaseOf(ArsenalData.get(chest, ArsenalData.LOAD)) == Rules.PHASE_LASAGNA) {
                 damage *= Rules.LASAGNA_FACTOR;
             }
+            if (fullSet(player, ArmorSet.COLLAPSAR) && !absolute) damage = shield(player, chest, damage);
             if (fullSet(player, ArmorSet.COLLAPSAR) && Rules.horizonCatches(damage, player.getHealth(), absolute, Fe.stored(chest),
                     now(player) >= ArsenalData.time(chest, ArsenalData.HORIZON_READY))) {
                 enterHorizon(player, chest);
@@ -332,6 +363,29 @@ public final class SuitEvents {
             }
         }
         event.setNewDamage(damage);
+    }
+
+    /**
+     * The suit pays for the hit in FE instead of the wearer paying in health, from the other pieces first. While the event horizon is
+     * ready, the chestpiece keeps back what it needs, so a suit running dry still has its last resort.
+     */
+    private static float shield(ServerPlayer player, ItemStack chest, float damage) {
+        long reserve = now(player) >= ArsenalData.time(chest, ArsenalData.HORIZON_READY) ? Rules.HORIZON_FE : 0;
+        float absorbed = 0;
+        for (EquipmentSlot slot : new EquipmentSlot[]{EquipmentSlot.HEAD, EquipmentSlot.FEET, EquipmentSlot.LEGS, EquipmentSlot.CHEST}) {
+            ItemStack piece = player.getItemBySlot(slot);
+            long available = Math.max(0, Fe.stored(piece) - (slot == EquipmentSlot.CHEST ? reserve : 0));
+            float paid = Rules.shieldable(damage - absorbed, available);
+            if (paid <= 0) continue;
+            Fe.spend(piece, Math.min((int) available, (int) Math.ceil(paid * Rules.SHIELD_FE_PER_HP)));
+            absorbed += paid;
+            if (absorbed >= damage) break;
+        }
+        if (absorbed <= 0) return damage;
+        // A hit the suit paid for still strains the lining, or the pasta phases would never move.
+        chest.set(ArsenalData.LOAD.get(), Math.min(Rules.LOAD_MAX, ArsenalData.get(chest, ArsenalData.LOAD) + Rules.loadFromDamage(absorbed)));
+        FxPayload.send(player.serverLevel(), FxPayload.RIPPLE, player.getBoundingBox().getCenter(), Vec3.ZERO, 1);
+        return damage - absorbed;
     }
 
     private static void afterDamage(LivingDamageEvent.Post event) {
