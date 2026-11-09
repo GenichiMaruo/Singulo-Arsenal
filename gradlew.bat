@@ -35,6 +35,11 @@ set APP_HOME=%DIRNAME%
 @rem Resolve any "." and ".." in APP_HOME to make it shorter.
 for %%i in ("%APP_HOME%") do set APP_HOME=%%~fi
 
+@rem Apply this checkout's optional local Java and dependency settings.
+if exist "%APP_HOME%\.local\environment.cmd" call "%APP_HOME%\.local\environment.cmd"
+if defined ARSENAL_SINGULO set "ORG_GRADLE_PROJECT_singuloJar=%ARSENAL_SINGULO%"
+if defined ARSENAL_PYTHON set "ORG_GRADLE_PROJECT_pythonExecutable=%ARSENAL_PYTHON%"
+
 @rem Add default JVM options here. You can also use JAVA_OPTS and GRADLE_OPTS to pass JVM options to this script.
 set DEFAULT_JVM_OPTS="-Xmx64m" "-Xms64m"
 

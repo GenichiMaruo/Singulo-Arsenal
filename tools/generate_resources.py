@@ -1,227 +1,388 @@
 #!/usr/bin/env python3
-"""Deterministic data and pixel-art generator; Python 3 stdlib only. Run from any directory."""
-import gzip
+"""Deterministic generator for every data file, translation and icon. Python 3 stdlib only; run from any directory."""
 import json
 from pathlib import Path
+import shutil
 import struct
 import zlib
 
 ROOT = Path(__file__).resolve().parents[1] / 'src/main/resources'
 MOD = 'singulo_arsenal'
-TIERS = ['explorer', 'catalytic', 'inertial', 'boundary']
+SETS = ['meissner', 'degeneracy', 'collapsar']
 PARTS = ['helmet', 'chestplate', 'leggings', 'boots']
-EXTRAS = ['circulation_cartridge', 'inertial_upgrade', 'boundary_upgrade']
-PALETTES = {
-    'explorer': ('#525963', '#92999d', '#d6b879'),
-    'catalytic': ('#56646a', '#d6e1d9', '#64cfaa'),
-    'inertial': ('#253449', '#7c96b1', '#56d9ef'),
-    'boundary': ('#221f35', '#544e72', '#ce9bf7'),
-}
+WEAPONS = ['quench_saber', 'casimir_blade', 'tidal_reaver', 'jet_lance']
+MATERIALS = ['flux_weave', 'pressure_lattice', 'collapsar_lamina', 'jet_collimator', 'tidal_edge']
+DAMAGE = ['quench', 'collapse', 'jet', 'shear', 'horizon']
+
 
 def write(path, value):
     target = ROOT / path
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(json.dumps(value, ensure_ascii=False, indent=2) + '\n')
+    target.write_text(json.dumps(value, ensure_ascii=False, indent=2) + '\n', encoding='utf-8', newline='\n')
 
-def item(id):
-    return {'item': id}
 
-def recipe(name, data, unlock):
-    data['category'] = 'equipment' if data['type'] == 'minecraft:crafting_shaped' else data.get('category', 'misc')
-    if data['type'].startswith('minecraft:smithing_'):
-        data.pop('category', None)
-    write(f'data/{MOD}/recipe/{name}.json', data)
+def s(name):
+    return f'singulo:{name}'
+
+
+def own(name):
+    return f'{MOD}:{name}'
+
+
+def ingredient(ref):
+    return {'tag': ref[1:]} if ref.startswith('#') else {'item': ref}
+
+
+def unlock_advancement(name, unlock):
     write(f'data/{MOD}/advancement/recipes/{name}.json', {
         'parent': 'minecraft:recipes/root',
-        'criteria': {'has_material': {'trigger': 'minecraft:inventory_changed',
-                    'conditions': {'items': [{'items': [unlock]}]}},
-                    'has_recipe': {'trigger': 'minecraft:recipe_unlocked', 'conditions': {'recipe': f'{MOD}:{name}'}}},
+        'criteria': {
+            'has_material': {'trigger': 'minecraft:inventory_changed', 'conditions': {'items': [{'items': [unlock]}]}},
+            'has_recipe': {'trigger': 'minecraft:recipe_unlocked', 'conditions': {'recipe': own(name)}},
+        },
         'requirements': [['has_material', 'has_recipe']],
-        'rewards': {'recipes': [f'{MOD}:{name}']}})
+        'rewards': {'recipes': [own(name)]},
+    })
 
-# Both early suits can be crafted independently. Later suits improve existing equipment at a smithing table.
-patterns = {
-    'helmet': ['PSP', 'P P'], 'chestplate': ['P P', 'PSP', 'PPP'],
-    'leggings': ['PSP', 'P P', 'P P'], 'boots': ['P P', 'S S']}
-for tier in TIERS[:2]:
-    for part in PARTS:
-        key = {'P': item('singulo:steel_plate'), 'S': item('singulo:white_ceramic_composite')}
-        pattern = patterns[part]
-        if tier == 'catalytic':
-            key = {'P': item('singulo:superconducting_coil'), 'S': item('singulo:muon_bundle')}
-        recipe(f'{tier}_{part}', {'type': 'minecraft:crafting_shaped', 'pattern': pattern, 'key': key,
-               'result': {'id': f'{MOD}:{tier}_{part}', 'count': 1}}, key['S']['item'])
 
-recipe('circulation_cartridge', {'type': 'minecraft:crafting_shapeless',
-       'ingredients': [item('singulo:spent_muon_catalyst'), item('singulo:white_ceramic_composite'), item('singulo:steel_plate')],
-       'result': {'id': f'{MOD}:circulation_cartridge', 'count': 1}}, 'singulo:spent_muon_catalyst')
-recipe('inertial_upgrade', {'type': 'minecraft:crafting_shaped', 'pattern': [' C ', 'QEQ', ' C '],
-       'key': {'C': item('singulo:superconducting_coil'), 'Q': item('singulo:quantum_computing_module'), 'E': item('singulo:entangled_element')},
-       'result': {'id': f'{MOD}:inertial_upgrade', 'count': 1}}, 'singulo:quantum_computing_module')
-recipe('boundary_upgrade', {'type': 'minecraft:crafting_shaped', 'pattern': [' D ', 'GHG', ' D '],
-       'key': {'D': item('singulo:degenerate_matter_shell'), 'G': item('singulo:gravity_field_stabilizer'), 'H': item('singulo:hawking_condensate')},
-       'result': {'id': f'{MOD}:boundary_upgrade', 'count': 1}}, 'singulo:hawking_condensate')
-reset = {f'{MOD}:{key}': 0 for key in ['energy', 'impact', 'repair', 'shield', 'active_until', 'ready_at', 'overloaded_until', 'collect_at']}
-for tier, base, addition in [('inertial', 'catalytic', 'quantum_computing_module'), ('boundary', 'inertial', 'gravity_field_stabilizer')]:
+def shaped(name, pattern, key, unlock):
+    """A crafting-table recipe. Every pattern below is a drawing of the thing being built; see docs/arsenal.md."""
+    write(f'data/{MOD}/recipe/{name}.json', {
+        'type': 'minecraft:crafting_shaped', 'category': 'equipment', 'pattern': pattern,
+        'key': {symbol: ingredient(ref) for symbol, ref in key.items()},
+        'result': {'id': own(name), 'count': 1},
+    })
+    unlock_advancement(name, unlock)
+
+
+def machine(name, station, stage, time, energy, ingredients, unlock, fluids=(), count=1):
+    """A Singulo machine recipe. The base mod reads these by station id, so they appear in its machines and JEI pages."""
+    data = {
+        'type': 'singulo:machine', 'station': station, 'stage': stage, 'time': time, 'energy': energy,
+        'ingredients': [{'ingredient': ingredient(ref), 'count': n} for ref, n in ingredients],
+    }
+    if fluids:
+        data['fluid_ingredients'] = [{'fluid': fluid, 'amount': amount} for fluid, amount in fluids]
+    data['result'] = {'id': own(name), 'count': count}
+    write(f'data/{MOD}/recipe/{name}.json', data)
+    unlock_advancement(name, unlock)
+
+
+# ---- Components -------------------------------------------------------------------------------------------------
+
+HELIUM = s('liquid_helium')
+machine('flux_weave', 'precision_assembler', 2, 120, 200,
+        [(s('superconducting_wire'), 4), (s('white_ceramic_composite'), 2), (s('coolant_cartridge'), 1)],
+        s('superconducting_wire'), count=2)
+machine('pressure_lattice', 'degenerate_compactor', 4, 400, 50_000,
+        [(s('degenerate_matter_shell'), 1), (s('nihonium_plate'), 4), ('#c:plates/steel', 4)],
+        s('degenerate_matter_shell'), fluids=[(s('liquid_nitrogen'), 400)], count=4)
+# One lamina is one full Jet Forge firing on top of the firing that made its ingot: about 316 GFE and 78 seconds each.
+machine('collapsar_lamina', 'accretion_jet_forge', 5, 1200, 250_000_000,
+        [(s('collapsar_ingot'), 1), (s('nuclear_pasta'), 1), (s('mass_pellet'), 32)],
+        s('collapsar_ingot'), fluids=[(HELIUM, 2000)])
+machine('jet_collimator', 'precision_assembler', 5, 400, 200_000,
+        [(s('confinement_ring'), 2), (s('optical_lattice_substrate'), 2), (s('jet_condensate'), 4), (s('collapsar_ingot'), 1)],
+        s('jet_condensate'))
+machine('tidal_edge', 'tidal_spindle', 5, 1200, 20_000_000,
+        [(s('collapsar_ingot'), 2), (s('tidal_filament'), 8)], s('tidal_filament'), fluids=[(HELIUM, 500)])
+
+# ---- Suits: every shape puts the working part where it sits on the body ----------------------------------------------
+
+meissner = {'C': s('white_ceramic_composite'), 'W': own('flux_weave'), 'S': s('superconducting_coil'), 'K': s('coolant_cartridge')}
+for name, pattern, used in [
+    ('meissner_helmet', ['CSC', 'W W'], 'CSW'),       # sensing coil at the crown
+    ('meissner_chestplate', ['W W', 'CKC', 'CWC'], 'WCK'),  # cryostat over the heart
+    ('meissner_leggings', ['CSC', 'W W', 'C C'], 'CSW'),    # persistent-current loop at the waist
+    ('meissner_boots', ['W W', 'S S'], 'WS'),         # levitation coils in the soles
+]:
+    shaped(name, pattern, {k: meissner[k] for k in used}, own('flux_weave'))
+
+degeneracy = {'G': own('pressure_lattice'), 'D': s('degenerate_matter_shell'), 'N': s('nihonium_plate'), 'Q': s('quantum_computing_module')}
+for name, pattern, used in [
+    ('degeneracy_helmet', ['GQG', 'G G'], 'GQ'),      # telemetry at the crown
+    ('degeneracy_chestplate', ['G G', 'GDG', 'NGN'], 'GDN'),  # shell at the sternum, carrying the load
+    ('degeneracy_leggings', ['GNG', 'G G', 'N N'], 'GN'),     # braced nihonium hip and shin
+    ('degeneracy_boots', ['N N', 'D D'], 'ND'),       # degenerate shells for soles: what the slam lands on
+]:
+    shaped(name, pattern, {k: degeneracy[k] for k in used}, own('pressure_lattice'))
+
+collapsar = {'L': own('collapsar_lamina'), 'B': s('micro_black_hole'), 'R': s('confinement_ring'), 'F': s('tidal_filament'),
+             'Q': s('quantum_computing_module'), 'O': s('optical_lattice_substrate'), 'G': s('gravity_field_stabilizer'), 'J': s('jet_condensate')}
+for name, pattern, used in [
+    ('collapsar_helmet', ['LQL', 'FOF'], 'LQFO'),     # optical lattice over the eyes
+    ('collapsar_chestplate', ['L L', 'RBR', 'LFL'], 'LRBF'),  # a contained hole between its confinement rings
+    ('collapsar_leggings', ['LGL', 'F F', 'L L'], 'LGF'),     # field stabilizer at the waist, filament down the legs
+    ('collapsar_boots', ['L L', 'J J'], 'LJ'),        # jet condensate at the soles, where Jet Burst exits
+]:
+    shaped(name, pattern, {k: collapsar[k] for k in used}, own('collapsar_lamina'))
+
+# ---- Weapons -----------------------------------------------------------------------------------------------------
+
+shaped('quench_saber', [' S ', 'WKW', ' P '],
+       {'S': s('superconducting_coil'), 'W': own('flux_weave'), 'K': s('coolant_cartridge'), 'P': s('steel_plate')}, own('flux_weave'))
+# Mirrors either side of exotic matter: the gap in the top row is the blade.
+shaped('casimir_blade', ['M M', 'MEM', ' F '],
+       {'M': s('mirror_plate'), 'E': s('exotic_matter'), 'F': s('nihonium_frame')}, s('mirror_plate'))
+shaped('tidal_reaver', [' T ', 'LGL', ' F '],
+       {'T': own('tidal_edge'), 'L': own('collapsar_lamina'), 'G': s('gravity_field_stabilizer'), 'F': s('tidal_filament')}, own('tidal_edge'))
+# A contained black hole with a collimator on each pole.
+shaped('jet_lance', [' J ', 'LBL', ' J '],
+       {'J': own('jet_collimator'), 'L': own('collapsar_lamina'), 'B': s('micro_black_hole')}, own('jet_collimator'))
+
+# ---- Damage types and tags ---------------------------------------------------------------------------------------
+
+for name in DAMAGE:
+    write(f'data/{MOD}/damage_type/{name}.json', {'message_id': f'{MOD}.{name}', 'scaling': 'never', 'exhaustion': 0.1, 'effects': 'hurt'})
+write('data/minecraft/tags/damage_type/bypasses_cooldown.json', {'replace': False, 'values': [own('jet'), own('shear')]})
+for tag, part in [('head_armor', 'helmet'), ('chest_armor', 'chestplate'), ('leg_armor', 'leggings'), ('foot_armor', 'boots')]:
+    write(f'data/minecraft/tags/item/{tag}.json', {'replace': False, 'values': [own(f'{t}_{part}') for t in SETS]})
+write('data/minecraft/tags/item/swords.json', {'replace': False, 'values': [own(w) for w in WEAPONS[:3]]})
+write('data/minecraft/tags/item/enchantable/durability.json', {'replace': False, 'values': [own('jet_lance')]})
+
+# ---- Item models ---------------------------------------------------------------------------------------------------
+
+BUILTIN = {'parent': 'minecraft:builtin/entity', 'textures': {'particle': 'minecraft:block/gray_concrete'}}
+SWORD_DISPLAY = {
+    'gui': {'rotation': [0, 0, -45], 'translation': [0.4, 0.4, 0], 'scale': [0.6, 0.6, 0.6]},
+    'ground': {'translation': [0, 2, 0], 'scale': [0.38, 0.38, 0.38]},
+    'fixed': {'rotation': [0, 0, -45], 'scale': [0.7, 0.7, 0.7]},
+    'firstperson_righthand': {'rotation': [0, 0, 12], 'translation': [1.5, 2, -1], 'scale': [0.46, 0.46, 0.46]},
+    'firstperson_lefthand': {'rotation': [0, 0, -12], 'translation': [1.5, 2, -1], 'scale': [0.46, 0.46, 0.46]},
+    'thirdperson_righthand': {'rotation': [0, 90, 42], 'translation': [0, 4.5, 0.5], 'scale': [0.82, 0.82, 0.82]},
+    'thirdperson_lefthand': {'rotation': [0, -90, -42], 'translation': [0, 4.5, 0.5], 'scale': [0.82, 0.82, 0.82]},
+}
+LANCE_DISPLAY = {
+    'gui': {'rotation': [0, 0, -45], 'scale': [0.46, 0.46, 0.46]},
+    'ground': {'translation': [0, 2, 0], 'scale': [0.3, 0.3, 0.3]},
+    'fixed': {'rotation': [0, 0, -45], 'scale': [0.5, 0.5, 0.5]},
+    'firstperson_righthand': {'rotation': [-58, 0, 22], 'translation': [3, 2, -2], 'scale': [0.42, 0.42, 0.42]},
+    'firstperson_lefthand': {'rotation': [-58, 0, -22], 'translation': [3, 2, -2], 'scale': [0.42, 0.42, 0.42]},
+    'thirdperson_righthand': {'rotation': [75, 0, 0], 'translation': [0, 2.5, 0], 'scale': [0.72, 0.72, 0.72]},
+    'thirdperson_lefthand': {'rotation': [75, 0, 0], 'translation': [0, 2.5, 0], 'scale': [0.72, 0.72, 0.72]},
+}
+ARMOR_DISPLAY = {
+    'gui': {'rotation': [16, 208, 0], 'scale': [1, 1, 1]},
+    'ground': {'translation': [0, 3, 0], 'scale': [0.5, 0.5, 0.5]},
+    'fixed': {'rotation': [0, 180, 0], 'scale': [1, 1, 1]},
+    'firstperson_righthand': {'rotation': [0, 150, 0], 'translation': [1.5, 3, 0], 'scale': [0.38, 0.38, 0.38]},
+    'firstperson_lefthand': {'rotation': [0, -150, 0], 'translation': [1.5, 3, 0], 'scale': [0.38, 0.38, 0.38]},
+    'thirdperson_righthand': {'rotation': [75, 45, 0], 'translation': [0, 2.5, 0], 'scale': [0.34, 0.34, 0.34]},
+    'thirdperson_lefthand': {'rotation': [75, 225, 0], 'translation': [0, 2.5, 0], 'scale': [0.34, 0.34, 0.34]},
+}
+# The reaver is the broadest thing here and would otherwise fill a quarter of the first-person view.
+REAVER_DISPLAY = {**SWORD_DISPLAY,
+                  'firstperson_righthand': {'rotation': [0, 0, 12], 'translation': [2, 1, -1], 'scale': [0.36, 0.36, 0.36]},
+                  'firstperson_lefthand': {'rotation': [0, 0, -12], 'translation': [2, 1, -1], 'scale': [0.36, 0.36, 0.36]}}
+DISPLAYS = {'jet_lance': LANCE_DISPLAY, 'tidal_reaver': REAVER_DISPLAY}
+for name in WEAPONS:
+    write(f'assets/{MOD}/models/item/{name}.json', {**BUILTIN, 'display': DISPLAYS.get(name, SWORD_DISPLAY)})
+for t in SETS:
     for part in PARTS:
-        recipe(f'{tier}_{part}', {'type': 'minecraft:smithing_transform',
-               'template': item(f'{MOD}:{tier}_upgrade'), 'base': item(f'{MOD}:{base}_{part}'),
-               'addition': item(f'singulo:{addition}'),
-               'result': {'id': f'{MOD}:{tier}_{part}', 'components': reset}}, f'{MOD}:{tier}_upgrade')
+        write(f'assets/{MOD}/models/item/{t}_{part}.json', {**BUILTIN, 'display': ARMOR_DISPLAY})
+for name in MATERIALS:
+    write(f'assets/{MOD}/models/item/{name}.json', {'parent': 'minecraft:item/generated', 'textures': {'layer0': f'{MOD}:item/{name}'}})
+
+# ---- Translations --------------------------------------------------------------------------------------------------
 
 ja, en = {}, {}
-ja_names = {
- 'explorer': ['遺構探査面', '補強探索服', '踏破用作業衣', '緩衝作業靴'],
- 'catalytic': ['循環監視面', '触媒循環装甲', '補助循環装甲', '耐熱作業靴'],
- 'inertial': ['慣性観測器', '慣性制御装甲', '姿勢制御装甲', '衝撃回収靴'],
- 'boundary': ['境界観測面', '事象境界装甲', '境界安定装甲', '空間固定靴']}
-en_names = {
- 'explorer': ['Ruin Survey Visor', 'Reinforced Exploration Suit', 'Expedition Trousers', 'Cushioned Work Boots'],
- 'catalytic': ['Circulation Monitor', 'Catalytic Circulation Armor', 'Auxiliary Circulation Leggings', 'Heatproof Work Boots'],
- 'inertial': ['Inertial Observer', 'Inertial Control Armor', 'Attitude Control Leggings', 'Impact Recovery Boots'],
- 'boundary': ['Boundary Observer', 'Event Boundary Armor', 'Boundary Stabilization Leggings', 'Spatial Anchor Boots']}
-ja_tips = {
- 'explorer': ['暗視キー（既定 V）：暗視10秒／再使用30秒。', '鉄相当の防御。鋼板で修理できる高耐久の作業服。', '着用中は凍結の蓄積を抑える。', '粉雪の上を歩ける。落下距離を3ブロック分軽減。'],
- 'catalytic': ['対応する胴の補修残量を HUD に表示。', '非戦闘10秒後、1秒につき耐久1回復。持ち物の循環カートリッジ1個で256補修。', '対応する胴の自己修復を、装備中の触媒循環防具全体に拡張。', '溶岩の外では残り炎上時間を最大2秒に短縮。溶岩耐性はない。'],
- 'inertial': ['衝撃蓄積・過負荷・蓄積装備の電力を HUD に表示。', '100 FE でノックバック60%軽減。被弾から衝撃を回収（上限100）。満杯で5秒停止。', '回避キー（既定 Z）：衝撃20＋2,000 FE。地上のみ／再使用1.5秒。単品でも衝撃を回収（上限40）。', '200 FE で落下ダメージ50%軽減。6ブロック以上の落下から衝撃回収。'],
- 'boundary': ['防壁残量・持続時間・再使用待ち・胴の電力を HUD に表示。', '防壁キー（既定 B）：20,000 FE＋100 FE/t。ダメージ16点を吸収／3秒／再使用60秒。', '対応する胴の防壁の持続時間を5秒に延長。', '対応する防壁の作動中、落下ダメージとノックバックを75%軽減。']}
-en_tips = {
- 'explorer': ['Vision key (default V): 10s night vision, 30s cooldown.', 'Iron-level protection, high durability; repair with Steel Plates.', 'Prevents freezing from building up while worn.', 'Walk on powder snow; subtract 3 blocks from fall distance.'],
- 'catalytic': ['Displays the matching chestplate\'s repair reserve.', 'After 10s out of combat, repairs 1 durability/s. A carried cartridge supplies 256 points.', 'Extends the matching chestplate\'s repair to all worn catalytic armor.', 'Outside lava, caps remaining burn time at 2 seconds. No lava immunity.'],
- 'inertial': ['Displays impact, overload, and the reservoir armor\'s FE.', '100 FE reduces knockback by 60%. Collects impact from hits (max 100); overload disables for 5s.', 'Dodge key (default Z): 20 impact + 2,000 FE, grounded only, 1.5s cooldown. Collects impact alone (max 40).', '200 FE halves fall damage; recovers impact from falls of at least 6 blocks.'],
- 'boundary': ['Displays shield points, duration, cooldown, and chestplate FE.', 'Barrier key (default B): 20,000 FE + 100 FE/t, absorbs 16 damage for 3s, 60s cooldown.', 'Extends the matching chestplate\'s barrier duration to 5 seconds.', 'While the matching barrier is active, reduces fall damage and knockback by 75%.']}
-for tier in TIERS:
+names = {
+    'meissner': (['マイスナー観測帽', 'マイスナー胸殻', 'マイスナー脚衣', 'マイスナー浮上靴'],
+                 ['Meissner Observer', 'Meissner Carapace', 'Meissner Greaves', 'Meissner Levitators']),
+    'degeneracy': (['縮退圧兜', '縮退圧胸甲', '縮退圧脚甲', '縮退圧鉄靴'],
+                   ['Degeneracy Helm', 'Degeneracy Cuirass', 'Degeneracy Tassets', 'Degeneracy Sabatons']),
+    'collapsar': (['コラプサー観測冠', 'コラプサー炉心甲', 'コラプサー潮汐脚甲', 'コラプサー噴流靴'],
+                  ['Collapsar Corona', 'Collapsar Corecase', 'Collapsar Tidal Greaves', 'Collapsar Jet Boots']),
+}
+tips = {
+    'meissner': (
+        ['SQUID磁力計：敵対的なものの位置を壁越しに表示する。', '飛び道具を磁場排除で弾き返す（1,500 FE／発）。', '永久電流：着用中の各部位の電力を均等化する。歩行速度+7%。', '空中でスニーク：磁束ピン止めでゆっくり降下する（30 FE/t）。'],
+        ['SQUID magnetometer: marks hostile creatures through walls.', 'Expels projectiles with the Meissner effect (1,500 FE each).', 'Persistent current: worn pieces share FE evenly. +7% walking speed.', 'Sneak in midair: flux pinning lowers you slowly (30 FE/t).']),
+    'degeneracy': (
+        ['毒とウィザーを濾過する（2,000 FE）。', 'チャンドラセカール限界：一撃の被ダメージ8を超える分を圧力に変換する。圧力60で崩壊して衝撃波を放ち、30秒間停止する。能力キーで手動で放出できる（圧力15以上）。', '接地中にスニークすると踏ん張る：被ダメージ-30%、ノックバック無効。', '4ブロック以上の落下を衝撃波に変える（500 FE／ブロック）。'],
+        ['Filters poison and wither (2,000 FE).', 'Chandrasekhar limit: damage over 8 per hit becomes pressure. At 60 it collapses in a shockwave and locks for 30s. The ability key vents it early (15+ pressure).', 'Sneak on the ground to brace: -30% damage, no knockback.', 'Turns falls of 4+ blocks into a shockwave (500 FE per block).']),
+    'collapsar': (
+        ['無毛定理：有害な効果を消し去る（10,000 FE）。', '核パスタの裏地：受けた衝撃で ニョッキ（速度+15%）→ スパゲッティ（間合い+1、ノックバック軽減）→ ラザニア（被ダメージ-30%、速度-10%）と相転移する。脚甲が必要。能力キー：ジェット噴射（靴が必要）。', '胴の核パスタ相転移を駆動する。', '落下ダメージ無効。胴とそろえるとジェット噴射が使える。'],
+        ['No-hair theorem: erases harmful effects (10,000 FE).', 'Nuclear-pasta lining: damage drives it through gnocchi (+15% speed), spaghetti (+1 reach, knockback resistance), lasagna (-30% damage, -10% speed). Needs the greaves. Ability key: Jet Burst (needs the boots).', 'Drives the corecase\'s pasta phase transitions.', 'No fall damage. With the corecase, enables Jet Burst.']),
+}
+for t in SETS:
     for n, part in enumerate(PARTS):
-        ja[f'item.{MOD}.{tier}_{part}'] = ja_names[tier][n]
-        en[f'item.{MOD}.{tier}_{part}'] = en_names[tier][n]
-        ja[f'tooltip.{MOD}.{tier}.{part}'] = ja_tips[tier][n]
-        en[f'tooltip.{MOD}.{tier}.{part}'] = en_tips[tier][n]
-for id, j, e in [('circulation_cartridge', '循環カートリッジ', 'Circulation Cartridge'),
-                 ('inertial_upgrade', '慣性制御改修キット', 'Inertial Upgrade Kit'),
-                 ('boundary_upgrade', '事象境界改修キット', 'Boundary Upgrade Kit')]:
-    ja[f'item.{MOD}.{id}'] = j
-    en[f'item.{MOD}.{id}'] = e
+        ja[f'item.{MOD}.{t}_{part}'], en[f'item.{MOD}.{t}_{part}'] = names[t][0][n], names[t][1][n]
+        ja[f'tooltip.{MOD}.{t}.{part}'], en[f'tooltip.{MOD}.{t}.{part}'] = tips[t][0][n], tips[t][1][n]
+
+weapon_text = {
+    'quench_saber': ('クエンチ・セイバー', 'Quench Saber',
+                     ['攻撃9／攻撃速度1.6。', '命中で電流が溜まり、5発目で超伝導が破れてクエンチする。', '周囲に10ダメージと炎上（8,000 FE）。'],
+                     ['9 damage, 1.6 attack speed.', 'Hits build current; the fifth quenches the superconductor.', 'Dumps 10 damage and fire around the target (8,000 FE).']),
+    'casimir_blade': ('カシミール刃', 'Casimir Blade',
+                      ['攻撃13／攻撃速度1.6。刃は鏡の間の真空で、防具の効果を35%無視する。', '使用長押し（0.8秒）で鏡を閉じる（40,000 FE）。', '次の一撃は防具を完全に無視し、ダメージ1.5倍。'],
+                      ['13 damage, 1.6 attack speed. The blade is the vacuum between its mirrors; ignores 35% of armor.', 'Hold use for 0.8s to close the mirrors (40,000 FE).', 'The next hit ignores armor entirely and deals 1.5x.']),
+    'tidal_reaver': ('潮汐断裁刃', 'Tidal Reaver',
+                     ['攻撃22／攻撃速度1.0。命中で潮汐応力を付与（最大5、被ダメージ+8%／層）。', '使用長押し：ロッシュ焦点が周囲の敵を引き寄せる（300,000 FE/秒）。', '離して断裁：応力に応じて16〜66ダメージを与え、応力を解放する。'],
+                     ['22 damage, 1.0 attack speed. Hits apply tidal stress (up to 5, +8% damage taken each).', 'Hold use: a Roche focus drags nearby enemies in (300,000 FE/s).', 'Release to shear for 16-66 damage by stress, spending it.']),
+    'jet_lance': ('双極ジェット槍', 'Bipolar Jet Lance',
+                  ['使用長押し：点火→3段の収束→照射（最長6秒）。', '前方80ブロックを貫通し、防具の6割を無視して56 DPS（500,000 FE/秒）。', '逆極のジェットは背後14ブロックも焼く。反動はない。'],
+                  ['Hold use: ignition, three-ring collimation, then irradiation (up to 6s).', 'Pierces 80 blocks ahead for 56 DPS, ignoring 60% of armor (500,000 FE/s).', 'The opposite jet burns 14 blocks behind you. There is no recoil.']),
+}
+for name, (j, e, tj, te) in weapon_text.items():
+    ja[f'item.{MOD}.{name}'], en[f'item.{MOD}.{name}'] = j, e
+    for n in range(3):
+        ja[f'tooltip.{MOD}.{name}.{n + 1}'], en[f'tooltip.{MOD}.{name}.{n + 1}'] = tj[n], te[n]
+
+for name, j, e in [('flux_weave', '磁束織布', 'Flux Weave'), ('pressure_lattice', '縮退格子板', 'Pressure Lattice'),
+                   ('collapsar_lamina', 'コラプサー積層板', 'Collapsar Lamina'), ('jet_collimator', 'ジェット収束器', 'Jet Collimator'),
+                   ('tidal_edge', '潮汐鍛造刃', 'Tidal Edge')]:
+    ja[f'item.{MOD}.{name}'], en[f'item.{MOD}.{name}'] = j, e
+
 common = {
- 'itemGroup.singulo_arsenal': ('Singulo Arsenal', 'Singulo Arsenal'),
- 'key.categories.singulo_arsenal': ('Singulo Arsenal', 'Singulo Arsenal'),
- 'key.singulo_arsenal.vision': ('遺構探査面：暗視', 'Survey visor: Night vision'),
- 'key.singulo_arsenal.dodge': ('慣性装甲：地上回避', 'Inertial armor: Ground dodge'),
- 'key.singulo_arsenal.barrier': ('境界装甲：防壁展開', 'Boundary armor: Deploy barrier'),
- 'tooltip.singulo_arsenal.stage': ('Singulo 進行段階 %s', 'Singulo progression stage %s'),
- 'tooltip.singulo_arsenal.energy': ('電力：%s / %s FE', 'Energy: %s / %s FE'),
- 'tooltip.singulo_arsenal.charge': ('充電：手に持ち、スニークして電源の出力面に使用。', 'Charge: hold and sneak-use an energy output face.'),
- 'tooltip.singulo_arsenal.repair': ('補修残量：%s / %s', 'Repair reserve: %s / %s'),
- 'message.singulo_arsenal.charged': ('%s FE 充電しました。', 'Charged %s FE.'),
- 'message.singulo_arsenal.need_vision': ('遺構探査面を装備してください。', 'Equip a Ruin Survey Visor.'),
- 'message.singulo_arsenal.need_dodge': ('姿勢制御装甲を装備してください。', 'Equip Attitude Control Leggings.'),
- 'message.singulo_arsenal.need_barrier': ('事象境界装甲を装備してください。', 'Equip Event Boundary Armor.'),
- 'message.singulo_arsenal.cooling': ('再使用まで待機中です。', 'Ability is cooling down.'),
- 'message.singulo_arsenal.no_energy': ('電力が不足しています。', 'Not enough energy.'),
- 'message.singulo_arsenal.overloaded': ('慣性装甲が過負荷：5秒間、衝撃制御が停止します。', 'Inertial overload: impact control disabled for 5 seconds.'),
- 'message.singulo_arsenal.dodge_unavailable': ('回避には接地・衝撃20・脚の2,000 FEが必要です。過負荷や再使用待ちの間は使用できません。', 'Dodge needs ground, 20 impact and 2,000 leg FE; unavailable during overload or cooldown.'),
- 'hud.singulo_arsenal.repair': ('循環装甲 | 補修残量 %s', 'Circulation | Repair reserve %s'),
- 'hud.singulo_arsenal.overload': ('慣性装甲 | 過負荷 あと%s秒', 'Inertial | Overload: %ss'),
- 'hud.singulo_arsenal.impact': ('慣性装甲 | 衝撃 %s | 回避 %s FE | 安定化 %s FE', 'Inertial | Impact %s | Dodge %s FE | Stabilizer %s FE'),
- 'hud.singulo_arsenal.shield': ('境界場 | 防壁 %s | あと%s秒', 'Boundary | Shield %s | %ss'),
- 'hud.singulo_arsenal.boundary': ('境界装甲 | %s FE | 再展開 %s秒', 'Boundary | %s FE | Cooldown %ss'),
+    'itemGroup.singulo_arsenal': ('Singulo Arsenal', 'Singulo Arsenal'),
+    'key.categories.singulo_arsenal': ('Singulo Arsenal', 'Singulo Arsenal'),
+    'key.singulo_arsenal.ability': ('装甲の起動機能', 'Armor ability'),
+    'tooltip.singulo_arsenal.stage': ('Singulo 進行段階 %s', 'Singulo progression stage %s'),
+    'tooltip.singulo_arsenal.energy': ('電力：%s / %s FE', 'Energy: %s / %s FE'),
+    'tooltip.singulo_arsenal.charge': ('充電：手に持ち、スニークして電源の出力面に使用。', 'Charge: hold and sneak-use an energy output face.'),
+    'tooltip.singulo_arsenal.accretion': ('降着：持ち物の質量ペレットを自動で電力に変える（1個で500,000 FE）。', 'Accretion: burns mass pellets from your inventory for power (500,000 FE each).'),
+    'tooltip.singulo_arsenal.full_set.meissner': ('全身：レンツの法則で攻撃者を弾き飛ばす。', 'Full set: Lenz\'s law throws melee attackers back.'),
+    'tooltip.singulo_arsenal.full_set.degeneracy': ('各部位の機能は単体で働く。', 'Each piece works on its own.'),
+    'tooltip.singulo_arsenal.full_set.collapsar': ('全身：致死の一撃を事象の地平面で止める。電力8,000,000 FE、再使用10分。', 'Full set: an event horizon stops a lethal hit. 8,000,000 FE, 10-minute cooldown.'),
+    'message.singulo_arsenal.charged': ('%s FE を充電（残量 %s FE）', 'Charged %s FE (%s FE stored)'),
+    'message.singulo_arsenal.no_energy': ('電力が不足しています。', 'Not enough energy.'),
+    'message.singulo_arsenal.no_ability': ('この胴装備に起動機能はありません。', 'This chestpiece has no ability.'),
+    'message.singulo_arsenal.need_boots': ('ジェット噴射にはコラプサー噴流靴が必要です。', 'Jet Burst needs Collapsar Jet Boots.'),
+    'message.singulo_arsenal.vent_unavailable': ('放出には圧力 %s 以上が必要です。', 'Venting needs at least %s pressure.'),
+    'message.singulo_arsenal.collapse': ('チャンドラセカール限界を超過：装甲が崩壊した。', 'Chandrasekhar limit exceeded: the plating collapsed.'),
+    'hud.singulo_arsenal.meissner': ('マイスナー', 'Meissner'),
+    'hud.singulo_arsenal.degeneracy': ('縮退圧', 'Degeneracy'),
+    'hud.singulo_arsenal.collapsar': ('コラプサー', 'Collapsar'),
+    'hud.singulo_arsenal.pressure': ('圧力 %s / %s', 'Pressure %s / %s'),
+    'hud.singulo_arsenal.collapsed': ('崩壊中：あと %s 秒', 'Collapsed: %ss'),
+    'hud.singulo_arsenal.phase.0': ('ニョッキ相 %s / %s', 'Gnocchi phase %s / %s'),
+    'hud.singulo_arsenal.phase.1': ('スパゲッティ相 %s / %s', 'Spaghetti phase %s / %s'),
+    'hud.singulo_arsenal.phase.2': ('ラザニア相 %s / %s', 'Lasagna phase %s / %s'),
+    'hud.singulo_arsenal.horizon_cooling': ('事象の地平面：再使用まで %s 秒', 'Horizon: ready in %ss'),
+    'death.attack.singulo_arsenal.quench': ('%1$s は %2$s のクエンチに巻き込まれた', '%1$s was caught in %2$s\'s quench'),
+    'death.attack.singulo_arsenal.collapse': ('%1$s は %2$s の縮退圧に押しつぶされた', '%1$s was crushed by %2$s\'s degeneracy pressure'),
+    'death.attack.singulo_arsenal.jet': ('%1$s は %2$s の相対論的ジェットに焼かれた', '%1$s was burned by %2$s\'s relativistic jet'),
+    'death.attack.singulo_arsenal.shear': ('%1$s は %2$s の潮汐力で引き裂かれた', '%1$s was torn apart by %2$s\'s tidal force'),
+    'death.attack.singulo_arsenal.horizon': ('%1$s は %2$s の事象の地平面に触れた', '%1$s touched %2$s\'s event horizon'),
 }
 for key, (j, e) in common.items():
     ja[key], en[key] = j, e
 for locale, data in [('ja_jp', ja), ('en_us', en)]:
-    write(f'assets/{MOD}/lang/{locale}.json', data)
+    write(f'assets/{MOD}/lang/{locale}.json', dict(sorted(data.items())))
 write('pack.mcmeta', {'pack': {'pack_format': 34, 'description': 'Singulo Arsenal equipment resources'}})
-write('data/minecraft/tags/item/freeze_immune_wearables.json', {
-    'replace': False, 'values': [f'{MOD}:explorer_leggings']})
 
-# Minimal PNG writer: no image tools/dependencies needed to regenerate the checked-in art.
-def rgb(code):
-    return tuple(bytes.fromhex(code.removeprefix('#'))) + (255,)
 
-def canvas(w, h):
-    return [[(0, 0, 0, 0) for _ in range(w)] for _ in range(h)]
+# ---- Icons ---------------------------------------------------------------------------------------------------------
 
-def rect(pixels, x, y, w, h, color):
-    for py in range(y, min(y+h, len(pixels))):
-        for px in range(x, min(x+w, len(pixels[0]))):
-            if px >= 0 and py >= 0:
-                pixels[py][px] = color
-
-def png(path, pixels):
-    h, w = len(pixels), len(pixels[0])
-    raw = b''.join(b'\x00' + b''.join(bytes(p) for p in row) for row in pixels)
-    def chunk(tag, value):
-        return struct.pack('>I', len(value)) + tag + value + struct.pack('>I', zlib.crc32(tag + value) & 0xffffffff)
-    data = b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', w, h, 8, 6, 0, 0, 0)) + chunk(b'IDAT', zlib.compress(raw)) + chunk(b'IEND', b'')
+def png(path, width, height, pixels):
+    def chunk(kind, data):
+        return struct.pack('>I', len(data)) + kind + data + struct.pack('>I', zlib.crc32(kind + data))
+    rows = b''.join(b'\x00' + bytes(v for px in pixels[y * width:(y + 1) * width] for v in px) for y in range(height))
     target = ROOT / path
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_bytes(data)
+    target.write_bytes(b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', width, height, 8, 6, 0, 0, 0))
+                       + chunk(b'IDAT', zlib.compress(rows, 9)) + chunk(b'IEND', b''))
 
-for tier in TIERS:
-    dark, panel, glow = map(rgb, PALETTES[tier])
-    for part in PARTS:
-        pixels = canvas(16, 16)
-        if part == 'helmet':
-            rect(pixels, 3, 3, 10, 10, dark); rect(pixels, 4, 3, 8, 3, panel)
-            rect(pixels, 4, 7, 8, 2, glow); rect(pixels, 6, 10, 4, 2, panel)
-        elif part == 'chestplate':
-            rect(pixels, 2, 3, 12, 4, dark); rect(pixels, 4, 5, 8, 9, dark)
-            rect(pixels, 5, 5, 6, 7, panel); rect(pixels, 7, 6, 2, 3, glow)
-            rect(pixels, 2, 3, 3, 2, panel); rect(pixels, 11, 3, 3, 2, panel)
-            rect(pixels, 4, 12, 8, 1, glow)
-        elif part == 'leggings':
-            rect(pixels, 3, 2, 10, 4, dark); rect(pixels, 3, 6, 4, 8, dark); rect(pixels, 9, 6, 4, 8, dark)
-            rect(pixels, 4, 6, 2, 6, panel); rect(pixels, 10, 6, 2, 6, panel)
-            rect(pixels, 4, 3, 8, 1, glow); rect(pixels, 4, 9, 2, 1, glow); rect(pixels, 10, 9, 2, 1, glow)
-        else:
-            for x in (2, 9):
-                rect(pixels, x, 4, 4, 9, dark); rect(pixels, x-1, 10, 5, 3, dark)
-                rect(pixels, x+1, 5, 2, 6, panel); rect(pixels, x, 8, 3, 1, glow)
-        id = f'{tier}_{part}'
-        png(f'assets/{MOD}/textures/item/{id}.png', pixels)
-        write(f'assets/{MOD}/models/item/{id}.json', {'parent': 'minecraft:item/generated', 'textures': {'layer0': f'{MOD}:item/{id}'}})
-    # Vanilla biped armor UV atlas (64x32): head, body, legs, arms. Layer 2 is used by leggings.
-    for layer in (1, 2):
-        pixels = canvas(64, 32)
-        for x, y, w, h in [(0, 0, 32, 16), (0, 16, 16, 16), (16, 16, 24, 16), (40, 16, 24, 16)]:
-            rect(pixels, x, y, w, h, dark)
-            for py in range(y+1, y+h-1):
-                for px in range(x+1, x+w-1):
-                    if px % 8 not in (0, 7) and py % 8 not in (0, 7): pixels[py][px] = panel
-            rect(pixels, x+1, y+5, w-2, 1, glow)
-        # Narrow dark visor with illuminated edges on the front of the head.
-        rect(pixels, 8, 10, 8, 3, dark); rect(pixels, 8, 10, 8, 1, glow)
-        png(f'assets/{MOD}/textures/models/armor/{tier}_layer_{layer}.png', pixels)
-for n, extra in enumerate(EXTRAS):
-    pixels = canvas(16, 16)
-    rect(pixels, 4, 2, 8, 12, rgb('#283442'))
-    rect(pixels, 5, 3, 6, 10, rgb('#a8b8bb'))
-    color = rgb(['#64cfaa', '#56d9ef', '#ce9bf7'][n])
-    rect(pixels, 6, 5, 4, 6, color); rect(pixels, 6, 2, 4, 1, rgb('#d6b879'))
-    png(f'assets/{MOD}/textures/item/{extra}.png', pixels)
-    write(f'assets/{MOD}/models/item/{extra}.json', {'parent': 'minecraft:item/generated', 'textures': {'layer0': f'{MOD}:item/{extra}'}})
 
-# GameTest structure: 5x5 stone floor inside an otherwise empty arena, deterministic gzip timestamp.
-def utf(s):
-    b = s.encode(); return struct.pack('>H', len(b)) + b
+def rgb(value):
+    return ((value >> 16) & 255, (value >> 8) & 255, value & 255, 255)
 
-def tag(t, name, data):
-    return bytes([t]) + utf(name) + data
 
-def integer(i):
-    return struct.pack('>i', i)
+def sprite(name, art, palette):
+    assert len(art) == 16 and all(len(row) == 16 for row in art), name
+    png(f'assets/{MOD}/textures/item/{name}.png', 16, 16,
+        [(0, 0, 0, 0) if c == '.' else rgb(palette[c]) for row in art for c in row])
 
-def ints(values):
-    return b'\x03' + integer(len(values)) + b''.join(integer(v) for v in values)
 
-palette = b'\x0a' + integer(1) + tag(8, 'Name', utf('minecraft:stone')) + b'\x00'
-blocks = b'\x0a' + integer(25) + b''.join(tag(9, 'pos', ints([x, 0, z])) + tag(3, 'state', integer(0)) + b'\x00' for x in range(5) for z in range(5))
-nbt = b'\x0a\x00\x00' + tag(3, 'DataVersion', integer(3955)) + tag(9, 'size', ints([5, 5, 5])) + tag(9, 'palette', palette) + tag(9, 'blocks', blocks) + tag(9, 'entities', b'\x0a' + integer(0)) + b'\x00'
-path = ROOT / f'data/{MOD}/structure/empty.nbt'
-path.parent.mkdir(parents=True, exist_ok=True)
-path.write_bytes(gzip.compress(nbt, mtime=0))
-print('Generated 19 items, 8 armor textures, 19 recipes, recipe unlocks, ja/en translations and GameTest arena.')
-
-# Keep weapon translations alongside the armor catalog during deterministic regeneration.
-from generate_railgun_resources import generate as generate_railgun
-
-generate_railgun()
+sprite('flux_weave', [
+    '................',
+    '..wwcwwcwwcwww..',
+    '.wWWcWWcWWcWWsw.',
+    '.wWWcWWcWWcWWsw.',
+    '.ccccccccccccsc.',
+    '.wWWcWWcWWcWWsw.',
+    '.wWWcWWcWWcWWsw.',
+    '.ccccccccccccsc.',
+    '.wWWcWWcWWcWWsw.',
+    '.wWWcWWcWWcWWsw.',
+    '.ccccccccccccsc.',
+    '.wWWcWWcWWcWWsw.',
+    '.wWWcWWcWWcWWsw.',
+    '.sssssssssssss..',
+    '..wwcwwcwwcwww..',
+    '................',
+], {'w': 0xB9C5D1, 'W': 0xE7ECF1, 'c': 0x7CE8FF, 's': 0x8D9AA8})
+sprite('pressure_lattice', [
+    '................',
+    '.DDDDDDDDDDDDDD.',
+    '.DPPPPaPPPaPPPD.',
+    '.DPLLPaPLPaPLPD.',
+    '.DPPPPaPPPaPPPD.',
+    '.DaaaahaaahaaaD.',
+    '.DPPPPaPPPaPPPD.',
+    '.DPLLPaPLPaPLPD.',
+    '.DPPPPaPPPaPPPD.',
+    '.DaaaahaaahaaaD.',
+    '.DPPPPaPPPaPPPD.',
+    '.DPLLPaPLPaPLPD.',
+    '.DPPPPaPPPaPPPD.',
+    '.DDDDDDDDDDDDDD.',
+    '................',
+    '................',
+], {'D': 0x262220, 'P': 0x3E3936, 'L': 0x59524A, 'a': 0xE08A2E, 'h': 0xFFD27A})
+sprite('collapsar_lamina', [
+    '................',
+    '..IIIIIIIIIIII..',
+    '.IVVVVVVVVVVVVI.',
+    '.IVoVoVoVoVoVVI.',
+    '.IVVVVVVVVVVVVI.',
+    '.IEEEEEEEEEEEEI.',
+    '.IVyyyyyyyyyyVI.',
+    '.IVVVVVVVVVVVVI.',
+    '.IEEEEEEEEEEEEI.',
+    '.IVwwwwwwwwwwVI.',
+    '.IVVVVVVVVVVVVI.',
+    '.IEEEEEEEEEEEEI.',
+    '.IVVVVVVVVVVVVI.',
+    '..IIIIIIIIIIII..',
+    '................',
+    '................',
+], {'I': 0xE7D8B0, 'V': 0x0E0D14, 'E': 0x24212E, 'o': 0xFFB061, 'y': 0xFFE2A0, 'w': 0xFFFFFF})
+sprite('jet_collimator', [
+    '................',
+    '.....IIIIII.....',
+    '...IIVVVVVVII...',
+    '..IVVyyyyyyVVI..',
+    '..IVyyEEEEyyVI..',
+    '.IVyyEIIIIEyyVI.',
+    '.IVyEIVVVVIEyVI.',
+    '.IVyEIV..VIEyVI.',
+    '.IVyEIV..VIEyVI.',
+    '.IVyEIVVVVIEyVI.',
+    '.IVyyEIIIIEyyVI.',
+    '..IVyyEEEEyyVI..',
+    '..IVVyyyyyyVVI..',
+    '...IIVVVVVVII...',
+    '.....IIIIII.....',
+    '................',
+], {'I': 0xE7D8B0, 'V': 0x24212E, 'E': 0x0E0D14, 'y': 0xFFD28A})
+sprite('tidal_edge', [
+    '.............yII',
+    '............yVVI',
+    '...........yVVVI',
+    '..........yVVVV.',
+    '.........yVVVV..',
+    '........yVVVV...',
+    '.......yVVVV....',
+    '......yVVVV.....',
+    '.....yVVVV......',
+    '....yVVVV.......',
+    '...yVVVVt.......',
+    '..yVVVVt.t......',
+    '.yVVVVt...t.....',
+    'yVVVVt.....t....',
+    'IVVVt.......t...',
+    'IIIt.........t..',
+], {'I': 0xE7D8B0, 'V': 0x24212E, 'y': 0xFFE2A0, 't': 0xFFD28A})
+png(f'assets/{MOD}/textures/misc/white.png', 1, 1, [(255, 255, 255, 255)])

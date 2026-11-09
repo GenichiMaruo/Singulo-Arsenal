@@ -1,0 +1,37 @@
+{
+  "type": "singulo:machine",
+  "station": "precision_assembler",
+  "stage": 5,
+  "time": 400,
+  "energy": 200000,
+  "ingredients": [
+    {
+      "ingredient": {
+        "item": "singulo:confinement_ring"
+      },
+      "count": 2
+    },
+    {
+      "ingredient": {
+        "item": "singulo:optical_lattice_substrate"
+      },
+      "count": 2
+    },
+    {
+      "ingredient": {
+        "item": "singulo:jet_condensate"
+      },
+      "count": 4
+    },
+    {
+      "ingredient": {
+        "item": "singulo:collapsar_ingot"
+      },
+      "count": 1
+    }
+  ],
+  "result": {
+    "id": "singulo_arsenal:jet_collimator",
+    "count": 1
+  }
+}

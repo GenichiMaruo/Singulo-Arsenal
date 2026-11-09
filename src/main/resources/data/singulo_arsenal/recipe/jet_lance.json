@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    " J ",
+    "LBL",
+    " J "
+  ],
+  "key": {
+    "J": {
+      "item": "singulo_arsenal:jet_collimator"
+    },
+    "L": {
+      "item": "singulo_arsenal:collapsar_lamina"
+    },
+    "B": {
+      "item": "singulo:micro_black_hole"
+    }
+  },
+  "result": {
+    "id": "singulo_arsenal:jet_lance",
+    "count": 1
+  }
+}

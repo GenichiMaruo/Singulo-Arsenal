@@ -1,0 +1,31 @@
+{
+  "type": "singulo:machine",
+  "station": "precision_assembler",
+  "stage": 2,
+  "time": 120,
+  "energy": 200,
+  "ingredients": [
+    {
+      "ingredient": {
+        "item": "singulo:superconducting_wire"
+      },
+      "count": 4
+    },
+    {
+      "ingredient": {
+        "item": "singulo:white_ceramic_composite"
+      },
+      "count": 2
+    },
+    {
+      "ingredient": {
+        "item": "singulo:coolant_cartridge"
+      },
+      "count": 1
+    }
+  ],
+  "result": {
+    "id": "singulo_arsenal:flux_weave",
+    "count": 2
+  }
+}

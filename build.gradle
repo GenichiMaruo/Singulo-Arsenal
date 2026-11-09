@@ -28,7 +28,7 @@ if (providers.gradleProperty('singuloJar').isPresent()) {
 def requireSingulo = tasks.register('requireSingulo') {
     doLast {
         if (!providers.gradleProperty('singuloJar').isPresent()) {
-            throw new GradleException('Starting the addon requires -PsinguloJar=/absolute/path/to/Singulo-0.10.0-1.21.1N.jar')
+            throw new GradleException('Starting the addon requires -PsinguloJar=/absolute/path/to/Singulo-0.16.0-1.21.1N.jar')
         }
     }
 }
@@ -74,6 +74,6 @@ tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
 tasks.register('offlineTest', Exec) {
     workingDir projectDir
     environment 'JAVA_HOME', javaToolchains.launcherFor(java.toolchain).get().metadata.installationPath.asFile.absolutePath
-    commandLine 'python3', 'tools/check.py'
+    commandLine providers.gradleProperty('pythonExecutable').getOrElse('python3'), '-X', 'utf8', 'tools/check.py'
 }
 tasks.named('check') { dependsOn 'offlineTest' }

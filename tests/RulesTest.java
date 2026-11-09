@@ -1,0 +1,98 @@
+import io.github.genichimaruo.singuloarsenal.core.Rules;
+
+public final class RulesTest {
+    private static int checks;
+
+    private static void check(boolean condition, String message) {
+        checks++;
+        if (!condition) throw new AssertionError(message);
+    }
+
+    public static void main(String[] args) {
+        // Tanks must conserve energy at every boundary, including nonsense input.
+        for (int capacity : new int[]{0, 240_000, Rules.LANCE_CAPACITY}) {
+            for (int stored : new int[]{-1, 0, 1, capacity, Integer.MAX_VALUE}) {
+                for (int request : new int[]{Integer.MIN_VALUE, -1, 0, 1, 500_000, Integer.MAX_VALUE}) {
+                    int taken = Rules.accepted(stored, capacity, request);
+                    check(taken >= 0 && taken <= Math.max(0, request), "accepted more than offered");
+                    check(Rules.clamp(stored, capacity) + taken <= capacity, "overfilled tank");
+                }
+            }
+        }
+        check(Rules.chargeRequest(Rules.LANCE_CAPACITY) == Rules.LANCE_CAPACITY / 8, "large tanks charge by fraction");
+        check(Rules.chargeRequest(1000) == 20_000, "small tanks keep a sane minimum");
+        check(!Rules.canAccrete(Rules.COLLAPSAR_CAPACITY - Rules.PELLET_FE + 1, Rules.COLLAPSAR_CAPACITY), "pellet wasted overfilling");
+        check(Rules.canAccrete(Rules.COLLAPSAR_CAPACITY - Rules.PELLET_FE, Rules.COLLAPSAR_CAPACITY), "exact room refused");
+
+        // Flux pin.
+        check(!Rules.shouldPin(true, true, false, -1, 100), "pinned on the ground");
+        check(!Rules.shouldPin(false, false, false, -1, 100), "pinned without sneaking");
+        check(!Rules.shouldPin(false, true, true, -1, 100), "pinned while flying");
+        check(!Rules.shouldPin(false, true, false, 0.2, 100), "pin must not cancel a jump");
+        check(!Rules.shouldPin(false, true, false, -1, 0), "pinned without energy");
+        check(Rules.shouldPin(false, true, false, -1, 1), "pin refused");
+        check(Rules.FLUX_CREEP < -0.03126, "creep must stay above the server's floating check or players get kicked");
+
+        for (int total : new int[]{0, 1, 7, 960_000}) {
+            for (int pieces = 1; pieces <= 4; pieces++) {
+                int level = Rules.balanced(total, pieces);
+                int remainder = total - level * pieces;
+                check(remainder >= 0 && remainder < pieces, "balance lost energy");
+            }
+        }
+
+        // Chandrasekhar limit: the excess may only be converted if it can be paid for.
+        check(Rules.pressureFrom(8, 1_000_000) == 0, "hit at the limit is untouched");
+        check(Rules.pressureFrom(8.5F, 1_000_000) == 1, "fraction over the limit rounds to a point");
+        check(Rules.pressureFrom(30, 1_000_000) == 22, "excess conversion");
+        check(Rules.pressureFrom(30, Rules.PRESSURE_FE_PER_HP * 5) == 5, "limited by energy");
+        check(Rules.pressureFrom(30, 0) == 0, "free pressure");
+        check(Rules.pressureFrom(Float.NaN, 1_000_000) == 0, "NaN pressure");
+        check(Rules.pressureFrom(Float.POSITIVE_INFINITY, 1_000_000) == 0, "infinite pressure");
+        check(Rules.slamDamage(3.9F) == 0, "small falls do not slam");
+        check(Rules.slamDamage(1000) == 30, "slam is bounded");
+        check(Rules.slamRadius(1000) <= 7, "slam radius is bounded");
+        check(Rules.collapseDamage(Rules.PRESSURE_MAX) == 27, "collapse damage");
+
+        // Pasta phases.
+        check(Rules.phaseOf(0) == Rules.PHASE_GNOCCHI && Rules.phaseOf(33) == Rules.PHASE_GNOCCHI, "gnocchi band");
+        check(Rules.phaseOf(34) == Rules.PHASE_SPAGHETTI && Rules.phaseOf(66) == Rules.PHASE_SPAGHETTI, "spaghetti band");
+        check(Rules.phaseOf(67) == Rules.PHASE_LASAGNA && Rules.phaseOf(100) == Rules.PHASE_LASAGNA, "lasagna band");
+        check(Rules.phaseOf(-5) == Rules.PHASE_GNOCCHI && Rules.phaseOf(5000) == Rules.PHASE_LASAGNA, "phase clamps");
+        check(Rules.loadFromDamage(1000) == 15, "one hit cannot force lasagna");
+        check(Rules.loadFromDamage(Float.NaN) == 0 && Rules.loadFromDamage(0) == 0, "bad load");
+
+        // Horizon: never for survivable hits, /kill, an empty tank or during cooldown.
+        check(!Rules.horizonCatches(5, 20, false, Rules.HORIZON_FE, true), "non-lethal hit caught");
+        check(!Rules.horizonCatches(50, 20, true, Rules.HORIZON_FE, true), "catches /kill");
+        check(!Rules.horizonCatches(50, 20, false, Rules.HORIZON_FE - 1, true), "free horizon");
+        check(!Rules.horizonCatches(50, 20, false, Rules.HORIZON_FE, false), "cooldown ignored");
+        check(Rules.horizonCatches(20, 20, false, Rules.HORIZON_FE, true), "exactly lethal not caught");
+        check(Rules.COLLAPSAR_CAPACITY >= Rules.HORIZON_FE, "horizon must be affordable from one chestpiece");
+
+        // Weapons.
+        int current = 0;
+        for (int i = 1; i <= 5; i++) current = Rules.currentAfterHit(current);
+        check(current == Rules.QUENCH_MAX_CURRENT, "quench on the fifth hit");
+        check(Rules.currentAfterHit(Rules.QUENCH_MAX_CURRENT) == Rules.QUENCH_MAX_CURRENT, "current clamps");
+        check(Rules.stressAfterHit(Rules.STRESS_MAX) == Rules.STRESS_MAX, "stress clamps");
+        check(Rules.stressMultiplier(0) == 1, "no stress, no bonus");
+        check(Rules.shearDamage(5) == 66 && Rules.shearDamage(99) == 66, "shear bounded");
+        check(Rules.shearDamage(0) == 16, "shear base");
+        check(Rules.stretchFor(0, 0) == 1, "stretch rest");
+
+        check(Rules.lanceStage(0) == Rules.LANCE_IDLE, "lance idle");
+        check(Rules.lanceStage(1) == Rules.LANCE_IGNITING, "lance ignites");
+        check(Rules.lanceStage(Rules.LANCE_IGNITE) == Rules.LANCE_COLLIMATING, "lance collimates");
+        check(Rules.lanceStage(Rules.LANCE_COLLIMATE) == Rules.LANCE_FIRING, "lance fires");
+        float previous = Float.MAX_VALUE;
+        for (int held = 0; held <= Rules.LANCE_MAX_HOLD; held++) {
+            float radius = Rules.lanceRadius(held);
+            check(radius <= previous, "beam must narrow monotonically");
+            previous = radius;
+        }
+        int fullBurst = (Rules.LANCE_MAX_HOLD - Rules.LANCE_COLLIMATE) / 10 + 1;
+        check(fullBurst * Rules.LANCE_FE_PER_10_TICKS <= Rules.LANCE_CAPACITY, "a full tank must cover one full burst");
+        System.out.println("Rules: " + checks + " checks passed");
+    }
+}

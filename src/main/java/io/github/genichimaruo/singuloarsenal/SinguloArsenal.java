@@ -1,29 +1,36 @@
 package io.github.genichimaruo.singuloarsenal;
 
 import com.mojang.logging.LogUtils;
-import net.neoforged.fml.common.Mod;
-import net.neoforged.bus.api.IEventBus;
+import io.github.genichimaruo.singuloarsenal.armor.SuitEvents;
+import io.github.genichimaruo.singuloarsenal.core.ArsenalData;
+import io.github.genichimaruo.singuloarsenal.net.AbilityPayload;
+import io.github.genichimaruo.singuloarsenal.net.FxPayload;
+import io.github.genichimaruo.singuloarsenal.weapon.Weapons;
 import net.minecraft.resources.ResourceLocation;
-import io.github.genichimaruo.singuloarsenal.armor.ArsenalContent;
-import io.github.genichimaruo.singuloarsenal.armor.ArmorAbilities;
-import io.github.genichimaruo.singuloarsenal.network.ArmorActionPayload;
-import io.github.genichimaruo.singuloarsenal.network.RailShotPayload;
-import io.github.genichimaruo.singuloarsenal.weapon.WeaponContent;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.fml.common.Mod;
+import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import org.slf4j.Logger;
 
-/** Singulo の素材と失われた文明の技術を利用した武器・防具アドオン。 */
+/** Equipment for Singulo, each piece built around a physical phenomenon the base mod already makes real. */
 @Mod(SinguloArsenal.MOD_ID)
 public final class SinguloArsenal {
     public static final String MOD_ID = "singulo_arsenal";
     private static final Logger LOGGER = LogUtils.getLogger();
 
     public SinguloArsenal(IEventBus bus) {
-        ArsenalContent.register(bus);
-        WeaponContent.register(bus);
-        ArmorAbilities.register(bus);
-        bus.addListener(ArmorActionPayload::register);
-        bus.addListener(RailShotPayload::register);
+        ArsenalData.REGISTER.register(bus);
+        ArsenalItems.register(bus);
+        SuitEvents.register();
+        Weapons.register();
+        bus.addListener(SinguloArsenal::payloads);
         LOGGER.info("Singulo Arsenal initialized");
+    }
+
+    private static void payloads(RegisterPayloadHandlersEvent event) {
+        var registrar = event.registrar("2");
+        registrar.playToServer(AbilityPayload.TYPE, AbilityPayload.CODEC, AbilityPayload::handle);
+        registrar.playToClient(FxPayload.TYPE, FxPayload.CODEC, FxPayload::handle);
     }
 
     public static ResourceLocation id(String path) {
