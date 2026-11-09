@@ -1,0 +1,64 @@
+name: Build 1.20.1
+on:
+  push:
+    branches: ['1.20.1', 'feature/**']
+  pull_request:
+    branches: ['1.20.1']
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - loader: neoforge
+            suffix: N
+          - loader: forge
+            suffix: F
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: GenichiMaruo/Singulo
+          ref: ae6dcb48dacd5e72c8cc3a2d3fe22915ef528767
+          path: singulo-source
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Download Gradle with retries
+        run: |
+          for attempt in 1 2 3 4 5; do
+            if ./gradlew --version; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 5 ]; then
+              sleep 15
+            fi
+          done
+          exit 1
+      - name: Build the pinned Singulo dependency
+        working-directory: singulo-source
+        run: bash gradlew --no-daemon --no-configuration-cache --max-workers=4 build -Ploader=${{ matrix.loader }}
+      - name: Build and run all Arsenal GameTests
+        env:
+          SINGULO_SOURCE: ${{ github.workspace }}/singulo-source
+        run: ./gradlew --no-daemon --max-workers=4 build runGameTestServer -Ploader=${{ matrix.loader }} -PsinguloJar="$GITHUB_WORKSPACE/singulo-source/build/${{ matrix.loader }}/libs/Singulo-0.16.0-1.20.1${{ matrix.suffix }}.jar"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Singulo-Arsenal-0.1.0-1.20.1${{ matrix.suffix }}
+          path: build/${{ matrix.loader }}/libs/Singulo-Arsenal-0.1.0-1.20.1${{ matrix.suffix }}.jar
+          if-no-files-found: error
+      - name: Save integration logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-logs-${{ matrix.loader }}
+          path: build/${{ matrix.loader }}/gametest/logs/

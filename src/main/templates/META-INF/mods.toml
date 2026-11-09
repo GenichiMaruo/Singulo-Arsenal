@@ -1,0 +1,37 @@
+modLoader="javafml"
+loaderVersion="${loader_version_range}"
+license="${mod_license}"
+issueTrackerURL="https://github.com/GenichiMaruo/Singulo-Arsenal/issues"
+
+[[mods]]
+modId="${mod_id}"
+version="${mod_version}"
+displayName="${mod_name}"
+logoFile="singulo_arsenal_logo.png"
+authors="${mod_authors}"
+displayURL="https://github.com/GenichiMaruo/Singulo-Arsenal"
+description='''
+The official Singulo weapons and armor addon: gear built around the physics the base mod makes real.
+Meissner, Degeneracy and Collapsar armor, and four weapons up to Jet Forge endgame equipment.
+'''
+
+[[dependencies.${mod_id}]]
+modId="${loader_id}"
+mandatory=true
+versionRange="[${loader_version},)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.${mod_id}]]
+modId="minecraft"
+mandatory=true
+versionRange="${minecraft_version_range}"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.${mod_id}]]
+modId="singulo"
+mandatory=true
+versionRange="${singulo_version_range}"
+ordering="AFTER"
+side="BOTH"

@@ -1,0 +1,37 @@
+{
+  "type": "singulo:machine",
+  "station": "accretion_jet_forge",
+  "stage": 5,
+  "time": 1200,
+  "energy": 250000000,
+  "ingredients": [
+    {
+      "ingredient": {
+        "item": "singulo:collapsar_ingot"
+      },
+      "count": 1
+    },
+    {
+      "ingredient": {
+        "item": "singulo:nuclear_pasta"
+      },
+      "count": 1
+    },
+    {
+      "ingredient": {
+        "item": "singulo:mass_pellet"
+      },
+      "count": 32
+    }
+  ],
+  "fluid_ingredients": [
+    {
+      "fluid": "singulo:liquid_helium",
+      "amount": 2000
+    }
+  ],
+  "result": {
+    "item": "singulo_arsenal:collapsar_lamina",
+    "count": 1
+  }
+}

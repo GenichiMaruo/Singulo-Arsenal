@@ -1,0 +1,26 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    "LQL",
+    "FOF"
+  ],
+  "key": {
+    "L": {
+      "item": "singulo_arsenal:collapsar_lamina"
+    },
+    "Q": {
+      "item": "singulo:quantum_computing_module"
+    },
+    "F": {
+      "item": "singulo:tidal_filament"
+    },
+    "O": {
+      "item": "singulo:optical_lattice_substrate"
+    }
+  },
+  "result": {
+    "item": "singulo_arsenal:collapsar_helmet",
+    "count": 1
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    "LGL",
+    "F F",
+    "L L"
+  ],
+  "key": {
+    "L": {
+      "item": "singulo_arsenal:collapsar_lamina"
+    },
+    "G": {
+      "item": "singulo:gravity_field_stabilizer"
+    },
+    "F": {
+      "item": "singulo:tidal_filament"
+    }
+  },
+  "result": {
+    "item": "singulo_arsenal:collapsar_leggings",
+    "count": 1
+  }
+}

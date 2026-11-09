@@ -1,0 +1,37 @@
+{
+  "type": "singulo:machine",
+  "station": "precision_assembler",
+  "stage": 3,
+  "time": 200,
+  "energy": 400,
+  "ingredients": [
+    {
+      "ingredient": {
+        "item": "singulo:precision_actuator"
+      },
+      "count": 1
+    },
+    {
+      "ingredient": {
+        "item": "singulo:superconducting_coil"
+      },
+      "count": 2
+    },
+    {
+      "ingredient": {
+        "item": "singulo:muon_bundle"
+      },
+      "count": 2
+    },
+    {
+      "ingredient": {
+        "item": "singulo:steel_plate"
+      },
+      "count": 2
+    }
+  ],
+  "result": {
+    "item": "singulo_arsenal:thruster_module",
+    "count": 1
+  }
+}
