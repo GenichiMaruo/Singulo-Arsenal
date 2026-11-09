@@ -44,8 +44,8 @@ final class Terrain {
     }
 
     /**
-     * The one bite the jet takes: a tunnel straight through everything ahead, in a single tick. It stops at the first thing it may not
-     * break. Melted blocks drop nothing. Returns the deepest point where it actually melted something, or null if it touched no terrain.
+     * The one bite the jet takes: a tunnel straight through what is ahead, in a single tick. It gives out a fixed depth past the first
+     * surface, or at the first thing it may not break. Melted blocks drop nothing. Returns the deepest point where it actually melted something, or null if it touched no terrain.
      */
     static Vec3 drill(ServerPlayer player, ServerLevel level, Vec3 from, Vec3 direction, double range) {
         BlockHitResult first = level.clip(new ClipContext(from, from.add(direction.scale(range)), ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, player));
@@ -55,7 +55,9 @@ final class Terrain {
         Set<BlockPos> tried = new HashSet<>();
         Vec3 deepest = null;
         BlockPos previous = null;
-        for (double distance = from.distanceTo(first.getLocation()) + 0.05; distance <= range; distance += 0.5) {
+        double surface = from.distanceTo(first.getLocation());
+        double end = Math.min(range, surface + Rules.LANCE_BORE_DEPTH);
+        for (double distance = surface + 0.05; distance <= end; distance += 0.5) {
             Vec3 point = from.add(direction.scale(distance));
             BlockPos center = BlockPos.containing(point);
             if (center.equals(previous)) continue;

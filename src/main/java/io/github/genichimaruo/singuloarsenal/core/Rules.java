@@ -221,6 +221,8 @@ public final class Rules {
     public static final int LANCE_SHOT_FE = 1_000_000;
     public static final int LANCE_COOLDOWN = 160;
     public static final int LANCE_SHORT_COOLDOWN = 20;
+    /** How far past the first surface the shot can drill in breaking mode; the meltdown goes off where it gives out. */
+    public static final double LANCE_BORE_DEPTH = 20;
     /** Half-width of the tunnel the shot drills in breaking mode. */
     public static final double LANCE_BORE_RADIUS = 1.75;
     /** The rings spool up for this long before the shot goes off. */
