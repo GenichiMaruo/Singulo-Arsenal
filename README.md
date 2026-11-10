@@ -13,10 +13,10 @@ Singulo is required. Choose the file that matches your Minecraft version, loader
 | Minecraft | ローダー / Loader | Java | Singulo | ソース / Source | ダウンロード / Download |
 | --- | --- | --- | --- | --- | --- |
 | **1.21.1** | **NeoForge** 21.1.256+ | **21** | 0.16.x | [1.21.1](https://github.com/GenichiMaruo/Singulo-Arsenal/tree/1.21.1) | [v0.1.0](https://github.com/GenichiMaruo/Singulo-Arsenal/releases/tag/v0.1.0) |
-| 1.20.1 | Forge / NeoForge | 17 | — | — | 未対応 / not yet |
+| 1.20.1 | Forge / NeoForge | 17 | 0.16.x | [1.20.1（0.1.0）](https://github.com/GenichiMaruo/Singulo-Arsenal/tree/1.20.1) | [CurseForge](https://www.curseforge.com/minecraft/mc-mods/singulo-arsenal) |
 
 ファイル名は `Singulo-Arsenal-<版>-<Minecraft><ローダー>` で、末尾の `N` は NeoForge です。マルチプレイではクライアントとサーバーの両方に導入してください。
-初回の 0.1.0 は GitHub Releases で配布しています。以後の版は CurseForge で配布する予定で、ページが公開されたらここに載せます。
+初回の 0.1.0 は GitHub Releases で配布しています。以後の版の配布先は [CurseForge](https://www.curseforge.com/minecraft/mc-mods/singulo-arsenal) です。0.2.0 の変更は Minecraft 1.21.1 向けで、1.20.1 への移植は含みません。
 File names follow `Singulo-Arsenal-<version>-<Minecraft><loader>`, where `N` means NeoForge. Install it on both the client and the server.
 
 ## 何ができる？

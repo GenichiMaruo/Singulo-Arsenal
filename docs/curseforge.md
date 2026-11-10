@@ -6,7 +6,13 @@ GitHub Releases への MOD JAR 添付は初回の `v0.1.0` に限定します。
 CurseForge の審査通過後は CurseForge で MOD ファイルを配布し、以後の GitHub Releases には変更履歴・対応環境・CurseForge の配布リンクを掲載します。
 GitHub Releases の後続リリースには MOD JAR を添付しません。GitHub が自動表示するソースコードアーカイブと、開発用の Actions 成果物は通常どおり利用できます。
 
-CurseForge のプロジェクト ID と公開 URL は未設定です。審査通過後に README とこの文書へ実際の URL を反映します。
+CurseForge のプロジェクト ID は `1793647`、配布先は [Singulo Arsenal](https://www.curseforge.com/minecraft/mc-mods/singulo-arsenal) です。
+
+## 0.2.0 の公開準備
+
+Minecraft 1.21.1 / NeoForge / Java 21 向けです。`gradle.properties` の `mod_version` と CI の成果物は `0.2.0`、配布ファイルは `build/libs/Singulo-Arsenal-0.2.0-1.21.1N.jar` です。必須依存は Singulo 0.16.x です。
+
+PR のレビュー、build / integration、実クライアントの確認結果を判断してからマージします。マージ後の CI 成果物とバージョン・依存関係を再確認し、CurseForge に公開します。GitHub の `v0.2.0` には変更履歴と配布リンクを掲載し、MOD JAR は添付しません。
 
 ## 初回 0.1.0 の公開情報
 
