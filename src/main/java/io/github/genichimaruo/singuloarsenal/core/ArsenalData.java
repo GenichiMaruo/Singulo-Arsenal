@@ -35,6 +35,8 @@ public final class ArsenalData {
     public static final Supplier<DataComponentType<Long>> JET_UNTIL = time("jet_until");
     /** Shots fired since the last reload. */
     public static final Supplier<DataComponentType<Integer>> SHOTS = integer("shots");
+    /** How much the accretion drill takes per block: one of {@code Rules.DRILL_*}. */
+    public static final Supplier<DataComponentType<Integer>> TOOL_MODE = integer("tool_mode");
     /** 0 spares the terrain, 1 melts it. */
     public static final Supplier<DataComponentType<Integer>> TERRAIN_MODE = integer("terrain_mode");
 

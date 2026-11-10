@@ -13,8 +13,9 @@ MOD = 'singulo_arsenal'
 SETS = ['meissner', 'degeneracy', 'collapsar']
 PARTS = ['helmet', 'chestplate', 'leggings', 'boots']
 WEAPONS = ['quench_saber', 'casimir_blade', 'tidal_reaver', 'jet_lance']
+TOOLS = ['squid_pick', 'degeneracy_breaker', 'shear_saw', 'accretion_drill']
 MATERIALS = ['flux_weave', 'pressure_lattice', 'collapsar_lamina', 'jet_collimator', 'tidal_edge']
-MODULES = ['bit_drone_module', 'capacitor_module', 'plating_module', 'thruster_module', 'coolant_module', 'amplifier_module', 'metric_drive_module', 'meltdown_module']
+MODULES = ['bit_drone_module', 'capacitor_module', 'plating_module', 'thruster_module', 'coolant_module', 'amplifier_module', 'metric_drive_module', 'meltdown_module', 'overclock_module']
 DAMAGE = ['quench', 'collapse', 'jet', 'shear', 'horizon', 'bit']
 MATERIAL_SIZE = 32
 FINE_SIZE = 64
@@ -135,6 +136,23 @@ shaped('tidal_reaver', [' T ', 'LGL', ' F '],
 shaped('jet_lance', [' J ', 'LBL', ' R '],
        {'J': own('jet_collimator'), 'L': own('collapsar_lamina'), 'B': s('micro_black_hole'), 'R': s('confinement_ring')}, own('jet_collimator'))
 
+# ---- Tools: each drawn the way it is held, working end in the top row ----------------------------------------------------
+
+# The neutrino scanner at the centre of the head does the seeing, its pickup coil in the socket below; flux weave for the two
+# points, ceramic haft.
+shaped('squid_pick', ['WNW', ' S ', ' C '],
+       {'W': own('flux_weave'), 'N': s('neutrino_scanner'), 'S': s('superconducting_coil'), 'C': s('white_ceramic_composite')},
+       own('flux_weave'))
+# Pressed lattice for the head, with a shell at its heart to take the blow.
+shaped('degeneracy_breaker', ['GDG', 'GNG', ' F '],
+       {'G': own('pressure_lattice'), 'D': s('degenerate_matter_shell'), 'N': s('nihonium_plate'), 'F': s('nihonium_frame')}, own('pressure_lattice'))
+# The bar up the left, the motor beside it, the handle below.
+shaped('shear_saw', ['G  ', 'GAQ', ' NF'],
+       {'G': own('pressure_lattice'), 'A': s('precision_actuator'), 'Q': s('quantum_computing_module'), 'N': s('nihonium_plate'), 'F': s('nihonium_frame')}, own('pressure_lattice'))
+# The cutting edge on top, the hole between laminae, a ring sealing the back.
+shaped('accretion_drill', [' T ', 'LBL', ' R '],
+       {'T': own('tidal_edge'), 'L': own('collapsar_lamina'), 'B': s('micro_black_hole'), 'R': s('confinement_ring')}, own('tidal_edge'))
+
 # ---- Module Integrator and modules --------------------------------------------------------------------------------
 
 # Tool arms over a work lens, a control pair either side of the frame, on a plate base: the machine as it stands.
@@ -151,6 +169,7 @@ machine('amplifier_module', ASSEMBLER, 3, 200, 400, [(s('quantum_computing_modul
 # The base mod's drive, reworked to draw on the suit's tank instead of exotic matter.
 machine('metric_drive_module', ASSEMBLER, 5, 400, 200_000, [(s('metric_drive'), 1), (s('gravity_field_stabilizer'), 2), (s('superconducting_coil'), 4), (s('quantum_computing_module'), 1)], s('metric_drive'))
 machine('meltdown_module', ASSEMBLER, 5, 400, 200_000, [(s('jet_condensate'), 4), (s('heat_exchange_core'), 2), (s('entangled_element'), 2), (s('confinement_ring'), 1)], s('jet_condensate'))
+machine('overclock_module', ASSEMBLER, 3, 200, 400, [(s('precision_actuator'), 2), (s('quantum_computing_module'), 1), (s('superconducting_coil'), 2)], s('precision_actuator'))
 write(f'data/{MOD}/loot_table/blocks/module_integrator.json', {
     'type': 'minecraft:block',
     'pools': [{'rolls': 1, 'entries': [{'type': 'minecraft:item', 'name': own('module_integrator')}], 'conditions': [{'condition': 'minecraft:survives_explosion'}]}],
@@ -168,6 +187,12 @@ write('data/minecraft/tags/damage_type/bypasses_cooldown.json', {'replace': Fals
 for tag, part in [('head_armor', 'helmet'), ('chest_armor', 'chestplate'), ('leg_armor', 'leggings'), ('foot_armor', 'boots')]:
     write(f'data/minecraft/tags/item/{tag}.json', {'replace': False, 'values': [own(f'{t}_{part}') for t in SETS]})
 write('data/minecraft/tags/item/swords.json', {'replace': False, 'values': [own(w) for w in WEAPONS[:3]]})
+PICKAXE, AXE, SHOVEL, HOE = (f'#minecraft:mineable/{k}' for k in ('pickaxe', 'axe', 'shovel', 'hoe'))
+write(f'data/{MOD}/tags/block/mineable/breaker.json', {'replace': False, 'values': [PICKAXE, SHOVEL]})
+write(f'data/{MOD}/tags/block/mineable/drill.json', {'replace': False, 'values': [PICKAXE, AXE, SHOVEL, HOE]})
+write('data/minecraft/tags/item/pickaxes.json', {'replace': False, 'values': [own('squid_pick'), own('degeneracy_breaker'), own('accretion_drill')]})
+write('data/minecraft/tags/item/shovels.json', {'replace': False, 'values': [own('degeneracy_breaker'), own('accretion_drill')]})
+write('data/minecraft/tags/item/axes.json', {'replace': False, 'values': [own('shear_saw'), own('accretion_drill')]})
 write('data/minecraft/tags/item/enchantable/durability.json', {'replace': False, 'values': [own('jet_lance')]})
 
 # ---- Item models ---------------------------------------------------------------------------------------------------
@@ -221,6 +246,10 @@ GUI_FIT = {
     'collapsar_chestplate': (-0.00, 0.84, 0.859),
     'collapsar_leggings': (-0.23, -1.15, 1.235),
     'collapsar_boots': (-0.20, 0.20, 1.080),
+    'squid_pick': (-1.20, -1.70, 0.750),
+    'degeneracy_breaker': (-1.53, -1.74, 0.604),
+    'shear_saw': (-0.92, -1.08, 0.725),
+    'accretion_drill': (-0.80, -0.71, 0.684),
 }
 
 
@@ -234,8 +263,21 @@ def fitted(name, display):
 REAVER_DISPLAY = {**SWORD_DISPLAY,
                   'firstperson_righthand': {**SWORD_DISPLAY['firstperson_righthand'], 'scale': [0.54, 0.54, 0.54]},
                   'firstperson_lefthand': {**SWORD_DISPLAY['firstperson_lefthand'], 'scale': [0.54, 0.54, 0.54]}}
-DISPLAYS = {'jet_lance': LANCE_DISPLAY, 'tidal_reaver': REAVER_DISPLAY}
-for name in WEAPONS:
+# Tools are longer and far heavier in the head than a sword: same grip and angle, drawn smaller.
+
+
+def tool_display(first, third):
+    return {**SWORD_DISPLAY,
+            'firstperson_righthand': {**SWORD_DISPLAY['firstperson_righthand'], 'scale': [first] * 3},
+            'firstperson_lefthand': {**SWORD_DISPLAY['firstperson_lefthand'], 'scale': [first] * 3},
+            'thirdperson_righthand': {**SWORD_DISPLAY['thirdperson_righthand'], 'scale': [third] * 3},
+            'thirdperson_lefthand': {**SWORD_DISPLAY['thirdperson_lefthand'], 'scale': [third] * 3}}
+
+
+DISPLAYS = {'jet_lance': LANCE_DISPLAY, 'tidal_reaver': REAVER_DISPLAY,
+            'squid_pick': tool_display(0.48, 0.62), 'degeneracy_breaker': tool_display(0.4, 0.55),
+            'shear_saw': tool_display(0.46, 0.62), 'accretion_drill': tool_display(0.46, 0.62)}
+for name in WEAPONS + TOOLS:
     write(f'assets/{MOD}/models/item/{name}.json', {**BUILTIN, 'display': fitted(name, DISPLAYS.get(name, SWORD_DISPLAY))})
 for t in SETS:
     for part in PARTS:
@@ -282,6 +324,18 @@ for t in SETS:
         en[f'tooltip.{MOD}.{t}.{part}.summary'], en[f'tooltip.{MOD}.{t}.{part}'] = tips[t][1][n]
 
 weapon_text = {
+    'squid_pick': ('SQUID探査ピック', 'SQUID Prospector', '右クリックで周囲の鉱石を透視', 'Right click reveals nearby ores',
+                   ['採掘速度10、ダイヤモンド級まで。1ブロック 150 FE。', '右クリック：半径16の鉱石を壁越しに10秒表示（20k FE、再使用3秒）。', '耐久なし。電力切れは素手の速度になる。'],
+                   ['Mining speed 10, up to diamond. 150 FE per block.', 'Right click: shows ores within 16 blocks for 10s (20k FE, 3s cooldown).', 'No durability. Out of power it digs at hand speed.']),
+    'degeneracy_breaker': ('縮退圧ブレーカー', 'Degeneracy Breaker', '3×3を一撃で崩す', 'Caves in 3x3 at a blow',
+                           ['採掘速度16、ツルハシとシャベルを兼ねる。1ブロック 1k FE。', '掘った面の3×3をまとめて壊す。スニークで1ブロック。', 'チェストや機械、極端に硬いブロックは巻き込まない。'],
+                           ['Mining speed 16, pickaxe and shovel in one. 1k FE per block.', 'Breaks a 3x3 of the face you mine. Sneak for one block.', 'Leaves containers, machines and far harder blocks alone.']),
+    'shear_saw': ('剪断ソー', 'Shear Saw', '木を丸ごと伐採', 'Fells whole trees',
+                  ['採掘速度16、斧として使う。1ブロック 800 FE。', '葉のついた木の幹を丸ごと切り倒す（最大256本）。', 'スニークで1本だけ。建物の丸太は巻き込まない。'],
+                  ['Mining speed 16, used as an axe. 800 FE per block.', 'Fells the whole trunk of a living tree (up to 256 logs).', 'Sneak for one log. Log buildings are left alone.']),
+    'accretion_drill': ('降着ドリル', 'Accretion Drill', '全て掘り、ドロップを直接回収', 'Cuts anything; drops go to your pack',
+                        ['採掘速度40、全ツール兼用。1ブロック 2.5k FE。', 'ドロップと経験値を持ち物へ直接吸い込む。', '右クリック：単体／3×3／鉱脈（同じ鉱石を最大64個）。'],
+                        ['Mining speed 40, every tool in one. 2.5k FE per block.', 'Drops and experience go straight to you.', 'Right click: single, 3x3, or vein (up to 64 of the same ore).']),
     'quench_saber': ('クエンチ・セイバー', 'Quench Saber', '5発目でクエンチ爆発', '5th hit quenches',
                      ['攻撃9／攻撃速度1.6。', '命中で電流が溜まり、5発目で放電する。', '周囲に10ダメージと炎上（8k FE）。'],
                      ['9 damage, 1.6 speed.', 'Hits build current; the fifth discharges.', '10 damage and fire around the target (8k FE).']),
@@ -314,6 +368,7 @@ for name, j, e, tj, te, dj, de in [
     ('coolant_module', '冷却モジュール', 'Coolant Module', '武器：再使用時間 -25%', 'Weapons: -25% cooldown', '重複可。', 'Stacks.'),
     ('amplifier_module', '出力増幅器', 'Output Amplifier', '武器：ダメージ +15%', 'Weapons: +15% damage', '重複可。', 'Stacks.'),
     ('metric_drive_module', 'メトリックドライブ・モジュール', 'Metric Drive Module', '防具：電力で飛行', 'Armor: flight on FE', 'エキゾチック物質は不要。飛行中 400 FE/t、落下ダメージ無効。', 'No exotic matter. 400 FE/t while flying, no fall damage.'),
+    ('overclock_module', '掘削オーバークロック', 'Mining Overclock', '工具：採掘速度 +40%', 'Tools: +40% mining speed', '重複可。', 'Stacks.'),
     ('meltdown_module', '融解起爆モジュール', 'Meltdown Module', 'ジェット砲：着弾点が大爆発', 'Jet Cannon: first hit detonates', '発射と同時に着弾点が爆発（半径7、最大60ダメージ）。地形破壊モードでは貫通した一番奥で爆発し、石は溶岩になる。', 'Explodes at the impact the moment it fires (radius 7, up to 60 damage). In destruction mode it goes off at the deepest point, and stone turns to lava.'),
 ]:
     ja[f'item.{MOD}.{name}'], en[f'item.{MOD}.{name}'] = j, e
@@ -327,6 +382,11 @@ common = {
     'tooltip.singulo_arsenal.more': ('Shift：詳細', 'Shift: details'),
     'tooltip.singulo_arsenal.terrain_protect': ('地形保護', 'Terrain protected'),
     'tooltip.singulo_arsenal.terrain_break': ('地形破壊', 'Terrain destruction'),
+    'message.singulo_arsenal.scan': ('鉱石を %s 個検出', '%s ores found'),
+    'message.singulo_arsenal.drill_mode': ('採掘モード：%s', 'Mining mode: %s'),
+    'tool.singulo_arsenal.drill_mode.0': ('単体', 'Single'),
+    'tool.singulo_arsenal.drill_mode.1': ('3×3', '3x3'),
+    'tool.singulo_arsenal.drill_mode.2': ('鉱脈', 'Vein'),
     'message.singulo_arsenal.terrain_protect': ('地形保護モード', 'Terrain protection'),
     'message.singulo_arsenal.terrain_break': ('地形破壊モード', 'Terrain destruction'),
     'hud.singulo_arsenal.magazine': ('弾倉 %s / %s  %s', 'Magazine %s / %s  %s'),
@@ -396,7 +456,7 @@ def rgb(value):
     return ((value >> 16) & 255, (value >> 8) & 255, value & 255, 255)
 
 
-GLOWS = {'metric_drive_module': 'cW', 'meltdown_module': 'OyW', 'flux_weave': 'c', 'pressure_lattice': 'a', 'collapsar_lamina': 'oy', 'jet_collimator': 'cW', 'tidal_edge': 'sy',
+GLOWS = {'overclock_module': 'c', 'metric_drive_module': 'cW', 'meltdown_module': 'OyW', 'flux_weave': 'c', 'pressure_lattice': 'a', 'collapsar_lamina': 'oy', 'jet_collimator': 'cW', 'tidal_edge': 'sy',
          'bit_drone_module': 'cW', 'capacitor_module': 'c', 'thruster_module': 'cW', 'coolant_module': 'c', 'amplifier_module': 'c'}
 FRAMES = 8
 
@@ -658,6 +718,25 @@ sprite('amplifier_module', [
     '................',
     '................',
 ], {'I': 0xC2CDD9, 'V': 0x262430, 'P': 0xE7D8B0, 'c': 0x7CE8FF})
+# A drive gear with a rising arrow in its hub.
+sprite('overclock_module', [
+    '................',
+    '.......II.......',
+    '...II..II..II...',
+    '...IVIIVVIIVI...',
+    '....IVVVVVVI....',
+    '....IVVccVVI....',
+    '.IIIVccccccVIII.',
+    '.IVVVVVccVVVVVI.',
+    '.IVVVVVccVVVVVI.',
+    '.IIIVVVccVVVIII.',
+    '....IVVccVVI....',
+    '....IVVVVVVI....',
+    '...IVIIVVIIVI...',
+    '...II..II..II...',
+    '.......II.......',
+    '................',
+], {'I': 0xC2CDD9, 'V': 0x3A3648, 'c': 0x7CE8FF})
 # A warp coil wound round a sealed core of bent space.
 sprite('metric_drive_module', [
     '................',

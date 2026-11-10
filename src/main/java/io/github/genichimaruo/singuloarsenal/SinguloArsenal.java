@@ -7,6 +7,8 @@ import io.github.genichimaruo.singuloarsenal.module.ModuleContent;
 import io.github.genichimaruo.singuloarsenal.net.AbilityPayload;
 import io.github.genichimaruo.singuloarsenal.net.FirePayload;
 import io.github.genichimaruo.singuloarsenal.net.FxPayload;
+import io.github.genichimaruo.singuloarsenal.net.ScanPayload;
+import io.github.genichimaruo.singuloarsenal.tool.Mining;
 import io.github.genichimaruo.singuloarsenal.weapon.Weapons;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.bus.api.IEventBus;
@@ -26,15 +28,17 @@ public final class SinguloArsenal {
         ArsenalItems.register(bus);
         SuitEvents.register();
         Weapons.register();
+        Mining.register();
         bus.addListener(SinguloArsenal::payloads);
         LOGGER.info("Singulo Arsenal initialized");
     }
 
     private static void payloads(RegisterPayloadHandlersEvent event) {
-        var registrar = event.registrar("3");
+        var registrar = event.registrar("4");
         registrar.playToServer(AbilityPayload.TYPE, AbilityPayload.CODEC, AbilityPayload::handle);
         registrar.playToServer(FirePayload.TYPE, FirePayload.CODEC, FirePayload::handle);
         registrar.playToClient(FxPayload.TYPE, FxPayload.CODEC, FxPayload::handle);
+        registrar.playToClient(ScanPayload.TYPE, ScanPayload.CODEC, ScanPayload::handle);
     }
 
     public static ResourceLocation id(String path) {

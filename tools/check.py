@@ -16,9 +16,10 @@ RES = ROOT / 'src/main/resources'
 SETS = ['meissner', 'degeneracy', 'collapsar']
 PARTS = ['helmet', 'chestplate', 'leggings', 'boots']
 WEAPONS = ['quench_saber', 'casimir_blade', 'tidal_reaver', 'jet_lance']
+TOOLS = ['squid_pick', 'degeneracy_breaker', 'shear_saw', 'accretion_drill']
 MATERIALS = ['flux_weave', 'pressure_lattice', 'collapsar_lamina', 'jet_collimator', 'tidal_edge']
-MODULES = ['bit_drone_module', 'capacitor_module', 'plating_module', 'thruster_module', 'coolant_module', 'amplifier_module', 'metric_drive_module', 'meltdown_module']
-GEAR = [f'{s}_{p}' for s in SETS for p in PARTS] + WEAPONS + ['module_integrator']
+MODULES = ['bit_drone_module', 'capacitor_module', 'plating_module', 'thruster_module', 'coolant_module', 'amplifier_module', 'metric_drive_module', 'meltdown_module', 'overclock_module']
+GEAR = [f'{s}_{p}' for s in SETS for p in PARTS] + WEAPONS + TOOLS + ['module_integrator']
 ITEMS = GEAR + MATERIALS + MODULES
 
 javac = str(Path(os.environ['JAVA_HOME']) / 'bin/javac') if os.environ.get('JAVA_HOME') else shutil.which('javac')
@@ -74,7 +75,7 @@ for suit in SETS:
         assert f'tooltip.singulo_arsenal.{suit}.{part}' in locales[0], f'{suit}.{part}'
         assert f'tooltip.singulo_arsenal.{suit}.{part}.summary' in locales[0], f'{suit}.{part} summary'
     assert f'tooltip.singulo_arsenal.full_set.{suit}' in locales[0], suit
-for weapon in WEAPONS:
+for weapon in WEAPONS + TOOLS:
     for line in (1, 2, 3, 'summary'):
         assert f'tooltip.singulo_arsenal.{weapon}.{line}' in locales[0], weapon
 

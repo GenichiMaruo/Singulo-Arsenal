@@ -140,7 +140,8 @@ public final class SuitEvents {
     public static void upkeep(ServerPlayer player) {
         for (EquipmentSlot slot : SLOTS) Fe.accrete(player, player.getItemBySlot(slot));
         ItemStack held = player.getMainHandItem();
-        if (held.getItem() instanceof ArsenalWeapon) Fe.accrete(player, held);
+        // Fe.accrete itself checks that this is gear that feeds on pellets.
+        if (!(held.getItem() instanceof SuitItem)) Fe.accrete(player, held);
 
         fireBits(player);
         shareCurrent(player);

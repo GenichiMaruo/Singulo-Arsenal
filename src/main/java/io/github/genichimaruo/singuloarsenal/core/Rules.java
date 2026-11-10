@@ -339,6 +339,30 @@ public final class Rules {
         return Math.max(0, Math.min(1, age / 3));
     }
 
+    // ---- Mining tools -------------------------------------------------------------------------------------------------------
+
+    public static final int PICK_CAPACITY = 240_000;
+    public static final int TIER4_TOOL_CAPACITY = 2_000_000;
+    public static final int DRILL_CAPACITY = 16_000_000;
+    public static final int PICK_FE = 150;
+    public static final int BREAKER_FE = 1_000;
+    public static final int SAW_FE = 800;
+    public static final int DRILL_FE = 2_500;
+    public static final int SCAN_FE = 20_000;
+    public static final int SCAN_RADIUS = 16;
+    public static final int SCAN_MAX = 256;
+    public static final int SCAN_COOLDOWN = 60;
+    /** How long the scan's markers stay up. */
+    public static final int SCAN_TICKS = 200;
+    public static final int TREE_LIMIT = 256;
+    public static final int VEIN_LIMIT = 64;
+    public static final int DRILL_SINGLE = 0, DRILL_AREA = 1, DRILL_VEIN = 2;
+    public static final float OVERCLOCK_BONUS = 0.4F;
+
+    public static float overclocked(int modules) {
+        return 1 + OVERCLOCK_BONUS * Math.max(0, modules);
+    }
+
     // ---- Readouts ----------------------------------------------------------------------------------------------------------
 
     private static final String[] ENERGY_UNITS = {"k", "M", "G", "T", "P"};

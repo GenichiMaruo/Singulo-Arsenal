@@ -1,0 +1,30 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    "G  ",
+    "GAQ",
+    " NF"
+  ],
+  "key": {
+    "G": {
+      "item": "singulo_arsenal:pressure_lattice"
+    },
+    "A": {
+      "item": "singulo:precision_actuator"
+    },
+    "Q": {
+      "item": "singulo:quantum_computing_module"
+    },
+    "N": {
+      "item": "singulo:nihonium_plate"
+    },
+    "F": {
+      "item": "singulo:nihonium_frame"
+    }
+  },
+  "result": {
+    "id": "singulo_arsenal:shear_saw",
+    "count": 1
+  }
+}

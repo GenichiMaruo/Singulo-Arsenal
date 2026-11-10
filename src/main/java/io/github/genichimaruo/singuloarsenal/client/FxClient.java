@@ -8,6 +8,7 @@ import io.github.genichimaruo.singuloarsenal.client.art.ArsenalRenderTypes;
 import io.github.genichimaruo.singuloarsenal.client.art.Canvas;
 import io.github.genichimaruo.singuloarsenal.core.Rules;
 import io.github.genichimaruo.singuloarsenal.net.FxPayload;
+import io.github.genichimaruo.singuloarsenal.net.ScanPayload;
 import io.github.genichimaruo.singuloarsenal.weapon.JetLanceItem;
 import io.github.genichimaruo.singuloarsenal.weapon.TidalReaverItem;
 import java.util.ArrayList;
@@ -58,6 +59,13 @@ final class FxClient {
 
     static void register() {
         FxPayload.setClientHandler(FxClient::receive);
+        ScanPayload.setClientHandler(scan -> {
+            var mc = Minecraft.getInstance();
+            if (mc.level != null) {
+                scanned = scan.ores();
+                scannedUntil = mc.level.getGameTime() + Rules.SCAN_TICKS;
+            }
+        });
         NeoForge.EVENT_BUS.addListener(FxClient::tick);
         NeoForge.EVENT_BUS.addListener(FxClient::world);
         // Ahead of Singulo's own handler, which draws every lens registered so far and then forgets them.
@@ -107,6 +115,7 @@ final class FxClient {
         STRETCHES.clear();
         MUZZLES.clear();
         FORMATIONS.clear();
+        scanned = List.of();
         scene = next;
     }
 
@@ -207,6 +216,7 @@ final class FxClient {
         buffers.endBatch(ArsenalRenderTypes.GLOW);
         drawWorldJets(pose, buffers, mc, partial, camera);
         drawSquid(pose, buffers, mc, partial);
+        drawScan(pose, buffers, mc, partial);
         pose.popPose();
         frame++;
     }
@@ -527,6 +537,21 @@ final class FxClient {
                 previous = point;
             }
         }
+    }
+
+    private static List<net.minecraft.core.BlockPos> scanned = List.of();
+    private static long scannedUntil;
+
+    /** What the SQUID pick found: a block of light on each ore, seen through the rock, fading as the reading goes stale. */
+    private static void drawScan(PoseStack pose, MultiBufferSource.BufferSource buffers, Minecraft mc, float partial) {
+        float left = scannedUntil - mc.level.getGameTime() - partial;
+        if (left <= 0 || scanned.isEmpty()) return;
+        float alpha = 0.1F * Math.min(1, left / 40);
+        VertexConsumer xray = buffers.getBuffer(ArsenalRenderTypes.XRAY);
+        for (var pos : scanned) {
+            if (!mc.level.getBlockState(pos).isAir()) Canvas.glowCube(pose, xray, Vec3.atCenterOf(pos), 0.5, 0x7CE8FF, alpha);
+        }
+        buffers.endBatch(ArsenalRenderTypes.XRAY);
     }
 
     /** SQUID magnetometer: thin brackets on hostile things through walls, only for the wearer. */

@@ -79,6 +79,10 @@ public final class ArsenalReview {
         return List.of(ArsenalItems.QUENCH_SABER.get(), ArsenalItems.CASIMIR_BLADE.get(), ArsenalItems.TIDAL_REAVER.get(), ArsenalItems.JET_LANCE.get());
     }
 
+    private static List<Item> tools() {
+        return List.of(ArsenalItems.SQUID_PICK.get(), ArsenalItems.DEGENERACY_BREAKER.get(), ArsenalItems.SHEAR_SAW.get(), ArsenalItems.ACCRETION_DRILL.get());
+    }
+
     private static void dress(LivingEntity who, ArmorSet set, int load) {
         var pieces = ArsenalItems.SUITS.get(set);
         who.setItemSlot(EquipmentSlot.HEAD, charged(pieces.get(ArmorItem.Type.HELMET).get()));
@@ -226,6 +230,10 @@ public final class ArsenalReview {
         art.put("casimir", c -> WeaponArt.casimir(c, 0.5F, false, 3));
         art.put("reaver", c -> WeaponArt.reaver(c, 0, -1, 0));
         art.put("lance", c -> WeaponArt.lance(c, 0, -1, 0, -1));
+        art.put("pick", io.github.genichimaruo.singuloarsenal.client.art.ToolArt::squidPick);
+        art.put("breaker", io.github.genichimaruo.singuloarsenal.client.art.ToolArt::degeneracyBreaker);
+        art.put("saw", c -> io.github.genichimaruo.singuloarsenal.client.art.ToolArt.shearSaw(c, false, 0));
+        art.put("drill", c -> io.github.genichimaruo.singuloarsenal.client.art.ToolArt.accretionDrill(c, false, 0));
         StringBuilder out = new StringBuilder();
         art.forEach((name, draw) -> {
             List<float[]> points = new ArrayList<>();
@@ -508,6 +516,36 @@ public final class ArsenalReview {
         step(2, () -> teleport(mc, OX, 14, 0, 0));
         at += 20;
         shot("meltdown-tunnel");
+
+        // The tools: held by another player from two sides, in the wearer's own hand, and the ore scan through the floor.
+        String[] toolNames = {"pick", "breaker", "saw", "drill"};
+        step(2, () -> { selectSlot(mc, 0); teleport(mc, OX, OZ - 4, 0, 4); });
+        for (int i = 0; i < 4; i++) {
+            int index = i;
+            step(2, () -> server(mc, o -> hold(o, tools().get(index))));
+            step(2, () -> watch(mc, -55, 3.2));
+            at += 10;
+            shot("other-tool-" + toolNames[i] + "-right");
+            step(2, () -> watch(mc, 60, 3.2));
+            at += 8;
+            shot("other-tool-" + toolNames[i] + "-left");
+        }
+        step(2, () -> local(mc, p -> {
+            for (int i = 0; i < 4; i++) p.getInventory().setItem(5 + i, charged(tools().get(i)));
+            for (int x = -3; x <= 3; x += 2) p.serverLevel().setBlock(new BlockPos(x, 80, -2), Blocks.DIAMOND_ORE.defaultBlockState(), 3);
+            p.connection.teleport(OX, 81, -5, 0, 25);
+        }));
+        for (int i = 0; i < 4; i++) {
+            int slot = 5 + i;
+            step(4, () -> selectSlot(mc, slot));
+            at += 26;
+            shot("self-tool-" + toolNames[i]);
+        }
+        step(4, () -> selectSlot(mc, 5));
+        at += 20;
+        step(2, () -> mc.gameMode.useItem(mc.player, InteractionHand.MAIN_HAND));
+        at += 10;
+        shot("self-tool-scan");
 
         // Every effect, on open ground in front of the camera.
         step(2, () -> teleport(mc, OX + 5, 6, 0, 8));

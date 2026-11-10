@@ -38,7 +38,7 @@ public final class Weapons {
         NeoForge.EVENT_BUS.addListener(Weapons::incoming);
     }
 
-    static void describe(String id, ItemStack stack, int stage, List<Component> lines) {
+    public static void describe(String id, ItemStack stack, int stage, List<Component> lines) {
         lines.add(Component.translatable("tooltip.singulo_arsenal." + id + ".summary").withStyle(ChatFormatting.GRAY));
         Tips.energyLine(stack, lines);
         Modules.describe(stack, lines);

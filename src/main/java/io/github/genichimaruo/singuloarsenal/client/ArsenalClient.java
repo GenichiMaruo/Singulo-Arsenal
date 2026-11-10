@@ -13,6 +13,7 @@ import io.github.genichimaruo.singuloarsenal.core.Tips;
 import io.github.genichimaruo.singuloarsenal.module.ModuleContent;
 import io.github.genichimaruo.singuloarsenal.net.AbilityPayload;
 import io.github.genichimaruo.singuloarsenal.net.FirePayload;
+import io.github.genichimaruo.singuloarsenal.tool.AccretionDrillItem;
 import io.github.genichimaruo.singuloarsenal.weapon.CasimirBladeItem;
 import io.github.genichimaruo.singuloarsenal.weapon.JetLanceItem;
 import io.github.genichimaruo.singuloarsenal.weapon.TidalReaverItem;
@@ -177,6 +178,9 @@ public final class ArsenalClient {
         if (held.getItem() instanceof Powered && !(held.getItem() instanceof SuitItem)) {
             drawBar(gui, 8, y, held.getHoverName(), held, 0xFFC36B);
             y += 14;
+            if (held.getItem() instanceof AccretionDrillItem) {
+                gui.drawString(mc.font, Component.translatable("tool.singulo_arsenal.drill_mode." + AccretionDrillItem.mode(held)), 8, y, 0xFFE2A0, true);
+            }
             if (held.getItem() instanceof JetLanceItem) {
                 Component mode = Component.translatable(JetLanceItem.breaksTerrain(held) ? "hud.singulo_arsenal.terrain_break" : "hud.singulo_arsenal.terrain_protect");
                 gui.drawString(mc.font, Component.translatable("hud.singulo_arsenal.magazine", JetLanceItem.shotsLeft(held), Rules.LANCE_MAGAZINE, mode), 8, y, 0xFFE2A0, true);

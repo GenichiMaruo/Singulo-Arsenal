@@ -17,7 +17,7 @@ public final class WeaponArt {
     private WeaponArt() {}
 
     /** A grip with raised finger ridges, ending in a heavier pommel that keeps the hand from sliding off. */
-    private static void grip(Canvas c, double y0, double y1, double half, int core, int ridge, int pommel) {
+    static void grip(Canvas c, double y0, double y1, double half, int core, int ridge, int pommel) {
         c.box(-half, y0, -half, half, y1, half, core);
         for (double y = y0 + 1; y < y1 - 0.5; y += 1.5) c.box(-half - 0.25, y, -half - 0.25, half + 0.25, y + 0.5, half + 0.25, ridge);
         c.box(-half - 0.5, y0 - 1, -half - 0.5, half + 0.5, y0, half + 0.5, pommel);

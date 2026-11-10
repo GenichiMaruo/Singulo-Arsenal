@@ -116,6 +116,7 @@ public final class RulesTest {
         check(Rules.capacityWith(Integer.MAX_VALUE, 3) == Integer.MAX_VALUE, "capacity overflow");
         check(Rules.cooled(160, 0) == 160 && Rules.cooled(160, 1) == 120 && Rules.cooled(1, 9) == 1, "coolant");
         check(Rules.amplified(0) == 1 && Rules.amplified(-1) == 1, "amplifier");
+        check(Rules.overclocked(0) == 1 && Math.abs(Rules.overclocked(2) - 1.8F) < 0.001F && Rules.overclocked(-3) == 1, "overclock");
         check(Rules.LANCE_MAGAZINE * Rules.LANCE_SHOT_FE <= Rules.LANCE_CAPACITY, "a full tank must cover one magazine");
         System.out.println("Rules: " + checks + " checks passed");
     }

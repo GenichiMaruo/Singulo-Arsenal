@@ -1,0 +1,27 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    " T ",
+    "LBL",
+    " R "
+  ],
+  "key": {
+    "T": {
+      "item": "singulo_arsenal:tidal_edge"
+    },
+    "L": {
+      "item": "singulo_arsenal:collapsar_lamina"
+    },
+    "B": {
+      "item": "singulo:micro_black_hole"
+    },
+    "R": {
+      "item": "singulo:confinement_ring"
+    }
+  },
+  "result": {
+    "id": "singulo_arsenal:accretion_drill",
+    "count": 1
+  }
+}

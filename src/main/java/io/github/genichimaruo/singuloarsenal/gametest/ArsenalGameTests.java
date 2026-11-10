@@ -766,6 +766,102 @@ public final class ArsenalGameTests {
         h.succeed();
     }
 
+    // ---- Tools ---------------------------------------------------------------------------------------------------------
+
+    private static net.minecraft.core.BlockPos abs(GameTestHelper h, int x, int y, int z) {
+        return h.absolutePos(new net.minecraft.core.BlockPos(x, y, z));
+    }
+
+    /** Fills the 3x3 face at z = 3 and aims the player at its centre. */
+    private static ServerPlayer facingWall(GameTestHelper h, net.minecraft.world.level.block.Block block) {
+        ServerPlayer p = player(h, 2.5, 1.5);
+        p.setYRot(0);
+        p.setXRot(0);
+        for (int x = 1; x <= 3; x++) for (int y = 1; y <= 3; y++) h.setBlock(x, y, 3, block);
+        return p;
+    }
+
+    private static void strike(GameTestHelper h, ServerPlayer p) {
+        p.gameMode.destroyBlock(abs(h, 2, 2, 3));
+    }
+
+    @GameTest(template = ARENA)
+    public static void breakerTakesThreeByThreeUnlessSneaking(GameTestHelper h) {
+        ServerPlayer p = facingWall(h, Blocks.STONE);
+        ItemStack breaker = hold(p, new ItemStack(ArsenalItems.DEGENERACY_BREAKER.get()));
+        p.setShiftKeyDown(true);
+        strike(h, p);
+        h.assertBlockPresent(Blocks.AIR, new net.minecraft.core.BlockPos(2, 2, 3));
+        h.assertBlockPresent(Blocks.STONE, new net.minecraft.core.BlockPos(1, 2, 3));
+        h.setBlock(2, 2, 3, Blocks.STONE);
+        p.setShiftKeyDown(false);
+        int before = Fe.stored(breaker);
+        strike(h, p);
+        for (int x = 1; x <= 3; x++) for (int y = 1; y <= 3; y++) h.assertBlockPresent(Blocks.AIR, new net.minecraft.core.BlockPos(x, y, 3));
+        h.assertTrue(before - Fe.stored(breaker) == 9 * Rules.BREAKER_FE, "nine blocks, nine payments: " + (before - Fe.stored(breaker)));
+        h.assertTrue(breaker.getDamageValue() == 0, "powered tools do not wear out");
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void breakerLeavesContainersAlone(GameTestHelper h) {
+        ServerPlayer p = facingWall(h, Blocks.STONE);
+        hold(p, new ItemStack(ArsenalItems.DEGENERACY_BREAKER.get()));
+        h.setBlock(1, 2, 3, Blocks.CHEST);
+        strike(h, p);
+        h.assertBlockPresent(Blocks.CHEST, new net.minecraft.core.BlockPos(1, 2, 3));
+        h.assertBlockPresent(Blocks.AIR, new net.minecraft.core.BlockPos(3, 2, 3));
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void sawFellsLivingTreesButNotLogWalls(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 1.5);
+        hold(p, new ItemStack(ArsenalItems.SHEAR_SAW.get()));
+        for (int y = 1; y <= 3; y++) h.setBlock(1, y, 3, Blocks.OAK_LOG);
+        p.gameMode.destroyBlock(abs(h, 1, 1, 3));
+        h.assertBlockPresent(Blocks.OAK_LOG, new net.minecraft.core.BlockPos(1, 2, 3));
+        for (int y = 1; y <= 3; y++) h.setBlock(3, y, 3, Blocks.OAK_LOG);
+        h.setBlock(3, 4, 3, Blocks.OAK_LEAVES.defaultBlockState().setValue(net.minecraft.world.level.block.LeavesBlock.PERSISTENT, false));
+        p.gameMode.destroyBlock(abs(h, 3, 1, 3));
+        h.assertBlockPresent(Blocks.AIR, new net.minecraft.core.BlockPos(3, 3, 3));
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void drillFollowsVeinsIntoThePack(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 1.5);
+        ItemStack drill = hold(p, new ItemStack(ArsenalItems.ACCRETION_DRILL.get()));
+        drill.set(ArsenalData.TOOL_MODE.get(), Rules.DRILL_VEIN);
+        for (int x = 1; x <= 3; x++) h.setBlock(x, 2, 3, Blocks.IRON_ORE);
+        h.setBlock(2, 3, 3, Blocks.STONE);
+        p.gameMode.destroyBlock(abs(h, 1, 2, 3));
+        h.assertBlockPresent(Blocks.AIR, new net.minecraft.core.BlockPos(3, 2, 3));
+        h.assertBlockPresent(Blocks.STONE, new net.minecraft.core.BlockPos(2, 3, 3));
+        h.assertTrue(p.getInventory().countItem(net.minecraft.world.item.Items.RAW_IRON) >= 3, "drops did not reach the pack");
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void toolsWithoutPowerDigAtHandSpeed(GameTestHelper h) {
+        ItemStack pick = new ItemStack(ArsenalItems.SQUID_PICK.get());
+        h.assertTrue(pick.getDestroySpeed(Blocks.STONE.defaultBlockState()) == 1, "an empty tool must not dig at full speed");
+        Fe.set(pick, Fe.capacity(pick));
+        h.assertTrue(pick.getDestroySpeed(Blocks.STONE.defaultBlockState()) == 10, "a charged pick digs at its tier speed");
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void squidPickFindsOresNearestFirst(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 2.5);
+        h.setBlock(4, 2, 4, Blocks.DIAMOND_ORE);
+        h.setBlock(2, 2, 3, Blocks.IRON_ORE);
+        var found = io.github.genichimaruo.singuloarsenal.tool.SquidPickItem.scan(p);
+        h.assertTrue(found.size() >= 2, "ores missed: " + found.size());
+        h.assertTrue(found.getFirst().equals(abs(h, 2, 2, 3)), "nearest ore must come first: " + found.getFirst());
+        h.succeed();
+    }
+
     // ---- Recipes against the real base mod ---------------------------------------------------------------------------
 
     @GameTest(template = ARENA)
@@ -777,7 +873,7 @@ public final class ArsenalGameTests {
             h.assertTrue(recipes.byKey(id).isPresent(), "recipe failed to load: " + id);
             found++;
         }
-        h.assertTrue(found == 30, "unexpected item count " + found);
+        h.assertTrue(found == 35, "unexpected item count " + found);
         var lamina = recipes.byKey(SinguloArsenal.id("collapsar_lamina")).orElseThrow().value();
         h.assertTrue(BuiltInRegistries.RECIPE_SERIALIZER.getKey(lamina.getSerializer()).toString().equals("singulo:machine"), "lamina must be a Singulo machine recipe");
         h.succeed();

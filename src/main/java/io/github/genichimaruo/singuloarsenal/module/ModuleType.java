@@ -2,6 +2,7 @@ package io.github.genichimaruo.singuloarsenal.module;
 
 import io.github.genichimaruo.singuloarsenal.armor.SuitItem;
 import io.github.genichimaruo.singuloarsenal.core.Powered;
+import io.github.genichimaruo.singuloarsenal.tool.PoweredTool;
 import io.github.genichimaruo.singuloarsenal.weapon.ArsenalWeapon;
 import io.github.genichimaruo.singuloarsenal.weapon.JetLanceItem;
 import java.util.function.Predicate;
@@ -17,7 +18,8 @@ public enum ModuleType {
     COOLANT("coolant_module", item -> item instanceof ArsenalWeapon),
     AMPLIFIER("amplifier_module", item -> item instanceof ArsenalWeapon),
     METRIC_DRIVE("metric_drive_module", item -> item instanceof SuitItem),
-    MELTDOWN("meltdown_module", item -> item instanceof JetLanceItem);
+    MELTDOWN("meltdown_module", item -> item instanceof JetLanceItem),
+    OVERCLOCK("overclock_module", item -> item instanceof PoweredTool);
 
     public final String id;
     private final Predicate<Item> fits;
