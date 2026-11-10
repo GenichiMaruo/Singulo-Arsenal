@@ -905,6 +905,28 @@ public final class ArsenalGameTests {
         h.succeed();
     }
 
+    @GameTest(template = ARENA)
+    public static void canisterStoresPelletsAndFeedsGearFirst(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 2.5);
+        ItemStack canister = new ItemStack(ArsenalItems.PELLET_CANISTER.get());
+        p.setItemSlot(EquipmentSlot.MAINHAND, canister);
+        p.getInventory().add(new ItemStack(Fe.MASS_PELLET.get(), 64));
+        p.getInventory().add(new ItemStack(Fe.MASS_PELLET.get(), 36));
+        canister.use(h.getLevel(), p, net.minecraft.world.InteractionHand.MAIN_HAND);
+        h.assertTrue(io.github.genichimaruo.singuloarsenal.core.PelletCanisterItem.stored(p.getMainHandItem()) == 100, "all pellets go in");
+        h.assertTrue(p.getInventory().countItem(Fe.MASS_PELLET.get()) == 0, "none left loose");
+        p.getInventory().add(new ItemStack(Fe.MASS_PELLET.get(), 5));
+        ItemStack chest = new ItemStack(ArsenalItems.SUITS.get(ArmorSet.COLLAPSAR).get(ArmorItem.Type.CHESTPLATE).get());
+        h.assertTrue(Fe.accrete(p, chest) && Fe.stored(chest) == Rules.PELLET_FE, "accretion must still work");
+        h.assertTrue(io.github.genichimaruo.singuloarsenal.core.PelletCanisterItem.stored(p.getMainHandItem()) == 99
+                && p.getInventory().countItem(Fe.MASS_PELLET.get()) == 5, "the canister pays before loose pellets");
+        p.setShiftKeyDown(true);
+        p.getMainHandItem().use(h.getLevel(), p, net.minecraft.world.InteractionHand.MAIN_HAND);
+        h.assertTrue(io.github.genichimaruo.singuloarsenal.core.PelletCanisterItem.stored(p.getMainHandItem()) == 35
+                && p.getInventory().countItem(Fe.MASS_PELLET.get()) == 69, "sneaking takes one stack back out");
+        h.succeed();
+    }
+
     // ---- Utility modules ----------------------------------------------------------------------------------------------
 
     @GameTest(template = ARENA)
@@ -979,7 +1001,7 @@ public final class ArsenalGameTests {
             h.assertTrue(recipes.byKey(id).isPresent(), "recipe failed to load: " + id);
             found++;
         }
-        h.assertTrue(found == 38, "unexpected item count " + found);
+        h.assertTrue(found == 39, "unexpected item count " + found);
         var lamina = recipes.byKey(SinguloArsenal.id("collapsar_lamina")).orElseThrow().value();
         h.assertTrue(BuiltInRegistries.RECIPE_SERIALIZER.getKey(lamina.getSerializer()).toString().equals("singulo:machine"), "lamina must be a Singulo machine recipe");
         h.succeed();

@@ -365,6 +365,9 @@ public final class Rules {
         return 1 + OVERCLOCK_BONUS * Math.max(0, modules);
     }
 
+    /** Pellets one canister holds: sixty-four stacks. */
+    public static final int CANISTER_CAPACITY = 4_096;
+
     // ---- Utility modules ---------------------------------------------------------------------------------------------------
 
     /** Per item smelted on the way out of the block. */

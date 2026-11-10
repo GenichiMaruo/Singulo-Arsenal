@@ -153,6 +153,10 @@ shaped('shear_saw', ['G  ', 'GAQ', ' NF'],
 shaped('accretion_drill', [' T ', 'LBL', ' R '],
        {'T': own('tidal_edge'), 'L': own('collapsar_lamina'), 'B': s('micro_black_hole'), 'R': s('confinement_ring')}, own('tidal_edge'))
 
+# Steel walls, a ceramic floor, and a superconducting coil in the lid to keep the mass from fusing.
+shaped('pellet_canister', ['PSP', 'P P', 'PCP'],
+       {'P': s('steel_plate'), 'S': s('superconducting_coil'), 'C': s('white_ceramic_composite')}, s('mass_pellet'))
+
 # ---- Module Integrator and modules --------------------------------------------------------------------------------
 
 # Tool arms over a work lens, a control pair either side of the frame, on a plate base: the machine as it stands.
@@ -294,7 +298,7 @@ write(f'assets/{MOD}/models/item/module_integrator.json', {**BUILTIN, 'display':
     'thirdperson_righthand': {'rotation': [75, 45, 0], 'translation': [0, 2.5, 0], 'scale': [0.375, 0.375, 0.375]},
     'thirdperson_lefthand': {'rotation': [75, 45, 0], 'translation': [0, 2.5, 0], 'scale': [0.375, 0.375, 0.375]},
 }})
-for name in MATERIALS + MODULES:
+for name in MATERIALS + MODULES + ['pellet_canister']:
     write(f'assets/{MOD}/models/item/{name}.json', {'parent': 'minecraft:item/generated', 'textures': {'layer0': f'{MOD}:item/{name}'}})
 
 # ---- Translations --------------------------------------------------------------------------------------------------
@@ -389,6 +393,16 @@ common = {
     'tooltip.singulo_arsenal.terrain_protect': ('地形保護', 'Terrain protected'),
     'tooltip.singulo_arsenal.terrain_break': ('地形破壊', 'Terrain destruction'),
     'message.singulo_arsenal.scan': ('鉱石を %s 個検出', '%s ores found'),
+    'item.singulo_arsenal.pellet_canister': ('質量ペレット缶', 'Pellet Canister'),
+    'tooltip.singulo_arsenal.pellet_canister.summary': ('質量ペレットをまとめて保管', 'Holds mass pellets in bulk'),
+    'tooltip.singulo_arsenal.pellet_canister.count': ('質量ペレット %s / %s', 'Mass pellets %s / %s'),
+    'tooltip.singulo_arsenal.pellet_canister.1': ('右クリック：持ち物の質量ペレットをすべて収納。スニーク中は1スタック取り出す。',
+                                                  'Right click: stores every mass pellet you carry. Sneaking, takes one stack out.'),
+    'tooltip.singulo_arsenal.pellet_canister.2': ('持ち物画面ではペレットを重ねて入れ、右クリックで取り出せる。',
+                                                  'In the inventory, drop pellets on it to store them; right click to take a stack.'),
+    'tooltip.singulo_arsenal.pellet_canister.3': ('装備の自動充電は、持ち物のペレットより先にこの缶から使う。',
+                                                  'Gear feeding on pellets draws from this before loose pellets.'),
+    'message.singulo_arsenal.canister': ('質量ペレット %s / %s', 'Mass pellets %s / %s'),
     'message.singulo_arsenal.scan_hidden': ('（感度が足りず映らない鉱石が %s 個）', ' (%s more too faint to show)'),
     'tooltip.singulo_arsenal.scan_tier': ('感度 %s / %s', 'Sensitivity %s / %s'),
     'message.singulo_arsenal.drill_mode': ('採掘モード：%s', 'Mining mode: %s'),
@@ -783,6 +797,25 @@ sprite('collector_module', [
     '................',
     '................',
 ], {'I': 0xE7D8B0, 'V': 0x3A3648, 'E': 0x0E0D14, 'c': 0xFFC36B})
+# A sealed canister with its window full of pellets.
+sprite('pellet_canister', [
+    '................',
+    '.....IIIIII.....',
+    '....IEEEEEEI....',
+    '...IIIIIIIIII...',
+    '...IVVVVVVVVI...',
+    '...IVppPppPVI...',
+    '...IVpPppPpVI...',
+    '...IVPppPppVI...',
+    '...IVppPppPVI...',
+    '...IVpPppPpVI...',
+    '...IVPppPppVI...',
+    '...IVVVVVVVVI...',
+    '...IIIIIIIIII...',
+    '....IEEEEEEI....',
+    '.....IIIIII.....',
+    '................',
+], {'I': 0xC2CDD9, 'E': 0x3A4656, 'V': 0x262430, 'p': 0x6E5A9C, 'P': 0xD8C8FF})
 # A drive gear with a rising arrow in its hub.
 sprite('overclock_module', [
     '................',

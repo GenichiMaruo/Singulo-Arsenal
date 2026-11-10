@@ -57,6 +57,8 @@ public final class ArsenalItems {
     public static final DeferredItem<DegeneracyBreakerItem> DEGENERACY_BREAKER = ITEMS.register("degeneracy_breaker", DegeneracyBreakerItem::new);
     public static final DeferredItem<ShearSawItem> SHEAR_SAW = ITEMS.register("shear_saw", ShearSawItem::new);
     public static final DeferredItem<AccretionDrillItem> ACCRETION_DRILL = ITEMS.register("accretion_drill", AccretionDrillItem::new);
+    public static final DeferredItem<io.github.genichimaruo.singuloarsenal.core.PelletCanisterItem> PELLET_CANISTER =
+            ITEMS.register("pellet_canister", io.github.genichimaruo.singuloarsenal.core.PelletCanisterItem::new);
 
     static {
         // The suit is drawn by SuitLayer, so the material has no texture layers. Its sound is silent because vanilla
@@ -95,6 +97,7 @@ public final class ArsenalItems {
                     output.accept(charged(DEGENERACY_BREAKER.get()));
                     output.accept(charged(SHEAR_SAW.get()));
                     output.accept(charged(ACCRETION_DRILL.get()));
+                    output.accept(PELLET_CANISTER.get());
                     output.accept(FLUX_WEAVE.get());
                     output.accept(PRESSURE_LATTICE.get());
                     output.accept(COLLAPSAR_LAMINA.get());

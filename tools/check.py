@@ -20,7 +20,8 @@ TOOLS = ['squid_pick', 'degeneracy_breaker', 'shear_saw', 'accretion_drill']
 MATERIALS = ['flux_weave', 'pressure_lattice', 'collapsar_lamina', 'jet_collimator', 'tidal_edge']
 MODULES = ['bit_drone_module', 'capacitor_module', 'plating_module', 'thruster_module', 'coolant_module', 'amplifier_module', 'metric_drive_module', 'meltdown_module', 'overclock_module', 'smelter_module', 'induction_module', 'collector_module']
 GEAR = [f'{s}_{p}' for s in SETS for p in PARTS] + WEAPONS + TOOLS + ['module_integrator']
-ITEMS = GEAR + MATERIALS + MODULES
+CONTAINERS = ['pellet_canister']
+ITEMS = GEAR + MATERIALS + MODULES + CONTAINERS
 
 javac = str(Path(os.environ['JAVA_HOME']) / 'bin/javac') if os.environ.get('JAVA_HOME') else shutil.which('javac')
 java = str(Path(os.environ['JAVA_HOME']) / 'bin/java') if os.environ.get('JAVA_HOME') else shutil.which('java')
