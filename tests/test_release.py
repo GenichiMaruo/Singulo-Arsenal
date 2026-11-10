@@ -47,6 +47,9 @@ side="BOTH"
 versionRange="[0.16.0,0.17.0)"
 '''
 ENTRY_POINT = 'io/github/genichimaruo/singuloarsenal/SinguloArsenal.class'
+VERSION_TYPES = [{'id': i, 'slug': slug} for i, slug in [(1, 'minecraft-1-21'), (2, 'modloader'), (3, 'java'), (4, 'bukkit')]]
+VERSIONS = [{'id': i, 'name': name, 'gameVersionTypeID': group} for i, name, group in
+            [(100, '1.21.1', 1), (200, 'NeoForge', 2), (300, 'Java 21', 3), (400, '1.21.1', 4)]]
 
 
 class ArtifactTests(unittest.TestCase):
@@ -143,12 +146,11 @@ class ArtifactTests(unittest.TestCase):
 
 class ApiTests(unittest.TestCase):
     def test_preflight_only_uses_get_and_token_header(self):
-        versions = [{'name': name} for name in ['1.21.1', 'NeoForge', 'Java 21']]
         with patch.object(release.urllib.request, 'build_opener') as opener:
-            opener.return_value.open.return_value = io.BytesIO(json.dumps(versions).encode())
-            release.check_api('1793647', 'test-token')
-            opener.return_value.open.assert_called_once()
-            request = opener.return_value.open.call_args.args[0]
+            opener.return_value.open.side_effect = [io.BytesIO(json.dumps(x).encode()) for x in [VERSIONS, VERSION_TYPES]]
+            self.assertEqual(release.check_api('1793647', 'test-token'), [100, 200, 300])
+            self.assertEqual(opener.return_value.open.call_count, 2)
+            request = opener.return_value.open.call_args_list[0].args[0]
             self.assertEqual(request.get_method(), 'GET')
             self.assertIsNone(request.data)
             self.assertEqual(request.full_url, release.CF_VERSIONS)
@@ -183,6 +185,12 @@ class ApiTests(unittest.TestCase):
         request = urllib.request.Request(release.CF_VERSIONS, headers={'X-Api-Token': 'test-token'})
         self.assertIsNone(release.NoRedirect().redirect_request(request, None, 302, '', {}, 'https://example.com'))
 
+    def test_ambiguous_minecraft_versions_are_rejected(self):
+        duplicate = {'id': 101, 'name': '1.21.1', 'gameVersionTypeID': 1}
+        with patch.object(release, 'api_json', side_effect=[VERSIONS + [duplicate], VERSION_TYPES]):
+            with self.assertRaisesRegex(ValueError, 'no unique minecraft version'):
+                release.check_api('1793647', 'test-token')
+
 
 class UploadTests(unittest.TestCase):
     def setUp(self):
@@ -198,13 +206,12 @@ class UploadTests(unittest.TestCase):
                      'sha256': hashlib.sha256(self.jar.read_bytes()).hexdigest()}
 
     def test_multipart_publishes_exact_bytes_and_required_dependency(self):
-        versions = [{'name': name} for name in ['1.21.1', 'NeoForge', 'Java 21']]
         with patch.object(release.urllib.request, 'build_opener') as opener:
-            opener.return_value.open.side_effect = [io.BytesIO(json.dumps(versions).encode()), io.BytesIO(b'{"id":1234}')]
+            opener.return_value.open.side_effect = [io.BytesIO(json.dumps(x).encode()) for x in [VERSIONS, VERSION_TYPES, {'id': 1234}]]
             url = release.upload(self.plan, '1793647', 'test-token')
             requests = [call.args[0] for call in opener.return_value.open.call_args_list]
-            self.assertEqual([r.get_method() for r in requests], ['GET', 'POST'])
-            request = requests[1]
+            self.assertEqual([r.get_method() for r in requests], ['GET', 'GET', 'POST'])
+            request = requests[2]
             self.assertEqual(request.full_url, 'https://minecraft.curseforge.com/api/projects/1793647/upload-file')
             self.assertEqual(request.get_header('X-api-token'), 'test-token')
             message = BytesParser(policy=policy.default).parsebytes(
@@ -217,7 +224,7 @@ class UploadTests(unittest.TestCase):
             self.assertEqual(metadata, {
                 'displayName': self.jar.stem, 'releaseType': 'beta', 'changelogType': 'markdown',
                 'changelog': '# 0.2.0\n日本語の変更履歴',
-                'gameVersionNames': ['1.21.1', 'NeoForge', 'Java 21'],
+                'gameVersions': [100, 200, 300],
                 'relations': {'projects': [{'slug': 'singulo', 'type': 'requiredDependency'}]},
             })
             self.assertEqual(url, 'https://www.curseforge.com/minecraft/mc-mods/singulo-arsenal/files/1234')
@@ -231,7 +238,7 @@ class UploadTests(unittest.TestCase):
 
     def test_changed_jar_never_posts(self):
         self.jar.write_bytes(b'changed')
-        with patch.object(release, 'check_api'), patch.object(release.urllib.request, 'build_opener') as opener:
+        with patch.object(release, 'check_api', return_value=[100, 200, 300]), patch.object(release.urllib.request, 'build_opener') as opener:
             with self.assertRaisesRegex(ValueError, 'changed after validation'):
                 release.upload(self.plan, '1793647', 'test-token')
             opener.assert_not_called()
@@ -240,7 +247,7 @@ class UploadTests(unittest.TestCase):
         errors = [TimeoutError('test-secret'),
                   urllib.error.HTTPError('https://example.com', 400, 'invalid dependency', {}, io.BytesIO(b'test-secret'))]
         for error in errors:
-            with self.subTest(error=type(error).__name__), patch.object(release, 'check_api'), \
+            with self.subTest(error=type(error).__name__), patch.object(release, 'check_api', return_value=[100, 200, 300]), \
                  patch.object(release.urllib.request, 'build_opener') as opener:
                 opener.return_value.open.side_effect = error
                 with self.assertRaisesRegex(ValueError, 'check the Files page before retrying') as result:
@@ -250,17 +257,29 @@ class UploadTests(unittest.TestCase):
 
     def test_invalid_upload_response_is_not_retried(self):
         for response in [b'not json', b'{}', b'{"id":true}', b'{"id":-1}']:
-            with self.subTest(response=response), patch.object(release, 'check_api'), \
+            with self.subTest(response=response), patch.object(release, 'check_api', return_value=[100, 200, 300]), \
                  patch.object(release.urllib.request, 'build_opener') as opener:
                 opener.return_value.open.return_value = io.BytesIO(response)
                 with self.assertRaisesRegex(ValueError, 'check the Files page before retrying'):
                     release.upload(self.plan, '1793647', 'test-token')
                 opener.return_value.open.assert_called_once()
 
+    def test_upload_error_reports_api_code_with_redacted_message(self):
+        body = json.dumps({'errorCode': 1009, 'errorMessage': 'Invalid version test-secret 1793647'}).encode()
+        error = urllib.error.HTTPError('https://example.com', 400, 'rejected', {}, io.BytesIO(body))
+        with patch.object(release, 'check_api', return_value=[100, 200, 300]), \
+             patch.object(release.urllib.request, 'build_opener') as opener:
+            opener.return_value.open.side_effect = error
+            with self.assertRaises(ValueError) as result:
+                release.upload(self.plan, '1793647', 'test-secret')
+            self.assertIn('API code 1009', str(result.exception))
+            self.assertNotIn('test-secret', str(result.exception))
+            self.assertNotIn('1793647', str(result.exception))
+
     def test_cli_default_and_dry_run_never_upload(self):
         for arguments in [[], ['--check-api']]:
             with self.subTest(arguments=arguments), patch.object(release.sys, 'argv', ['prepare_release.py', *arguments]), \
-                 patch.object(release, 'prepare', return_value=self.plan), patch.object(release, 'check_api'), \
+                 patch.object(release, 'prepare', return_value=self.plan), patch.object(release, 'check_api', return_value=[100, 200, 300]), \
                  patch.object(release, 'upload') as upload, patch.dict(release.os.environ, {}, clear=True), \
                  redirect_stdout(io.StringIO()):
                 self.assertEqual(release.main(), 0)

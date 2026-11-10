@@ -61,6 +61,17 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
+def api_json(url, token):
+    request = urllib.request.Request(url, headers={'X-Api-Token': token, 'User-Agent': 'Singulo-Arsenal-release-check'})
+    try:
+        with urllib.request.build_opener(NoRedirect()).open(request, timeout=30) as response:
+            return json.load(response)
+    except urllib.error.HTTPError as error:
+        raise ValueError(f'CurseForge version lookup returned HTTP {error.code}') from None
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError):
+        raise ValueError('CurseForge version lookup failed; no upload was attempted') from None
+
+
 def check_api(project_id, token):
     if not re.fullmatch(r'[1-9][0-9]*', project_id):
         raise ValueError('CURSEFORGE_PROJECT_ID must be a positive numeric project ID')
@@ -68,32 +79,32 @@ def check_api(project_id, token):
         raise ValueError('CURSEFORGE_PROJECT_ID does not match the Singulo Arsenal project')
     if not token.strip():
         raise ValueError('CURSEFORGE_TOKEN is missing in the curseforge Environment')
-    request = urllib.request.Request(CF_VERSIONS, headers={'X-Api-Token': token, 'User-Agent': 'Singulo-Arsenal-release-check'})
-    try:
-        with urllib.request.build_opener(NoRedirect()).open(request, timeout=30) as response:
-            versions = json.load(response)
-    except urllib.error.HTTPError as error:
-        # Do not print response bodies or request headers that could contain credentials.
-        raise ValueError(f'CurseForge version lookup returned HTTP {error.code}') from None
-    except (urllib.error.URLError, TimeoutError, OSError, ValueError):
-        raise ValueError('CurseForge version lookup failed; no upload was attempted') from None
-    if not isinstance(versions, list):
+    versions = api_json(CF_VERSIONS, token)
+    types = api_json('https://minecraft.curseforge.com/api/game/version-types', token)
+    if not isinstance(versions, list) or not isinstance(types, list):
         raise ValueError('CurseForge returned an unexpected version catalogue')
-    names = {entry['name'] for entry in versions if isinstance(entry, dict) and isinstance(entry.get('name'), str)}
-    required = set(CF_VERSION_NAMES)
-    if not required <= names:
-        raise ValueError('CurseForge is missing required versions: ' + ', '.join(sorted(required - names)))
+    # The same display name can belong to Minecraft, Bukkit or addon version types.
+    ids = []
+    for name, category in zip(CF_VERSION_NAMES, ['minecraft', 'modloader', 'java']):
+        type_ids = {entry['id'] for entry in types if isinstance(entry, dict) and type(entry.get('id')) is int
+                    and isinstance(entry.get('slug'), str) and entry['slug'].startswith(category)}
+        matches = {entry['id'] for entry in versions if isinstance(entry, dict) and entry.get('name') == name
+                   and type(entry.get('id')) is int and entry['id'] > 0 and entry.get('gameVersionTypeID') in type_ids}
+        if len(matches) != 1:
+            raise ValueError(f'CurseForge has no unique {category} version for {name}')
+        ids.append(matches.pop())
+    return ids
 
 
 def upload(plan, project_id, token):
     # Always validate the target and API configuration before the only write request.
-    check_api(project_id, token)
+    version_ids = check_api(project_id, token)
     metadata = {
         'displayName': plan['artifact_name'],
         'releaseType': plan['release_type'],
         'changelogType': 'markdown',
         'changelog': Path(plan['changelog']).read_text(encoding='utf-8'),
-        'gameVersionNames': CF_VERSION_NAMES,
+        'gameVersions': version_ids,
         'relations': {'projects': [{'slug': 'singulo', 'type': 'requiredDependency'}]},
     }
     jar = Path(plan['jar'])
@@ -118,7 +129,21 @@ def upload(plan, project_id, token):
         with urllib.request.build_opener(NoRedirect()).open(request, timeout=120) as response:
             result = json.load(response)
     except urllib.error.HTTPError as error:
-        raise ValueError(f'CurseForge upload returned HTTP {error.code}; check the Files page before retrying') from None
+        detail = ''
+        try:
+            response_error = json.loads(error.read(8192))
+            if isinstance(response_error, dict):
+                code = response_error.get('errorCode')
+                message = response_error.get('errorMessage')
+                if type(code) is int:
+                    detail += f' (API code {code})'
+                if isinstance(message, str):
+                    # Only the documented error message; never headers or raw response bodies.
+                    message = message.replace(token, '[redacted]').replace(project_id, '[project]')
+                    detail += ': ' + ' '.join(message.split())[:500]
+        except (ValueError, OSError):
+            pass
+        raise ValueError(f'CurseForge upload returned HTTP {error.code}{detail}; check the Files page before retrying') from None
     except (urllib.error.URLError, TimeoutError, OSError, ValueError):
         raise ValueError('CurseForge upload result is unknown; check the Files page before retrying') from None
     file_id = result.get('id') if isinstance(result, dict) else None
@@ -138,7 +163,8 @@ def main():
     try:
         plan = prepare(ROOT, args.jar_dir, args.release_type)
         if args.check_api:
-            check_api(os.environ.get('CURSEFORGE_PROJECT_ID', ''), os.environ.get('CURSEFORGE_TOKEN', ''))
+            ids = check_api(os.environ.get('CURSEFORGE_PROJECT_ID', ''), os.environ.get('CURSEFORGE_TOKEN', ''))
+            print('CurseForge version IDs: ' + ', '.join(f'{name}={value}' for name, value in zip(CF_VERSION_NAMES, ids)))
         elif args.upload:
             if os.environ.get('GITHUB_REF') != 'refs/heads/1.21.1':
                 raise ValueError('Uploads require the 1.21.1 release branch')
