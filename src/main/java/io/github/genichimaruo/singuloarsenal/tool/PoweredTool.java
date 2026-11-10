@@ -52,7 +52,11 @@ public abstract class PoweredTool extends DiggerItem implements Powered {
         return Fe.stored(stack) < fePerBlock ? 1 : speed * Rules.overclocked(Modules.count(stack, ModuleType.OVERCLOCK));
     }
 
-    @Override public boolean mineBlock(ItemStack stack, Level level, BlockState state, BlockPos pos, LivingEntity miner) { return true; }
+    @Override
+    public boolean mineBlock(ItemStack stack, Level level, BlockState state, BlockPos pos, LivingEntity miner) {
+        if (miner instanceof ServerPlayer player) Mining.mined(player, stack, pos, state);
+        return true;
+    }
     @Override public void postHurtEnemy(ItemStack stack, LivingEntity target, LivingEntity attacker) {}
     @Override public InteractionResult useOn(UseOnContext context) { return Fe.chargeFromBlock(context); }
     @Override public boolean shouldCauseReequipAnimation(ItemStack from, ItemStack to, boolean changed) { return !ItemStack.isSameItem(from, to); }

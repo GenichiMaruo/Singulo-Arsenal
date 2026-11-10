@@ -28,7 +28,6 @@ import net.neoforged.bus.api.EventPriority;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.common.Tags;
 import net.neoforged.neoforge.event.level.BlockDropsEvent;
-import net.neoforged.neoforge.event.level.BlockEvent;
 
 /** What happens when a powered tool breaks a block: the FE is paid, and whatever else the tool takes with it goes too, as this player. */
 public final class Mining {
@@ -38,21 +37,23 @@ public final class Mining {
     private Mining() {}
 
     public static void register() {
-        // Lowest: if a claim or anything else cancels the break, none of this happens.
-        NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, Mining::broken);
-        NeoForge.EVENT_BUS.addListener(Mining::drops);
+        NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, Mining::drops);
     }
 
-    private static void broken(BlockEvent.BreakEvent event) {
-        if (!(event.getPlayer() instanceof ServerPlayer player) || BUSY.contains(player.getUUID())) return;
-        ItemStack stack = player.getMainHandItem();
-        if (!(stack.getItem() instanceof PoweredTool tool) || !Fe.spend(stack, tool.fePerBlock())) return;
-        List<BlockPos> more = tool.alsoBreaks(player, stack, event.getPos(), event.getState());
+    /** Called by the tool after every BreakEvent listener has accepted the break. */
+    public static void mined(ServerPlayer player, ItemStack stack, BlockPos origin, BlockState struck) {
+        if (!(stack.getItem() instanceof PoweredTool tool) || !Fe.spend(stack, tool.fePerBlock()) || BUSY.contains(player.getUUID())) return;
+        List<BlockPos> more = tool.alsoBreaks(player, stack, origin, struck);
         if (more.isEmpty()) return;
+        ServerLevel level = player.serverLevel();
         BUSY.add(player.getUUID());
         try {
             for (BlockPos pos : more) {
-                if (!Fe.spend(stack, tool.fePerBlock())) break;
+                if (Fe.stored(stack) < tool.fePerBlock()) break;
+                // destroyBlock handles claim events, but its caller normally checks spawn protection and the world border.
+                if (!level.isLoaded(pos) || !level.getWorldBorder().isWithinBounds(pos) || !level.mayInteract(player, pos)) continue;
+                if (!mayTake(level, stack, pos, level.getBlockState(pos), struck, origin)) continue;
+                // The successful break calls mined again and pays once. A refused break costs nothing.
                 player.gameMode.destroyBlock(pos);
             }
         } finally {
@@ -80,6 +81,7 @@ public final class Mining {
     private static void smelt(BlockDropsEvent event, ItemStack tool) {
         ServerLevel level = event.getLevel();
         float experience = 0;
+        List<ItemEntity> overflow = new ArrayList<>();
         for (ItemEntity drop : event.getDrops()) {
             ItemStack stack = drop.getItem();
             if (!stack.is(Tags.Items.ORES) && !stack.is(Tags.Items.RAW_MATERIALS)) continue;
@@ -88,10 +90,18 @@ public final class Mining {
             if (recipe.isEmpty()) continue;
             ItemStack result = recipe.get().value().assemble(input, level.registryAccess());
             if (result.isEmpty() || !Fe.spend(tool, Rules.SMELT_FE * stack.getCount())) continue;
-            result.setCount(Math.min(result.getMaxStackSize(), result.getCount() * stack.getCount()));
+            result.setCount(result.getCount() * stack.getCount());
             experience += recipe.get().value().getExperience() * stack.getCount();
-            drop.setItem(result);
+            int limit = result.getMaxStackSize();
+            drop.setItem(result.split(limit));
+            while (!result.isEmpty()) {
+                ItemEntity extra = new ItemEntity(level, drop.getX(), drop.getY(), drop.getZ(), result.split(limit));
+                extra.setDeltaMovement(drop.getDeltaMovement());
+                extra.setDefaultPickUpDelay();
+                overflow.add(extra);
+            }
         }
+        event.getDrops().addAll(overflow);
         // As a furnace pays it out: the fraction is the chance of one more point.
         int whole = (int) experience;
         if (level.random.nextFloat() < experience - whole) whole++;
@@ -127,7 +137,7 @@ public final class Mining {
                     case Y -> origin.offset(a, 0, b);
                     case Z -> origin.offset(a, b, 0);
                 };
-                if (mayTake(level, stack, pos, level.getBlockState(pos), struck, origin)) out.add(pos);
+                if (level.isLoaded(pos) && mayTake(level, stack, pos, level.getBlockState(pos), struck, origin)) out.add(pos);
             }
         }
         return out;

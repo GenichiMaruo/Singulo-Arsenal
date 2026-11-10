@@ -87,7 +87,7 @@ public final class JetLanceItem extends Item implements ArsenalWeapon {
 
     /** Whether the gun could start a shot right now. Run on the client as well, to avoid sending clicks the server would refuse. */
     public static boolean ready(ItemStack stack, long now) {
-        return now >= ArsenalData.time(stack, ArsenalData.JET_UNTIL) + Rules.LANCE_SHOT_GAP
+        return shotsLeft(stack) > 0 && now >= ArsenalData.time(stack, ArsenalData.JET_UNTIL) + Rules.LANCE_SHOT_GAP
                 && ArsenalData.time(stack, ArsenalData.CHARGE_UNTIL) <= now && Weapons.reloadProgress(stack, now, 0) < 0;
     }
 
@@ -112,6 +112,7 @@ public final class JetLanceItem extends Item implements ArsenalWeapon {
             // Switching away cuts the jet and drops the charge.
             stack.remove(ArsenalData.CHARGE_UNTIL.get());
             if (jetAge(stack, level.getGameTime(), 0) >= 0) stack.remove(ArsenalData.JET_UNTIL.get());
+            finish(stack, player, server);
             return;
         }
         tickShot(stack, player, server);
@@ -129,7 +130,11 @@ public final class JetLanceItem extends Item implements ArsenalWeapon {
             return;
         }
         float age = jetAge(stack, now, 0);
-        if (age < 0) return;
+        if (age < 0) {
+            // Resume after a missed final tick, for example when the cannon was stored or its owner logged out.
+            finish(stack, player, level);
+            return;
+        }
         if (age > 0 && (int) age % Rules.LANCE_PULSE == 0) pulse(player, level);
         if ((int) age == Rules.LANCE_SHOT_TICKS - 1) finish(stack, player, level);
     }

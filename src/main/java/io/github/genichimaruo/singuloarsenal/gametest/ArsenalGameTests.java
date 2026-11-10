@@ -505,6 +505,32 @@ public final class ArsenalGameTests {
     }
 
     @GameTest(template = ARENA)
+    public static void switchingAwayCannotSkipAnEmptyMagazinesReload(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 2.5);
+        ItemStack cannon = hold(p, new ItemStack(ArsenalItems.JET_LANCE.get()));
+        cannon.set(ArsenalData.SHOTS.get(), Rules.LANCE_MAGAZINE - 1);
+        ignite(h, p, cannon);
+        p.setItemSlot(EquipmentSlot.MAINHAND, ItemStack.EMPTY);
+        cannon.getItem().inventoryTick(cannon, h.getLevel(), p, 1, false);
+        p.setItemSlot(EquipmentSlot.MAINHAND, cannon);
+        h.assertTrue(!JetLanceItem.tryFire(p), "switching away allowed a fifth shot without reloading");
+        h.assertTrue(Weapons.reloadProgress(cannon, h.getLevel().getGameTime(), 0) >= 0, "putting an empty cannon away must start its reload");
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void expiredShotsStillReloadAnEmptyMagazine(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 2.5);
+        ItemStack cannon = hold(p, new ItemStack(ArsenalItems.JET_LANCE.get()));
+        cannon.set(ArsenalData.SHOTS.get(), Rules.LANCE_MAGAZINE);
+        cannon.set(ArsenalData.JET_UNTIL.get(), h.getLevel().getGameTime() - Rules.LANCE_SHOT_GAP);
+        h.assertTrue(!JetLanceItem.tryFire(p), "an expired fourth shot allowed a fifth shot");
+        JetLanceItem.tickShot(cannon, p, h.getLevel());
+        h.assertTrue(Weapons.reloadProgress(cannon, h.getLevel().getGameTime(), 0) >= 0, "missing the final shot tick must not skip the reload");
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
     public static void onlyTheFirstInstantOfAShotDrillsTerrain(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 0.5);
         ItemStack cannon = hold(p, new ItemStack(ArsenalItems.JET_LANCE.get()));
@@ -654,6 +680,24 @@ public final class ArsenalGameTests {
         int found = 0;
         for (int i = IntegratorBlockEntity.FIRST_SOCKET; i < IntegratorBlockEntity.SLOTS; i++) if (!items.getStackInSlot(i).isEmpty()) found++;
         h.assertTrue(found == 2, "modules lost or duplicated: " + found);
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void legacyIntegratorSaveGainsFiveSocketsWithoutLosingModules(GameTestHelper h) {
+        IntegratorBlockEntity entity = integrator(h);
+        entity.items().setStackInSlot(0, charged(ArmorSet.COLLAPSAR, ArmorItem.Type.CHESTPLATE));
+        for (int slot = 1; slot <= 3; slot++) entity.items().setStackInSlot(slot, module(ModuleType.CAPACITOR));
+        var saved = entity.saveWithoutMetadata(h.getLevel().registryAccess());
+        saved.getCompound("items").putInt("Size", 4);
+        entity.loadWithComponents(saved, h.getLevel().registryAccess());
+        h.assertTrue(entity.items().getSlots() == 6, "a 0.1.0 save must expand to five sockets");
+        for (int slot = 1; slot <= 3; slot++) h.assertTrue(entity.items().getStackInSlot(slot).is(module(ModuleType.CAPACITOR).getItem()), "old socket lost its module");
+        entity.items().setStackInSlot(4, module(ModuleType.INDUCTION));
+        entity.items().setStackInSlot(5, module(ModuleType.COLLECTOR));
+        run(entity);
+        ItemStack gear = entity.items().getStackInSlot(0);
+        h.assertTrue(Modules.installed(gear).size() == 5 && Modules.count(gear, ModuleType.CAPACITOR) == 3, "all five modules must survive the migration and integrate");
         h.succeed();
     }
 
@@ -815,6 +859,48 @@ public final class ArsenalGameTests {
     }
 
     @GameTest(template = ARENA)
+    public static void canceledMiningDoesNotBreakNeighborsOrSpendEnergy(GameTestHelper h) {
+        ServerPlayer p = facingWall(h, Blocks.STONE);
+        ItemStack breaker = hold(p, new ItemStack(ArsenalItems.DEGENERACY_BREAKER.get()));
+        int before = Fe.stored(breaker);
+        java.util.function.Consumer<net.neoforged.neoforge.event.level.BlockEvent.BreakEvent> protect = event -> {
+            if (event.getPlayer() == p && event.getPos().equals(abs(h, 2, 2, 3))) event.setCanceled(true);
+        };
+        var bus = net.neoforged.neoforge.common.NeoForge.EVENT_BUS;
+        bus.addListener(net.neoforged.bus.api.EventPriority.LOWEST, protect);
+        try {
+            strike(h, p);
+            for (int x = 1; x <= 3; x++) for (int y = 1; y <= 3; y++)
+                h.assertBlockPresent(Blocks.STONE, new net.minecraft.core.BlockPos(x, y, 3));
+            h.assertTrue(Fe.stored(breaker) == before, "a canceled break must not cost FE");
+        } finally {
+            bus.unregister(protect);
+        }
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void protectedNeighborsDoNotCostMiningEnergy(GameTestHelper h) {
+        ServerPlayer p = facingWall(h, Blocks.STONE);
+        ItemStack breaker = hold(p, new ItemStack(ArsenalItems.DEGENERACY_BREAKER.get()));
+        int before = Fe.stored(breaker);
+        java.util.function.Consumer<net.neoforged.neoforge.event.level.BlockEvent.BreakEvent> protect = event -> {
+            if (event.getPlayer() == p && !event.getPos().equals(abs(h, 2, 2, 3))) event.setCanceled(true);
+        };
+        var bus = net.neoforged.neoforge.common.NeoForge.EVENT_BUS;
+        bus.addListener(protect);
+        try {
+            strike(h, p);
+            h.assertBlockPresent(Blocks.AIR, new net.minecraft.core.BlockPos(2, 2, 3));
+            h.assertBlockPresent(Blocks.STONE, new net.minecraft.core.BlockPos(1, 2, 3));
+            h.assertTrue(before - Fe.stored(breaker) == Rules.BREAKER_FE, "only the permitted block may cost FE: " + (before - Fe.stored(breaker)));
+        } finally {
+            bus.unregister(protect);
+        }
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
     public static void sawFellsLivingTreesButNotLogWalls(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 1.5);
         hold(p, new ItemStack(ArsenalItems.SHEAR_SAW.get()));
@@ -905,6 +991,35 @@ public final class ArsenalGameTests {
         h.succeed();
     }
 
+    @SuppressWarnings("unchecked")
+    @GameTest(template = ARENA)
+    public static void craftingPickPreservesSensitivityForClickAndShiftClick(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 2.5);
+        var tier = (net.minecraft.core.component.DataComponentType<Integer>) BuiltInRegistries.DATA_COMPONENT_TYPE.get(
+                ResourceLocation.fromNamespaceAndPath("singulo", "scanner_tier"));
+        for (boolean shift : new boolean[]{false, true}) {
+            p.getInventory().clearContent();
+            var menu = new net.minecraft.world.inventory.CraftingMenu(1, p.getInventory(),
+                    net.minecraft.world.inventory.ContainerLevelAccess.create(h.getLevel(), abs(h, 2, 1, 2)));
+            p.containerMenu = menu;
+            ItemStack scanner = singulo("neutrino_scanner");
+            scanner.set(tier, 3);
+            menu.getSlot(1).set(new ItemStack(ArsenalItems.FLUX_WEAVE.get()));
+            menu.getSlot(2).set(scanner);
+            menu.getSlot(3).set(new ItemStack(ArsenalItems.FLUX_WEAVE.get()));
+            menu.getSlot(5).set(singulo("superconducting_coil"));
+            menu.getSlot(8).set(singulo("white_ceramic_composite"));
+            h.assertTrue(menu.getSlot(0).getItem().is(ArsenalItems.SQUID_PICK.get()), "the real recipe must match");
+            menu.clicked(0, 0, shift ? net.minecraft.world.inventory.ClickType.QUICK_MOVE : net.minecraft.world.inventory.ClickType.PICKUP, p);
+            ItemStack crafted = shift ? p.getInventory().items.stream().filter(s -> s.is(ArsenalItems.SQUID_PICK.get())).findFirst().orElse(ItemStack.EMPTY) : menu.getCarried();
+            h.assertTrue(crafted.is(ArsenalItems.SQUID_PICK.get()) && io.github.genichimaruo.singuloarsenal.tool.SquidPickItem.tier(crafted) == 3,
+                    "crafted pick lost sensitivity; shift=" + shift);
+            h.assertTrue(menu.getSlot(2).getItem().isEmpty() && menu.getSlot(0).getItem().isEmpty(), "crafting must consume the scanner exactly once");
+        }
+        p.containerMenu = p.inventoryMenu;
+        h.succeed();
+    }
+
     @GameTest(template = ARENA)
     public static void canisterStoresPelletsAndFeedsGearFirst(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 2.5);
@@ -945,6 +1060,35 @@ public final class ArsenalGameTests {
         h.assertItemEntityNotPresent(net.minecraft.world.item.Items.RAW_IRON, at, 3);
         h.assertItemEntityPresent(net.minecraft.world.item.Items.COBBLESTONE, new net.minecraft.core.BlockPos(1, 1, 3), 2);
         h.assertTrue(before - Fe.stored(pick) == 2 * Rules.PICK_FE + Rules.SMELT_FE, "two blocks and one smelt: " + (before - Fe.stored(pick)));
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void smeltingKeepsOutputsThatExceedOneStack(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 2.5);
+        ItemStack pick = hold(p, new ItemStack(ArsenalItems.SQUID_PICK.get()));
+        Modules.install(pick, List.of(module(ModuleType.SMELTER)));
+        ItemStack input = new ItemStack(net.minecraft.world.item.Items.RAW_IRON, 40);
+        var recipe = h.getLevel().getRecipeManager().getRecipeFor(net.minecraft.world.item.crafting.RecipeType.SMELTING,
+                new net.minecraft.world.item.crafting.SingleRecipeInput(input), h.getLevel()).orElseThrow();
+        // Model a data pack recipe that yields two ingots per raw item, restoring it before any other test runs.
+        ItemStack result = recipe.value().getResultItem(h.getLevel().registryAccess());
+        int original = result.getCount();
+        int before = Fe.stored(pick);
+        try {
+            result.setCount(2);
+            Vec3 at = h.absoluteVec(new Vec3(2.5, 2, 3.5));
+            var drops = new java.util.ArrayList<net.minecraft.world.entity.item.ItemEntity>();
+            drops.add(new net.minecraft.world.entity.item.ItemEntity(h.getLevel(), at.x, at.y, at.z, input));
+            var event = new net.neoforged.neoforge.event.level.BlockDropsEvent(h.getLevel(), abs(h, 2, 2, 3), Blocks.IRON_ORE.defaultBlockState(), null, drops, p, pick.copy());
+            net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(event);
+            h.assertTrue(drops.stream().allMatch(d -> d.getItem().is(net.minecraft.world.item.Items.IRON_INGOT)
+                    && d.getItem().getCount() <= d.getItem().getMaxStackSize()), "smelting must produce valid ingot stacks");
+            h.assertTrue(drops.stream().mapToInt(d -> d.getItem().getCount()).sum() == 80, "smelting discarded output above the stack limit");
+            h.assertTrue(before - Fe.stored(pick) == 40 * Rules.SMELT_FE, "smelting must charge for inputs, not output stacks");
+        } finally {
+            result.setCount(original);
+        }
         h.succeed();
     }
 

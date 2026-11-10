@@ -57,7 +57,8 @@ public final class AccretionDrillItem extends PoweredTool {
         return switch (mode(stack)) {
             case Rules.DRILL_AREA -> Mining.square(player, stack, origin, state, 1);
             case Rules.DRILL_VEIN -> state.is(Tags.Blocks.ORES)
-                    ? Mining.connected(origin, pos -> level.getBlockState(pos).is(state.getBlock()), Rules.VEIN_LIMIT)
+                    ? Mining.connected(origin, pos -> level.isLoaded(pos) && level.getBlockState(pos).is(state.getBlock())
+                            && Mining.mayTake(level, stack, pos, level.getBlockState(pos), state, origin), Rules.VEIN_LIMIT)
                     : List.of();
             default -> List.of();
         };
