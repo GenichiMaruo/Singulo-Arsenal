@@ -36,6 +36,9 @@ public final class Canvas {
     private final int light;
     private final int overlay;
     private int pass;
+    private int coarseSides;
+    private int hoopGapFrom = -1, hoopGapTo = -1;
+    private int vertexAlpha = 255;
     private VertexConsumer out;
 
     private final boolean textured;
@@ -136,9 +139,10 @@ public final class Canvas {
         float x0 = (float) Math.min(ax, bx), x1 = (float) Math.max(ax, bx);
         float y0 = (float) Math.min(ay, by), y1 = (float) Math.max(ay, by);
         float z0 = (float) Math.min(az, bz), z1 = (float) Math.max(az, bz);
-        // Each plate starts somewhere different in the tile, on a whole texel, so neighbours do not repeat.
-        int seed = Math.floorMod(Math.round(x0 * 2) * 7 + Math.round(y0 * 2) * 13 + Math.round(z0 * 2) * 5 + Math.round((x1 - x0) * 3), materialSize);
         float w = x1 - x0, h = y1 - y0, d = z1 - z0;
+        // Each plate starts somewhere different in the tile, on a whole texel. Chosen from its size and colour, never its position:
+        // moving parts would otherwise have their texture jump every frame.
+        int seed = Math.floorMod(Math.round(w * 2) * 7 + Math.round(h * 2) * 13 + Math.round(d * 2) * 5 + rgb * 3, materialSize);
         panel(x0, y0, z0, w, 0, 0, 0, h, 0, 0, 0, -1, seed, rgb, bevel);
         panel(x0, y0, z1, w, 0, 0, 0, h, 0, 0, 0, 1, seed + 11, rgb, bevel);
         panel(x0, y0, z0, 0, 0, d, 0, h, 0, -1, 0, 0, seed + 5, rgb, bevel);
@@ -157,12 +161,18 @@ public final class Canvas {
             strip(ox, oy, oz, ux, uy, uz, vx, vy, vz, nx, ny, nz, seed, 0, width, 0, height, width, height, top, bottom);
             return;
         }
-        strip(ox, oy, oz, ux, uy, uz, vx, vy, vz, nx, ny, nz, seed, e, width - e, e, height - e, width, height, top, bottom);
         int high = shade(rgb, 1.28F), low = shade(rgb, 0.58F);
-        strip(ox, oy, oz, ux, uy, uz, vx, vy, vz, nx, ny, nz, seed, 0, width, 0, e, width, height, high, high);
-        strip(ox, oy, oz, ux, uy, uz, vx, vy, vz, nx, ny, nz, seed, 0, width, height - e, height, width, height, low, low);
-        strip(ox, oy, oz, ux, uy, uz, vx, vy, vz, nx, ny, nz, seed, 0, e, e, height - e, width, height, shade(top, 0.86F), shade(bottom, 0.86F));
-        strip(ox, oy, oz, ux, uy, uz, vx, vy, vz, nx, ny, nz, seed, width - e, width, e, height - e, width, height, shade(top, 0.78F), shade(bottom, 0.78F));
+        // Nine patches, every neighbour sharing whole edges. A long bevel strip beside short ones leaves T-junctions, and those open
+        // one-pixel cracks that sparkle as the object moves.
+        float[] across = {0, e, width - e, width}, down = {0, e, height - e, height};
+        for (int row = 0; row < 3; row++) {
+            for (int column = 0; column < 3; column++) {
+                float side = column == 0 ? 0.86F : column == 2 ? 0.78F : 1;
+                int upper = row == 0 ? high : row == 2 ? low : column == 1 ? top : shade(top, side);
+                int lower = row == 0 ? high : row == 2 ? low : column == 1 ? bottom : shade(bottom, side);
+                strip(ox, oy, oz, ux, uy, uz, vx, vy, vz, nx, ny, nz, seed, across[column], across[column + 1], down[row], down[row + 1], width, height, upper, lower);
+            }
+        }
     }
 
     private void strip(float ox, float oy, float oz, float ux, float uy, float uz, float vx, float vy, float vz, float nx, float ny, float nz,
@@ -213,15 +223,37 @@ public final class Canvas {
     }
 
     private void vertex(float x, float y, float z, float u, float v, float nx, float ny, float nz, int rgb, int lightmap) {
-        out.vertex(pose.last().pose(), x, y, z).color((rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255, 255)
+        out.vertex(pose.last().pose(), x, y, z).color((rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255, vertexAlpha)
                 .uv(u, v).overlayCoords(overlay).uv2(lightmap).normal(pose.last().normal(), nx, ny, nz).endVertex();
     }
 
     // ---- round things --------------------------------------------------------------------------------------------
 
+    /** Draws round parts as polygons of this many sides from here on: visibly faceted, at the same scale as the plates around them. */
+    public void coarse(int sides) {
+        coarseSides = sides;
+    }
+
     /** A solid hoop with a square section. Axis: 0 = X, 1 = Y, 2 = Z. */
     public void hoop(double cx, double cy, double cz, int axis, double radius, double half, int rgb) {
         if (pass == SOLID_PASS) torus(cx, cy, cz, axis, radius, half, rgb, light);
+    }
+
+    /** A hoop with a run of facets left out, so something inside it can be seen from that side. */
+    public void hoop(double cx, double cy, double cz, int axis, double radius, double half, int rgb, int openFrom, int openTo) {
+        hoopGapFrom = openFrom;
+        hoopGapTo = openTo;
+        hoop(cx, cy, cz, axis, radius, half, rgb);
+        hoopGapFrom = -1;
+        hoopGapTo = -1;
+    }
+
+    /** A pane of tinted glass. Like everything self-lit it writes no depth, so what lies behind it is still drawn. */
+    public void glass(double x0, double y0, double z0, double x1, double y1, double z1, int rgb, float alpha) {
+        if (pass != LIT_PASS) return;
+        vertexAlpha = Math.round(alpha * 255);
+        cuboid(x0, y0, z0, x1, y1, z1, rgb, LightTexture.FULL_BRIGHT);
+        vertexAlpha = 255;
     }
 
     public void litHoop(double cx, double cy, double cz, int axis, double radius, double half, int rgb) {
@@ -229,27 +261,36 @@ public final class Canvas {
     }
 
     private void torus(double cx, double cy, double cz, int axis, double radius, double half, int rgb, int lightmap) {
-        int segments = 28;
+        int segments = coarseSides > 0 ? coarseSides : 28;
         double in = radius - half, out2 = radius + half;
+        // Half a step round, so a polygon sits with flats, not corners, on the axes.
+        double start = coarseSides > 0 ? Math.PI / segments : 0;
+        float step = (float) (2 * radius * Math.sin(Math.PI / segments));
         for (int i = 0; i < segments; i++) {
-            double a = i * Math.PI * 2 / segments, b = (i + 1) * Math.PI * 2 / segments;
-            quadOnRing(cx, cy, cz, axis, a, b, in, -half, in, half, rgb, lightmap, -1);
-            quadOnRing(cx, cy, cz, axis, a, b, out2, half, out2, -half, rgb, lightmap, 1);
-            quadOnRing(cx, cy, cz, axis, a, b, in, half, out2, half, rgb, lightmap, 0);
-            quadOnRing(cx, cy, cz, axis, a, b, out2, -half, in, -half, rgb, lightmap, 0);
+            if (i >= hoopGapFrom && i <= hoopGapTo && hoopGapFrom >= 0) continue;
+            double a = start + i * Math.PI * 2 / segments, b = start + (i + 1) * Math.PI * 2 / segments;
+            float u = i * step;
+            quadOnRing(cx, cy, cz, axis, a, b, in, -half, in, half, rgb, lightmap, -1, u, step, (float) (2 * half));
+            quadOnRing(cx, cy, cz, axis, a, b, out2, half, out2, -half, rgb, lightmap, 1, u, step, (float) (2 * half));
+            quadOnRing(cx, cy, cz, axis, a, b, in, half, out2, half, rgb, lightmap, 0, u, step, (float) (2 * half));
+            quadOnRing(cx, cy, cz, axis, a, b, out2, -half, in, -half, rgb, lightmap, 0, u, step, (float) (2 * half));
         }
     }
 
-    private void quadOnRing(double cx, double cy, double cz, int axis, double a, double b, double r0, double h0, double r1, double h1, int rgb, int lightmap, int radialNormal) {
+    /** {@code u}, {@code width} and {@code height} are in model pixels. Rings take the material at half the plates' density, so they read as coarser castings. */
+    private void quadOnRing(double cx, double cy, double cz, int axis, double a, double b, double r0, double h0, double r1, double h1, int rgb, int lightmap, int radialNormal,
+                            float u, float width, float height) {
         float[] p0 = onRing(cx, cy, cz, axis, a, r0, h0), p1 = onRing(cx, cy, cz, axis, b, r0, h0);
         float[] p2 = onRing(cx, cy, cz, axis, b, r1, h1), p3 = onRing(cx, cy, cz, axis, a, r1, h1);
         float[] n = radialNormal != 0
                 ? onRing(0, 0, 0, axis, (a + b) / 2, radialNormal, 0)
                 : onRing(0, 0, 0, axis, 0, 0, Math.signum(h0));
-        vertex(p0[0], p0[1], p0[2], 0, 0, n[0], n[1], n[2], rgb, lightmap);
-        vertex(p1[0], p1[1], p1[2], 1, 0, n[0], n[1], n[2], rgb, lightmap);
-        vertex(p2[0], p2[1], p2[2], 1, 1, n[0], n[1], n[2], rgb, lightmap);
-        vertex(p3[0], p3[1], p3[2], 0, 1, n[0], n[1], n[2], rgb, lightmap);
+        float scale = Math.max(1, density / 2F) / materialSize;
+        float s0 = u * scale, s1 = (u + width) * scale, t0 = 0, t1 = height * scale;
+        vertex(p0[0], p0[1], p0[2], s0, t0, n[0], n[1], n[2], rgb, lightmap);
+        vertex(p1[0], p1[1], p1[2], s1, t0, n[0], n[1], n[2], rgb, lightmap);
+        vertex(p2[0], p2[1], p2[2], s1, t1, n[0], n[1], n[2], rgb, lightmap);
+        vertex(p3[0], p3[1], p3[2], s0, t1, n[0], n[1], n[2], rgb, lightmap);
     }
 
     private static float[] onRing(double cx, double cy, double cz, int axis, double angle, double radius, double along) {
@@ -261,24 +302,30 @@ public final class Canvas {
         };
     }
 
-    /** A soft additive ring: brightest at {@code radius}, fading to nothing over {@code width} each way. */
+    /** A volume of light round a hoop: nested square-section rings, brightest in the middle, solid from every side. */
     public void halo(double cx, double cy, double cz, int axis, double radius, double width, int rgb, float alpha) {
         if (pass != GLOW_PASS || alpha <= 0) return;
-        haloRing(pose, out, cx, cy, cz, axis, radius, width, rgb, alpha);
-    }
-
-    public static void haloRing(PoseStack pose, VertexConsumer out, double cx, double cy, double cz, int axis, double radius, double width, int rgb, float alpha) {
-        int segments = 48;
-        for (int i = 0; i < segments; i++) {
-            double a = i * Math.PI * 2 / segments, b = (i + 1) * Math.PI * 2 / segments;
-            for (int side = -1; side <= 1; side += 2) {
-                double outer = Math.max(0, radius + side * width);
-                glow(pose, out, onRing(cx, cy, cz, axis, a, radius, 0), rgb, alpha);
-                glow(pose, out, onRing(cx, cy, cz, axis, b, radius, 0), rgb, alpha);
-                glow(pose, out, onRing(cx, cy, cz, axis, b, outer, 0), rgb, 0);
-                glow(pose, out, onRing(cx, cy, cz, axis, a, outer, 0), rgb, 0);
+        int segments = coarseSides > 0 ? coarseSides : 32;
+        double start = coarseSides > 0 ? Math.PI / segments : 0;
+        for (int layer = 1; layer <= 3; layer++) {
+            double half = width * layer / 3 * 0.6;
+            float shade = alpha * (0.34F - 0.08F * layer);
+            for (int i = 0; i < segments; i++) {
+                double a = start + i * Math.PI * 2 / segments, b = start + (i + 1) * Math.PI * 2 / segments;
+                double in = Math.max(0, radius - half), out2 = radius + half;
+                glowQuad(cx, cy, cz, axis, a, b, in, -half, in, half, rgb, shade);
+                glowQuad(cx, cy, cz, axis, a, b, out2, -half, out2, half, rgb, shade);
+                glowQuad(cx, cy, cz, axis, a, b, in, half, out2, half, rgb, shade);
+                glowQuad(cx, cy, cz, axis, a, b, in, -half, out2, -half, rgb, shade);
             }
         }
+    }
+
+    private void glowQuad(double cx, double cy, double cz, int axis, double a, double b, double r0, double h0, double r1, double h1, int rgb, float alpha) {
+        glow(pose, out, onRing(cx, cy, cz, axis, a, r0, h0), rgb, alpha);
+        glow(pose, out, onRing(cx, cy, cz, axis, b, r0, h0), rgb, alpha);
+        glow(pose, out, onRing(cx, cy, cz, axis, b, r1, h1), rgb, alpha);
+        glow(pose, out, onRing(cx, cy, cz, axis, a, r1, h1), rgb, alpha);
     }
 
     private static void glow(PoseStack pose, VertexConsumer out, float[] p, int rgb, float alpha) {
@@ -289,7 +336,7 @@ public final class Canvas {
     /** A low-poly sphere, solid in the first pass. Used for event horizons, which are simply black. */
     public void sphere(double cx, double cy, double cz, double radius, int rgb) {
         if (pass != SOLID_PASS) return;
-        int rings = 16, sectors = 24;
+        int rings = coarseSides > 0 ? 4 : 16, sectors = coarseSides > 0 ? coarseSides : 24;
         for (int i = 0; i < rings; i++) {
             double a0 = Math.PI * i / rings, a1 = Math.PI * (i + 1) / rings;
             for (int j = 0; j < sectors; j++) {
@@ -320,15 +367,26 @@ public final class Canvas {
         pose.mulPose(new Quaternionf().setFromNormalized(new Matrix3f(x, y, z)));
     }
 
-    /** A soft additive band along Y at the given X and Z, fading to nothing at +-width: the glow of an energised edge. */
+    /** The glow of an energised edge: a volume of light along Y at the given X and Z, in nested boxes, brightest at the core. */
     public void softBand(double x, double y0, double y1, double z, double width, int rgb, float alpha) {
         if (pass != GLOW_PASS || alpha <= 0) return;
-        for (int side = -1; side <= 1; side += 2) {
-            glow(pose, out, new float[]{(float) x, (float) y0, (float) z}, rgb, alpha);
-            glow(pose, out, new float[]{(float) x, (float) y1, (float) z}, rgb, alpha);
-            glow(pose, out, new float[]{(float) (x + side * width), (float) y1, (float) z}, rgb, 0);
-            glow(pose, out, new float[]{(float) (x + side * width), (float) y0, (float) z}, rgb, 0);
+        double depth = Math.max(0.3, width * 0.3);
+        for (int layer = 1; layer <= 3; layer++) {
+            double w = width * layer / 3, d = depth * layer / 3;
+            float shade = alpha * (0.3F - 0.07F * layer);
+            float x0 = (float) (x - w), x1 = (float) (x + w), z0 = (float) (z - d), z1 = (float) (z + d), a = (float) y0, b = (float) y1;
+            glowFace(x0, a, z0, x0, b, z0, x1, b, z0, x1, a, z0, rgb, shade);
+            glowFace(x0, a, z1, x0, b, z1, x1, b, z1, x1, a, z1, rgb, shade);
+            glowFace(x0, a, z0, x0, b, z0, x0, b, z1, x0, a, z1, rgb, shade);
+            glowFace(x1, a, z0, x1, b, z0, x1, b, z1, x1, a, z1, rgb, shade);
         }
+    }
+
+    private void glowFace(float ax, float ay, float az, float bx, float by, float bz, float cx, float cy, float cz, float dx, float dy, float dz, int rgb, float alpha) {
+        glow(pose, out, new float[]{ax, ay, az}, rgb, alpha);
+        glow(pose, out, new float[]{bx, by, bz}, rgb, alpha);
+        glow(pose, out, new float[]{cx, cy, cz}, rgb, alpha);
+        glow(pose, out, new float[]{dx, dy, dz}, rgb, alpha);
     }
 
     /**
@@ -340,7 +398,7 @@ public final class Canvas {
         sphere(0, 0, 0, radius, 0x000000);
         if (pass != GLOW_PASS) return;
         double phase = t * 0.14;
-        int segments = 72;
+        int segments = coarseSides > 0 ? coarseSides * 2 : 72;
         for (int i = 0; i < segments; i++) {
             double a = i * Math.PI * 2 / segments, b = (i + 1) * Math.PI * 2 / segments;
             // Lensed image of the far disk: strongest over the top, thin underneath.
@@ -351,7 +409,7 @@ public final class Canvas {
         }
         // The disk seen nearly edge-on. Its near half is in front of the shadow, its far half behind it.
         double flatten = 0.24;
-        int bands = 5;
+        int bands = coarseSides > 0 ? 2 : 5;
         for (int band = 0; band < bands; band++) {
             double r0 = radius * (1.3 + (diskReach - 1.3) * band / bands), r1 = radius * (1.3 + (diskReach - 1.3) * (band + 1) / bands);
             float f0 = band / (float) bands, f1 = (band + 1) / (float) bands;
@@ -405,22 +463,53 @@ public final class Canvas {
         }
     }
 
-    /** A flat additive ring in world space, facing along {@code axis}. */
-    public static void worldRing(PoseStack pose, VertexConsumer out, Vec3 center, Vec3 axis, double radius, double width, int rgb, float alpha) {
-        if (alpha <= 0) return;
-        Vec3 u = perpendicular(axis), v = axis.cross(u).normalize();
-        int segments = 64;
-        for (int i = 0; i < segments; i++) {
-            double a = i * Math.PI * 2 / segments, b = (i + 1) * Math.PI * 2 / segments;
-            Vec3 p = u.scale(Math.cos(a)).add(v.scale(Math.sin(a))), q = u.scale(Math.cos(b)).add(v.scale(Math.sin(b)));
-            point(pose, out, center.add(p.scale(Math.max(0, radius - width))), rgb, 0);
-            point(pose, out, center.add(q.scale(Math.max(0, radius - width))), rgb, 0);
-            point(pose, out, center.add(q.scale(radius)), rgb, alpha);
-            point(pose, out, center.add(p.scale(radius)), rgb, alpha);
-            point(pose, out, center.add(p.scale(radius)), rgb, alpha);
-            point(pose, out, center.add(q.scale(radius)), rgb, alpha);
-            point(pose, out, center.add(q.scale(radius + width)), rgb, 0);
-            point(pose, out, center.add(p.scale(radius + width)), rgb, 0);
+    /** A ball of light, bright where it faces the camera and fading to nothing at its edge. */
+    public static void glowBall(PoseStack pose, VertexConsumer out, Vec3 center, double radius, int rgb, float alpha, Vec3 camera) {
+        ball(pose, out, center, radius, rgb, alpha, camera, false);
+    }
+
+    /** A bubble of light: clear in the middle and bright round its limb, so it reads as a thin spherical front. */
+    public static void glowShell(PoseStack pose, VertexConsumer out, Vec3 center, double radius, int rgb, float alpha, Vec3 camera) {
+        ball(pose, out, center, radius, rgb, alpha, camera, true);
+    }
+
+    private static void ball(PoseStack pose, VertexConsumer out, Vec3 center, double radius, int rgb, float alpha, Vec3 camera, boolean shell) {
+        if (alpha <= 0 || radius <= 0) return;
+        Vec3 view = camera.subtract(center);
+        view = view.lengthSqr() < 1.0E-6 ? new Vec3(0, 1, 0) : view.normalize();
+        // Large fronts are seen close up: keep their outline round.
+        int rings = radius > 3 ? 18 : 10, sectors = radius > 3 ? 36 : 18;
+        for (int i = 0; i < rings; i++) {
+            double a0 = Math.PI * i / rings, a1 = Math.PI * (i + 1) / rings;
+            for (int j = 0; j < sectors; j++) {
+                double b0 = Math.PI * 2 * j / sectors, b1 = Math.PI * 2 * (j + 1) / sectors;
+                ballPoint(pose, out, center, radius, a0, b0, rgb, alpha, view, shell);
+                ballPoint(pose, out, center, radius, a1, b0, rgb, alpha, view, shell);
+                ballPoint(pose, out, center, radius, a1, b1, rgb, alpha, view, shell);
+                ballPoint(pose, out, center, radius, a0, b1, rgb, alpha, view, shell);
+            }
+        }
+    }
+
+    private static void ballPoint(PoseStack pose, VertexConsumer out, Vec3 center, double radius, double polar, double azimuth, int rgb, float alpha, Vec3 view, boolean shell) {
+        Vec3 n = new Vec3(Math.sin(polar) * Math.cos(azimuth), Math.cos(polar), Math.sin(polar) * Math.sin(azimuth));
+        double facing = n.dot(view);
+        double k = shell ? Math.pow(1 - Math.abs(facing), 2.2) : Math.pow(Math.max(0, facing), 1.5);
+        point(pose, out, center.add(n.scale(radius)), rgb, alpha * (float) k);
+    }
+
+    /** A small self-lit cube of debris. */
+    public static void glowCube(PoseStack pose, VertexConsumer out, Vec3 c, double half, int rgb, float alpha) {
+        if (alpha <= 0 || half <= 0) return;
+        double[] s = {-half, half};
+        for (int axis = 0; axis < 3; axis++) {
+            for (double side : s) {
+                for (int[] corner : new int[][]{{0, 0}, {1, 0}, {1, 1}, {0, 1}}) {
+                    double u = s[corner[0]], v = s[corner[1]];
+                    Vec3 offset = axis == 0 ? new Vec3(side, u, v) : axis == 1 ? new Vec3(u, side, v) : new Vec3(u, v, side);
+                    point(pose, out, c.add(offset), rgb, alpha);
+                }
+            }
         }
     }
 

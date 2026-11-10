@@ -3,6 +3,8 @@ package io.github.genichimaruo.singuloarsenal.module;
 import io.github.genichimaruo.singuloarsenal.armor.SuitItem;
 import io.github.genichimaruo.singuloarsenal.core.ArsenalData;
 import io.github.genichimaruo.singuloarsenal.core.Rules;
+import io.github.genichimaruo.singuloarsenal.core.Tips;
+import io.github.genichimaruo.singuloarsenal.tool.PoweredTool;
 import io.github.genichimaruo.singuloarsenal.weapon.ArsenalWeapon;
 import java.util.ArrayList;
 import java.util.List;
@@ -19,6 +21,7 @@ public final class Modules {
     public static int slots(ItemStack gear) {
         if (gear.getItem() instanceof SuitItem suit) return Rules.moduleSlots(suit.set.stage);
         if (gear.getItem() instanceof ArsenalWeapon weapon) return Rules.moduleSlots(weapon.stage());
+        if (gear.getItem() instanceof PoweredTool tool) return Rules.moduleSlots(tool.stage());
         return 0;
     }
 
@@ -60,6 +63,6 @@ public final class Modules {
         if (slots == 0) return;
         List<ItemStack> modules = installed(gear);
         lines.add(Component.translatable("tooltip.singulo_arsenal.modules", modules.size(), slots).withStyle(ChatFormatting.BLUE));
-        for (ItemStack module : modules) lines.add(Component.literal(" - ").append(module.getHoverName()).withStyle(ChatFormatting.DARK_AQUA));
+        if (Tips.detail()) for (ItemStack module : modules) lines.add(Component.literal(" - ").append(module.getHoverName()).withStyle(ChatFormatting.DARK_AQUA));
     }
 }

@@ -1,15 +1,16 @@
 name: Build 1.20.1
 on:
   push:
-    branches: ['1.20.1', 'feature/**']
+    branches: ['1.20.1', 'feature/**', 'fix/**']
   pull_request:
     branches: ['1.20.1']
+  workflow_call:
 permissions:
   contents: read
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -28,7 +29,9 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: |
+            17
+            21
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -51,10 +54,15 @@ jobs:
         env:
           SINGULO_SOURCE: ${{ github.workspace }}/singulo-source
         run: ./gradlew --no-daemon --max-workers=4 build runGameTestServer -Ploader=${{ matrix.loader }} -PsinguloJar="$GITHUB_WORKSPACE/singulo-source/build/${{ matrix.loader }}/libs/Singulo-0.16.0-1.20.1${{ matrix.suffix }}.jar"
+      - name: Test release validation
+        run: python3 -m unittest discover -s tests -p 'test_release.py' -v
+      - name: Validate release JAR and changelog
+        id: release
+        run: python3 tools/prepare_release.py --loader ${{ matrix.loader }}
       - uses: actions/upload-artifact@v4
         with:
-          name: Singulo-Arsenal-0.1.0-1.20.1${{ matrix.suffix }}
-          path: build/${{ matrix.loader }}/libs/Singulo-Arsenal-0.1.0-1.20.1${{ matrix.suffix }}.jar
+          name: ${{ steps.release.outputs.artifact_name }}
+          path: ${{ steps.release.outputs.jar }}
           if-no-files-found: error
       - name: Save integration logs
         if: always()

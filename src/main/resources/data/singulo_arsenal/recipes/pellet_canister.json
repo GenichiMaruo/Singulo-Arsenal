@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    "PSP",
+    "P P",
+    "PCP"
+  ],
+  "key": {
+    "P": {
+      "item": "singulo:steel_plate"
+    },
+    "S": {
+      "item": "singulo:superconducting_coil"
+    },
+    "C": {
+      "item": "singulo:white_ceramic_composite"
+    }
+  },
+  "result": {
+    "item": "singulo_arsenal:pellet_canister",
+    "count": 1
+  }
+}

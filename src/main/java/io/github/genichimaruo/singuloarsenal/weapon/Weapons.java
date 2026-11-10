@@ -5,6 +5,7 @@ import io.github.genichimaruo.singuloarsenal.core.ArsenalData;
 import io.github.genichimaruo.singuloarsenal.core.Fe;
 import io.github.genichimaruo.singuloarsenal.core.Powered;
 import io.github.genichimaruo.singuloarsenal.core.Rules;
+import io.github.genichimaruo.singuloarsenal.core.Tips;
 import io.github.genichimaruo.singuloarsenal.module.ModuleType;
 import io.github.genichimaruo.singuloarsenal.module.Modules;
 import java.util.List;
@@ -13,6 +14,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.Entity;
@@ -20,6 +22,7 @@ import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 
@@ -34,16 +37,20 @@ public final class Weapons {
         MinecraftForge.EVENT_BUS.addListener(Weapons::incoming);
     }
 
-    static void describe(String id, ItemStack stack, int capacity, List<Component> lines) {
-        for (int i = 1; i <= 3; i++) {
-            lines.add(Component.translatable("tooltip.singulo_arsenal." + id + "." + i).withStyle(ChatFormatting.GRAY));
+    public static void describe(String id, ItemStack stack, int stage, List<Component> lines) {
+        lines.add(Component.translatable("tooltip.singulo_arsenal." + id + ".summary").withStyle(ChatFormatting.GRAY));
+        Tips.energyLine(stack, lines);
+        Modules.describe(stack, lines);
+        if (!Tips.detail()) {
+            Tips.hint(lines);
+            return;
         }
-        lines.add(Component.translatable("tooltip.singulo_arsenal.energy", Fe.stored(stack), Fe.capacity(stack)).withStyle(ChatFormatting.AQUA));
+        for (int i = 1; i <= 3; i++) lines.add(Component.translatable("tooltip.singulo_arsenal." + id + "." + i).withStyle(ChatFormatting.DARK_AQUA));
         if (stack.getItem() instanceof Powered powered && powered.accretes()) {
             lines.add(Component.translatable("tooltip.singulo_arsenal.accretion").withStyle(ChatFormatting.DARK_AQUA));
         }
         lines.add(Component.translatable("tooltip.singulo_arsenal.charge").withStyle(ChatFormatting.DARK_GRAY));
-        Modules.describe(stack, lines);
+        lines.add(Component.translatable("tooltip.singulo_arsenal.stage", stage).withStyle(ChatFormatting.GOLD));
     }
 
     /** A cooldown after this weapon's coolant modules. */
@@ -72,6 +79,11 @@ public final class Weapons {
     static void sound(Entity at, String singuloEvent, float volume, float pitch) {
         SoundEvent event = BuiltInRegistries.SOUND_EVENT.get(new ResourceLocation("singulo", singuloEvent));
         if (event != null) at.level().playSound(null, at.getX(), at.getY(), at.getZ(), event, SoundSource.PLAYERS, volume, pitch);
+    }
+
+    static void soundAt(ServerLevel level, Vec3 at, String singuloEvent, float volume, float pitch) {
+        SoundEvent event = BuiltInRegistries.SOUND_EVENT.get(new ResourceLocation("singulo", singuloEvent));
+        if (event != null) level.playSound(null, at.x, at.y, at.z, event, SoundSource.PLAYERS, volume, pitch);
     }
 
     /** Tidal stress decays by expiry, not per tick, so a mob nobody is fighting costs nothing. */

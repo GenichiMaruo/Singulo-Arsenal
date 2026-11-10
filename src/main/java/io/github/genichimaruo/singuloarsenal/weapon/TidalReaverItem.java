@@ -1,6 +1,7 @@
 package io.github.genichimaruo.singuloarsenal.weapon;
 
 import io.github.genichimaruo.singuloarsenal.core.ArsenalDamage;
+import io.github.genichimaruo.singuloarsenal.core.ArsenalData;
 import io.github.genichimaruo.singuloarsenal.core.Fe;
 import io.github.genichimaruo.singuloarsenal.core.Rules;
 import io.github.genichimaruo.singuloarsenal.net.FxPayload;
@@ -9,6 +10,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResultHolder;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -44,7 +46,21 @@ public final class TidalReaverItem extends PoweredSword {
             return InteractionResultHolder.fail(stack);
         }
         player.startUsingItem(hand);
+        if (!level.isClientSide) ArsenalData.set(stack, ArsenalData.FOCUS_START, level.getGameTime());
         return InteractionResultHolder.consume(stack);
+    }
+
+    /** How far the Roche focus has grown from 0 to 1, or -1 when it is closed. Read from the stack, so it is the same on every client. */
+    public static float focusProgress(ItemStack stack, long now, float partial) {
+        if (!ArsenalData.has(stack, ArsenalData.FOCUS_START)) return -1;
+        return Math.max(0, Math.min(1, (now - ArsenalData.time(stack, ArsenalData.FOCUS_START) + partial) / Rules.REAVER_MAX_HOLD));
+    }
+
+    /** Closes the focus however the hold ended: released, out of power, or the blade put away. */
+    @Override
+    public void inventoryTick(ItemStack stack, Level level, Entity entity, int slot, boolean selected) {
+        if (level.isClientSide || !ArsenalData.has(stack, ArsenalData.FOCUS_START) || !(entity instanceof LivingEntity holder)) return;
+        if (!holder.isUsingItem() || holder.getMainHandItem() != stack) ArsenalData.remove(stack, ArsenalData.FOCUS_START);
     }
 
     @Override
@@ -57,7 +73,6 @@ public final class TidalReaverItem extends PoweredSword {
             return;
         }
         if (held % 2 == 0) pull(player);
-        if (held % 20 == 0) Weapons.sound(player, "tidal_spindle_running", 0.9F, 0.8F);
     }
 
     private void pull(Player player) {
@@ -74,6 +89,7 @@ public final class TidalReaverItem extends PoweredSword {
 
     @Override
     public void releaseUsing(ItemStack stack, Level level, LivingEntity entity, int remaining) {
+        ArsenalData.remove(stack, ArsenalData.FOCUS_START);
         if (level instanceof ServerLevel server && entity instanceof Player player) {
             if (Rules.REAVER_MAX_HOLD - remaining >= Rules.REAVER_MIN_HOLD) shear(player, server);
             else player.getCooldowns().addCooldown(this, Rules.LANCE_SHORT_COOLDOWN);
@@ -82,6 +98,7 @@ public final class TidalReaverItem extends PoweredSword {
 
     @Override
     public ItemStack finishUsingItem(ItemStack stack, Level level, LivingEntity entity) {
+        ArsenalData.remove(stack, ArsenalData.FOCUS_START);
         if (level instanceof ServerLevel server && entity instanceof Player player) shear(player, server);
         return stack;
     }
@@ -100,7 +117,7 @@ public final class TidalReaverItem extends PoweredSword {
         player.getCooldowns().addCooldown(this, Weapons.cooled(player.getMainHandItem(), Rules.REAVER_COOLDOWN));
         Weapons.beginReload(player.getMainHandItem(), level.getGameTime(), Weapons.cooled(player.getMainHandItem(), Rules.REAVER_COOLDOWN));
         FxPayload.send(level, FxPayload.SHEAR, focus, player.getLookAngle(), (float) Rules.REAVER_RANGE);
-        Weapons.sound(player, "black_hole.devour", 1.8F, 1.1F);
+        Weapons.soundAt(level, focus, "jet_forge.pulse", 2F, 1.3F);
     }
 
     @Override

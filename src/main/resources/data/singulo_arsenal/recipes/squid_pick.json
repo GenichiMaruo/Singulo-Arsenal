@@ -1,0 +1,27 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    "WNW",
+    " S ",
+    " C "
+  ],
+  "key": {
+    "W": {
+      "item": "singulo_arsenal:flux_weave"
+    },
+    "N": {
+      "item": "singulo:neutrino_scanner"
+    },
+    "S": {
+      "item": "singulo:superconducting_coil"
+    },
+    "C": {
+      "item": "singulo:white_ceramic_composite"
+    }
+  },
+  "result": {
+    "item": "singulo_arsenal:squid_pick",
+    "count": 1
+  }
+}

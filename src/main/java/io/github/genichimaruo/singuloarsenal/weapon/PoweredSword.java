@@ -2,7 +2,6 @@ package io.github.genichimaruo.singuloarsenal.weapon;
 
 import io.github.genichimaruo.singuloarsenal.core.Fe;
 import java.util.List;
-import net.minecraft.ChatFormatting;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionResult;
@@ -33,8 +32,7 @@ abstract class PoweredSword extends SwordItem implements ArsenalWeapon {
 
     @Override
     public void appendHoverText(ItemStack stack, net.minecraft.world.level.Level context, List<Component> lines, TooltipFlag flag) {
-        lines.add(Component.translatable("tooltip.singulo_arsenal.stage", stage).withStyle(ChatFormatting.GOLD));
-        Weapons.describe(BuiltInRegistries.ITEM.getKey(this).getPath(), stack, capacity, lines);
+        Weapons.describe(BuiltInRegistries.ITEM.getKey(this).getPath(), stack, stage, lines);
     }
     @Override public void initializeClient(java.util.function.Consumer<net.minecraftforge.client.extensions.common.IClientItemExtensions> consumer) {
         io.github.genichimaruo.singuloarsenal.client.ArsenalClient.extensions(consumer);

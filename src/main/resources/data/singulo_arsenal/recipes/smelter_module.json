@@ -1,0 +1,37 @@
+{
+  "type": "singulo:machine",
+  "station": "precision_assembler",
+  "stage": 3,
+  "time": 200,
+  "energy": 400,
+  "ingredients": [
+    {
+      "ingredient": {
+        "item": "singulo:heat_exchange_core"
+      },
+      "count": 2
+    },
+    {
+      "ingredient": {
+        "item": "singulo:white_ceramic_composite"
+      },
+      "count": 2
+    },
+    {
+      "ingredient": {
+        "item": "singulo:steel_plate"
+      },
+      "count": 2
+    },
+    {
+      "ingredient": {
+        "item": "singulo:superconducting_wire"
+      },
+      "count": 1
+    }
+  ],
+  "result": {
+    "item": "singulo_arsenal:smelter_module",
+    "count": 1
+  }
+}
