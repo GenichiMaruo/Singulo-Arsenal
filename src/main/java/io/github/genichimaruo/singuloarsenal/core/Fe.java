@@ -68,7 +68,7 @@ public final class Fe {
             int wanted = own.receiveEnergy(Rules.chargeRequest(capacity(stack)), true);
             int got = source.extractEnergy(wanted, false);
             own.receiveEnergy(got, false);
-            player.displayClientMessage(Component.translatable("message.singulo_arsenal.charged", got, stored(stack)), true);
+            player.displayClientMessage(Component.translatable("message.singulo_arsenal.charged", Rules.compactEnergy(got), Rules.compactEnergy(stored(stack))), true);
         }
         return InteractionResult.sidedSuccess(context.getLevel().isClientSide);
     }
@@ -77,6 +77,11 @@ public final class Fe {
     public static boolean accrete(Player player, ItemStack gear) {
         if (!(gear.getItem() instanceof Powered powered) || !powered.accretes()) return false;
         if (!Rules.canAccrete(stored(gear), capacity(gear))) return false;
+        // Canisters first: they exist to be drawn on, and loose pellets may be wanted for crafting.
+        if (PelletCanisterItem.draw(player)) {
+            set(gear, stored(gear) + Rules.PELLET_FE);
+            return true;
+        }
         for (ItemStack fuel : player.getInventory().items) {
             if (fuel.is(MASS_PELLET.get())) {
                 fuel.shrink(1);

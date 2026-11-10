@@ -1,74 +1,144 @@
 package io.github.genichimaruo.singuloarsenal.client;
 
+import io.github.genichimaruo.singuloarsenal.ArsenalItems;
+import io.github.genichimaruo.singuloarsenal.armor.ArmorSet;
+import io.github.genichimaruo.singuloarsenal.core.Rules;
+import io.github.genichimaruo.singuloarsenal.core.Tips;
+import io.github.genichimaruo.singuloarsenal.module.IntegratorBlockEntity;
 import io.github.genichimaruo.singuloarsenal.module.IntegratorMenu;
+import java.util.ArrayList;
+import java.util.List;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.ArmorItem;
+import net.minecraft.world.item.ItemStack;
 
-/** Drawn with plain fills: a gear bed in the middle, sockets around it, and lines showing which sockets this gear actually has. */
+/** Laid out by Singulo's rules: header with a status chip, the machine's own part, a groove, the inventory. Numbers are icons and values; sentences live in tooltips. */
 public final class IntegratorScreen extends AbstractContainerScreen<IntegratorMenu> {
-    private static final int PANEL = 0xFF23212C, EDGE = 0xFF0F0E15, RIM = 0xFF4C4860, SLOT = 0xFF14131B, ACCENT = 0xFF7CE8FF, LOCKED = 0xFF2C2A36;
+    private static final int BAR_X = 11, BAR_Y = 24, BAR_W = 6, BAR_H = 58;
+    private static final int ARROW_X = IntegratorMenu.ARROW_X, ARROW_Y = IntegratorMenu.ARROW_Y;
+    private static final int BUTTON_X = 96, BUTTON_Y = 62, BUTTON_W = 54, BUTTON_H = 15;
+    private static final int STAT_Y = 72, COST_X = 26, TIME_X = 62;
+    private final ItemStack ghost;
 
     public IntegratorScreen(IntegratorMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
-        imageWidth = 176;
-        imageHeight = 166;
-        inventoryLabelY = 73;
+        imageWidth = IntegratorMenu.WIDTH;
+        imageHeight = IntegratorMenu.HEIGHT;
+        titleLabelX = 8;
+        titleLabelY = 6;
+        inventoryLabelX = IntegratorMenu.INVENTORY_X;
+        inventoryLabelY = imageHeight - 93;
+        ghost = new ItemStack(ArsenalItems.SUITS.get(ArmorSet.COLLAPSAR).get(ArmorItem.Type.CHESTPLATE).get());
+    }
+
+    private record State(GuiKit.Status icon, int color, String key) {}
+
+    private State state() {
+        if (menu.working()) {
+            return menu.energyStored() >= Rules.INTEGRATE_FE_PER_TICK ? new State(GuiKit.Status.RUN, GuiKit.OK, "running") : new State(GuiKit.Status.NO_POWER, GuiKit.WARN, "no_power");
+        }
+        if (menu.gear().isEmpty()) return new State(GuiKit.Status.IDLE, GuiKit.IDLE, "empty");
+        if (!menu.valid()) return new State(GuiKit.Status.WARN, GuiKit.BAD, "invalid");
+        return new State(GuiKit.Status.IDLE, GuiKit.IDLE, "ready");
+    }
+
+    private static MutableComponent line(String key, Object... args) {
+        return Component.translatable("screen.singulo_arsenal." + key, args);
+    }
+
+    private GuiKit.Press buttonState(int mouseX, int mouseY) {
+        if (!menu.canStart()) return GuiKit.Press.DISABLED;
+        return GuiKit.inside(mouseX, mouseY, leftPos + BUTTON_X, topPos + BUTTON_Y, BUTTON_W, BUTTON_H) ? GuiKit.Press.HOVER : GuiKit.Press.NORMAL;
     }
 
     @Override
-    protected void init() {
-        super.init();
-        addRenderableWidget(Button.builder(Component.translatable("screen.singulo_arsenal.integrate"), b -> {
-            if (minecraft != null && minecraft.gameMode != null) minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 0);
-        }).bounds(leftPos + 116, topPos + 58, 52, 18).build());
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (button == 0 && menu.canStart() && GuiKit.inside(mouseX, mouseY, leftPos + BUTTON_X, topPos + BUTTON_Y, BUTTON_W, BUTTON_H)) {
+            if (minecraft != null && minecraft.gameMode != null) {
+                minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 0);
+                minecraft.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1));
+            }
+            return true;
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override
     public void render(GuiGraphics gui, int mouseX, int mouseY, float partial) {
         super.render(gui, mouseX, mouseY, partial);
         renderTooltip(gui, mouseX, mouseY);
+        List<Component> tip = hovered(mouseX, mouseY);
+        if (!tip.isEmpty() && hoveredSlot == null) GuiKit.tooltip(gui, font, tip, 200, mouseX, mouseY);
+    }
+
+    private List<Component> hovered(int mouseX, int mouseY) {
+        int x = leftPos, y = topPos;
+        if (GuiKit.inside(mouseX, mouseY, x + BAR_X - 1, y + BAR_Y - 1, BAR_W + 2, BAR_H + 2)) {
+            List<Component> lines = new ArrayList<>();
+            lines.add(line("energy", Tips.energy(menu.energyStored()), Tips.energy(Rules.INTEGRATOR_CAPACITY)));
+            if (!Tips.detail()) Tips.hint(lines);
+            return lines;
+        }
+        int chipRight = imageWidth - 6;
+        if (GuiKit.inside(mouseX, mouseY, x + chipRight - GuiKit.CHIP_WIDTH, y + GuiKit.POWER_Y, GuiKit.CHIP_WIDTH, 11)) {
+            State state = state();
+            return List.of(line("status." + state.key).withStyle(s -> s.withColor(state.color)));
+        }
+        if (GuiKit.inside(mouseX, mouseY, x + COST_X, y + STAT_Y - 1, 34, 10)) return List.of(line("cost"));
+        if (GuiKit.inside(mouseX, mouseY, x + TIME_X, y + STAT_Y - 1, 24, 10)) return List.of(line("time"));
+        return List.of();
     }
 
     @Override
     protected void renderBg(GuiGraphics gui, float partial, int mouseX, int mouseY) {
         int x = leftPos, y = topPos;
-        gui.fill(x, y, x + imageWidth, y + imageHeight, EDGE);
-        gui.fill(x + 1, y + 1, x + imageWidth - 1, y + imageHeight - 1, RIM);
-        gui.fill(x + 3, y + 3, x + imageWidth - 3, y + imageHeight - 3, PANEL);
-        gui.fill(x + 3, y + 3, x + imageWidth - 3, y + 4, 0xFF6A6480);
+        GuiKit.frame(gui, x, y, imageWidth, imageHeight);
+        GuiKit.header(gui, x, y, imageWidth);
+        GuiKit.groove(gui, x + 7, y + imageHeight - 96, imageWidth - 14);
 
-        // Conduits from the bed to each socket, lit once the gear has that socket.
-        int cx = x + IntegratorMenu.POSITIONS[0][0] + 8, cy = y + IntegratorMenu.POSITIONS[0][1] + 8;
-        for (int socket = 0; socket < 3; socket++) {
-            int[] p = IntegratorMenu.POSITIONS[socket + 1];
-            int sx = x + p[0] + 8, sy = y + p[1] + 8;
-            int color = menu.socketOpen(socket) ? (menu.working() ? 0xFFFFFFFF : ACCENT) : LOCKED;
-            gui.fill(Math.min(cx, sx) - 1, Math.min(cy, sy) - 1, Math.max(cx, sx) + 1, Math.max(cy, sy) + 1, color);
-        }
+        GuiKit.gauge(gui, x + BAR_X, y + BAR_Y, BAR_W, BAR_H, (double) menu.energyStored() / Rules.INTEGRATOR_CAPACITY, GuiKit.GLOW);
+        GuiKit.arrow(gui, x + ARROW_X, y + ARROW_Y, menu.progress() / 100D);
+
         for (int i = 0; i < menu.slots.size(); i++) {
             Slot slot = menu.slots.get(i);
-            boolean locked = i >= 1 && i <= 3 && !menu.socketOpen(i - 1);
-            gui.fill(x + slot.x - 1, y + slot.y - 1, x + slot.x + 17, y + slot.y + 17, i == 0 ? ACCENT : i <= 3 && !locked ? 0xFF5FB9D0 : RIM);
-            gui.fill(x + slot.x, y + slot.y, x + slot.x + 16, y + slot.y + 16, locked ? LOCKED : SLOT);
+            int sx = x + slot.x, sy = y + slot.y;
+            boolean socket = i >= IntegratorBlockEntity.FIRST_SOCKET && i < IntegratorBlockEntity.SLOTS;
+            if (socket && !menu.socketOpen(i - IntegratorBlockEntity.FIRST_SOCKET) && !slot.hasItem()) {
+                GuiKit.lockedSlot(gui, sx, sy);
+            } else {
+                GuiKit.slot(gui, sx, sy);
+                if (socket && slot.hasItem() && !menu.socketHolds(i - IntegratorBlockEntity.FIRST_SOCKET)) gui.renderOutline(sx - 1, sy - 1, 18, 18, GuiKit.BAD);
+            }
         }
-        // Stored FE on the left, integration progress under the bed.
-        int barX = x + 12, barTop = y + 20, barHeight = 50;
-        gui.fill(barX - 1, barTop - 1, barX + 9, barTop + barHeight + 1, RIM);
-        gui.fill(barX, barTop, barX + 8, barTop + barHeight, SLOT);
-        int filled = barHeight * menu.energy() / 100;
-        gui.fill(barX, barTop + barHeight - filled, barX + 8, barTop + barHeight, 0xFFFFC36B);
-        int px = x + 44, py = y + 20;
-        gui.fill(px, py, px + 88, py + 3, SLOT);
-        gui.fill(px, py, px + 88 * menu.progress() / 100, py + 3, ACCENT);
+        if (!menu.slots.get(IntegratorBlockEntity.GEAR).hasItem()) {
+            Slot bed = menu.slots.get(IntegratorBlockEntity.GEAR);
+            gui.pose().pushPose();
+            gui.renderItem(ghost, x + bed.x, y + bed.y);
+            gui.pose().translate(0, 0, 200);
+            gui.fill(x + bed.x, y + bed.y, x + bed.x + 16, y + bed.y + 16, 0xA05A646E);
+            gui.pose().popPose();
+        }
+
+        GuiKit.labelButton(gui, font, x + BUTTON_X, y + BUTTON_Y, BUTTON_W, BUTTON_H, line("integrate"), buttonState(mouseX, mouseY));
+
+        GuiKit.bolt(gui, x + COST_X, y + STAT_Y, GuiKit.WARN);
+        gui.drawString(font, Rules.compactEnergy((long) Rules.INTEGRATE_TICKS * Rules.INTEGRATE_FE_PER_TICK), x + COST_X + 10, y + STAT_Y, GuiKit.TEXT, false);
+        GuiKit.hourglass(gui, x + TIME_X, y + STAT_Y, GuiKit.DIM);
+        gui.drawString(font, Rules.INTEGRATE_TICKS / 20 + "s", x + TIME_X + 10, y + STAT_Y, GuiKit.TEXT, false);
     }
 
     @Override
     protected void renderLabels(GuiGraphics gui, int mouseX, int mouseY) {
-        gui.drawString(font, title, titleLabelX, titleLabelY, 0xFFE9EEF2, false);
-        gui.drawString(font, playerInventoryTitle, inventoryLabelX, inventoryLabelY, 0xFFB9B5C8, false);
+        gui.drawString(font, title, titleLabelX, titleLabelY, GuiKit.TEXT, false);
+        gui.drawString(font, playerInventoryTitle, inventoryLabelX, inventoryLabelY, GuiKit.TEXT, false);
+        State state = state();
+        GuiKit.chip(gui, imageWidth - 6, GuiKit.POWER_Y, state.icon, state.color);
     }
 }

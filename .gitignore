@@ -7,6 +7,13 @@ libs/
 .vscode/
 __pycache__/
 *.pyc
-/tmp/pdfs/
+/tmp/
+# Output of the VS Code / Eclipse Java tooling, and local exports
+bin/
+/output/
+.project
+.classpath
+.settings/
+.factorypath
 .local/
 /Singulo-*.jar

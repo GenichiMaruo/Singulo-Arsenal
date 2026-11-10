@@ -5,6 +5,10 @@ import io.github.genichimaruo.singuloarsenal.armor.SuitItem;
 import io.github.genichimaruo.singuloarsenal.core.Fe;
 import io.github.genichimaruo.singuloarsenal.core.Powered;
 import io.github.genichimaruo.singuloarsenal.module.ModuleContent;
+import io.github.genichimaruo.singuloarsenal.tool.AccretionDrillItem;
+import io.github.genichimaruo.singuloarsenal.tool.DegeneracyBreakerItem;
+import io.github.genichimaruo.singuloarsenal.tool.ShearSawItem;
+import io.github.genichimaruo.singuloarsenal.tool.SquidPickItem;
 import io.github.genichimaruo.singuloarsenal.weapon.CasimirBladeItem;
 import io.github.genichimaruo.singuloarsenal.weapon.JetLanceItem;
 import io.github.genichimaruo.singuloarsenal.weapon.QuenchSaberItem;
@@ -49,6 +53,13 @@ public final class ArsenalItems {
     public static final DeferredItem<TidalReaverItem> TIDAL_REAVER = ITEMS.register("tidal_reaver", TidalReaverItem::new);
     public static final DeferredItem<JetLanceItem> JET_LANCE = ITEMS.register("jet_lance", JetLanceItem::new);
 
+    public static final DeferredItem<SquidPickItem> SQUID_PICK = ITEMS.register("squid_pick", SquidPickItem::new);
+    public static final DeferredItem<DegeneracyBreakerItem> DEGENERACY_BREAKER = ITEMS.register("degeneracy_breaker", DegeneracyBreakerItem::new);
+    public static final DeferredItem<ShearSawItem> SHEAR_SAW = ITEMS.register("shear_saw", ShearSawItem::new);
+    public static final DeferredItem<AccretionDrillItem> ACCRETION_DRILL = ITEMS.register("accretion_drill", AccretionDrillItem::new);
+    public static final DeferredItem<io.github.genichimaruo.singuloarsenal.core.PelletCanisterItem> PELLET_CANISTER =
+            ITEMS.register("pellet_canister", io.github.genichimaruo.singuloarsenal.core.PelletCanisterItem::new);
+
     static {
         // The suit is drawn by SuitLayer, so the material has no texture layers. Its sound is silent because vanilla
         // replays the equip sound whenever a worn stack's components change, which here is every FE payment.
@@ -73,7 +84,7 @@ public final class ArsenalItems {
         }
         TABS.register("arsenal", () -> CreativeModeTab.builder()
                 .title(Component.translatable("itemGroup.singulo_arsenal"))
-                .icon(() -> new ItemStack(JET_LANCE.get()))
+                .icon(() -> new ItemStack(ModuleContent.INTEGRATOR_ITEM.get()))
                 .displayItems((params, output) -> {
                     for (ArmorSet set : ArmorSet.values()) {
                         for (ArmorItem.Type type : PIECES) output.accept(charged(SUITS.get(set).get(type).get()));
@@ -82,6 +93,11 @@ public final class ArsenalItems {
                     output.accept(charged(CASIMIR_BLADE.get()));
                     output.accept(charged(TIDAL_REAVER.get()));
                     output.accept(charged(JET_LANCE.get()));
+                    output.accept(charged(SQUID_PICK.get()));
+                    output.accept(charged(DEGENERACY_BREAKER.get()));
+                    output.accept(charged(SHEAR_SAW.get()));
+                    output.accept(charged(ACCRETION_DRILL.get()));
+                    output.accept(PELLET_CANISTER.get());
                     output.accept(FLUX_WEAVE.get());
                     output.accept(PRESSURE_LATTICE.get());
                     output.accept(COLLAPSAR_LAMINA.get());

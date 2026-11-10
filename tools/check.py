@@ -16,10 +16,12 @@ RES = ROOT / 'src/main/resources'
 SETS = ['meissner', 'degeneracy', 'collapsar']
 PARTS = ['helmet', 'chestplate', 'leggings', 'boots']
 WEAPONS = ['quench_saber', 'casimir_blade', 'tidal_reaver', 'jet_lance']
+TOOLS = ['squid_pick', 'degeneracy_breaker', 'shear_saw', 'accretion_drill']
 MATERIALS = ['flux_weave', 'pressure_lattice', 'collapsar_lamina', 'jet_collimator', 'tidal_edge']
-MODULES = ['bit_drone_module', 'capacitor_module', 'plating_module', 'thruster_module', 'coolant_module', 'amplifier_module']
-GEAR = [f'{s}_{p}' for s in SETS for p in PARTS] + WEAPONS + ['module_integrator']
-ITEMS = GEAR + MATERIALS + MODULES
+MODULES = ['bit_drone_module', 'capacitor_module', 'plating_module', 'thruster_module', 'coolant_module', 'amplifier_module', 'metric_drive_module', 'meltdown_module', 'overclock_module', 'smelter_module', 'induction_module', 'collector_module']
+GEAR = [f'{s}_{p}' for s in SETS for p in PARTS] + WEAPONS + TOOLS + ['module_integrator']
+CONTAINERS = ['pellet_canister']
+ITEMS = GEAR + MATERIALS + MODULES + CONTAINERS
 
 javac = str(Path(os.environ['JAVA_HOME']) / 'bin/javac') if os.environ.get('JAVA_HOME') else shutil.which('javac')
 java = str(Path(os.environ['JAVA_HOME']) / 'bin/java') if os.environ.get('JAVA_HOME') else shutil.which('java')
@@ -63,12 +65,19 @@ for item in ITEMS:
         limit = {'accretion_jet_forge': 3, 'degenerate_compactor': 3, 'tidal_spindle': 2, 'precision_assembler': 6}[recipe['station']]
         assert len(recipe['ingredients']) <= limit, f'{item}: too many inputs for {recipe["station"]}'
 
+for module in MODULES:
+    assert f'tooltip.singulo_arsenal.{module}.detail' in locales[0], module
+# The default tooltip stays one short line; anything longer belongs behind Shift.
+for key, text in locales[0].items():
+    if key.endswith('.summary') or re.fullmatch(r'tooltip\.singulo_arsenal\.[a-z_]+_module', key):
+        assert len(text) <= 20, f'summary too long: {key}'
 for suit in SETS:
     for part in PARTS:
         assert f'tooltip.singulo_arsenal.{suit}.{part}' in locales[0], f'{suit}.{part}'
+        assert f'tooltip.singulo_arsenal.{suit}.{part}.summary' in locales[0], f'{suit}.{part} summary'
     assert f'tooltip.singulo_arsenal.full_set.{suit}' in locales[0], suit
-for weapon in WEAPONS:
-    for line in (1, 2, 3):
+for weapon in WEAPONS + TOOLS:
+    for line in (1, 2, 3, 'summary'):
         assert f'tooltip.singulo_arsenal.{weapon}.{line}' in locales[0], weapon
 
 # Materials tile at one texel per model pixel; Canvas.MATERIAL_SIZE assumes 32.

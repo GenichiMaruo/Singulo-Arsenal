@@ -7,10 +7,16 @@ import io.github.genichimaruo.singuloarsenal.client.art.Canvas;
 import io.github.genichimaruo.singuloarsenal.client.art.MachineArt;
 import io.github.genichimaruo.singuloarsenal.client.art.SuitArt;
 import io.github.genichimaruo.singuloarsenal.client.art.SuitArt.Piece;
+import io.github.genichimaruo.singuloarsenal.client.art.ToolArt;
 import io.github.genichimaruo.singuloarsenal.client.art.WeaponArt;
 import io.github.genichimaruo.singuloarsenal.core.ArsenalData;
 import io.github.genichimaruo.singuloarsenal.module.ModuleContent;
+import io.github.genichimaruo.singuloarsenal.core.Fe;
 import io.github.genichimaruo.singuloarsenal.core.Rules;
+import io.github.genichimaruo.singuloarsenal.tool.DegeneracyBreakerItem;
+import io.github.genichimaruo.singuloarsenal.tool.PoweredTool;
+import io.github.genichimaruo.singuloarsenal.tool.ShearSawItem;
+import io.github.genichimaruo.singuloarsenal.tool.SquidPickItem;
 import io.github.genichimaruo.singuloarsenal.weapon.CasimirBladeItem;
 import io.github.genichimaruo.singuloarsenal.weapon.JetLanceItem;
 import io.github.genichimaruo.singuloarsenal.weapon.QuenchSaberItem;
@@ -26,6 +32,8 @@ import net.minecraft.world.item.ItemStack;
 
 /** Renders gear as items, including inventory icons, from the same geometry that is worn, so an icon can never disagree with the model. */
 public final class GearRenderer extends BlockEntityWithoutLevelRenderer {
+    private static final java.util.Map<Integer, Long> LAST_WORK = new java.util.HashMap<>();
+
     public GearRenderer() {
         super(Minecraft.getInstance().getBlockEntityRenderDispatcher(), Minecraft.getInstance().getEntityModels());
     }
@@ -83,21 +91,40 @@ public final class GearRenderer extends BlockEntityWithoutLevelRenderer {
             float closing = armed ? 1 : Math.max(use, reload >= 0 ? 1 - reload : 0);
             Canvas.drawFine(pose, buffers, t, light, overlay, world, c -> WeaponArt.casimir(c, closing, armed, t));
         } else if (stack.getItem() instanceof TidalReaverItem) {
-            float use = using ? Math.min(1, (ticks + partial) / Rules.REAVER_MAX_HOLD) : 0;
+            float use = Math.max(0, owner != null ? TidalReaverItem.focusProgress(stack, now, partial) : 0);
             if (context.firstPerson()) {
                 // Drawn back while the focus builds, and snapped through on the shear.
                 float strike = reload >= 0 && reload < 0.1F ? 1 - reload / 0.1F : 0;
                 pose.mulPose(Axis.XP.rotationDegrees(-22 * use + 34 * strike));
             }
             Canvas.drawFine(pose, buffers, t, light, overlay, world, c -> WeaponArt.reaver(c, use, reload, t));
+            if (owner != null && world) FxClient.heldHole(pose, context, 0, 6, 0, (0.55F + use * 0.25F) * (reload >= 0 ? Math.min(1, reload * 1.15F) : 1));
+        } else if (stack.getItem() instanceof PoweredTool) {
+            var mc = Minecraft.getInstance();
+            boolean working = owner != null && world && (owner.swinging || (owner == mc.player && mc.gameMode != null && mc.gameMode.isDestroying()));
+            if (working) LAST_WORK.put(owner.getId(), now);
+            // Swings come in pulses. Held on across the gaps, or the lights and the bit would blink with every one.
+            boolean running = owner != null && world && Fe.stored(stack) > 0 && now - LAST_WORK.getOrDefault(owner.getId(), Long.MIN_VALUE / 2) <= 8;
+            Canvas.drawFine(pose, buffers, t, light, overlay, world, c -> {
+                if (stack.getItem() instanceof SquidPickItem) ToolArt.squidPick(c);
+                else if (stack.getItem() instanceof DegeneracyBreakerItem) ToolArt.degeneracyBreaker(c);
+                else if (stack.getItem() instanceof ShearSawItem) ToolArt.shearSaw(c, running, t);
+                else ToolArt.accretionDrill(c, running, t);
+            });
         } else if (stack.getItem() instanceof JetLanceItem) {
-            float held = using ? ticks + partial : 0;
-            float ignition = using ? Math.min(1, held / Rules.LANCE_COLLIMATE) : 0;
+            float jet = owner != null && world ? JetLanceItem.jetAge(stack, now, partial) : -1;
+            float charge = owner != null && world ? JetLanceItem.chargeProgress(stack, now, partial) : -1;
+            float ignition = jet >= 0 ? 1 : Math.max(0, charge);
+            boolean leftHanded = context == ItemDisplayContext.FIRST_PERSON_LEFT_HAND || context == ItemDisplayContext.THIRD_PERSON_LEFT_HAND;
             if (owner != null && world) {
                 FxClient.aimLance(owner, pose, context, partial);
                 boolean firstPerson = context.firstPerson();
                 // Recoil runs straight back along the barrel, so the beam stays on its axis.
-                pose.translate(0, -(firstPerson ? 1.6F : 0.8F) * (using ? Rules.lanceKick(held) : 0), 0);
+                pose.translate(0, -(firstPerson ? 1.6F : 0.8F) * Rules.lanceKick(jet), 0);
+                if (reload >= 0 && !firstPerson) {
+                    // Drawn in toward the chest while the support hand works on it: at arm's length the magazine is out of reach.
+                    pose.translate(0, -9 * Rules.reloadReach(reload), 0);
+                }
                 if (reload >= 0) {
                     // Muzzle up and rolled so the magazine well faces the support hand.
                     float tilt = Rules.reloadTilt(reload) * (firstPerson ? 1 : 0.55F);
@@ -105,8 +132,8 @@ public final class GearRenderer extends BlockEntityWithoutLevelRenderer {
                     pose.mulPose(Axis.YP.rotationDegrees((owner.getMainArm() == net.minecraft.world.entity.HumanoidArm.RIGHT ? 30 : -30) * tilt));
                 }
             }
-            Canvas.drawFine(pose, buffers, t, light, overlay, world, c -> WeaponArt.lance(c, ignition, reload, t));
-            if (owner != null) FxClient.lanceRendered(owner, pose, buffers, context, partial);
+            Canvas.drawFine(pose, buffers, t, light, overlay, world, c -> WeaponArt.lance(c, ignition, reload, t, leftHanded ? 1 : -1));
+            if (owner != null) FxClient.lanceRendered(owner, pose, buffers, context, partial, jet);
             FirstPersonHands.drawLance(owner, pose, buffers, light, context, reload);
         }
     }

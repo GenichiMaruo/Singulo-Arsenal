@@ -12,6 +12,7 @@ import io.github.genichimaruo.singuloarsenal.module.ModuleContent;
 import io.github.genichimaruo.singuloarsenal.module.ModuleType;
 import io.github.genichimaruo.singuloarsenal.module.Modules;
 import io.github.genichimaruo.singuloarsenal.weapon.JetLanceItem;
+import io.github.genichimaruo.singuloarsenal.weapon.TidalReaverItem;
 import io.github.genichimaruo.singuloarsenal.weapon.Weapons;
 import java.util.List;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -244,6 +245,8 @@ public final class ArsenalGameTests {
         near(h, (float) p.getAttributeValue(Attributes.MOVEMENT_SPEED), (float) base, "spaghetti leaves speed alone");
         h.assertTrue(p.getAttributeValue(Attributes.KNOCKBACK_RESISTANCE) >= Rules.SPAGHETTI_KNOCKBACK, "spaghetti knockback");
         chest.set(ArsenalData.LOAD.get(), 90);
+        // Not a full set, so the suit's energy shield stays out of this measurement.
+        p.setItemSlot(EquipmentSlot.HEAD, ItemStack.EMPTY);
         SuitEvents.applyAttributes(p);
         near(h, (float) p.getAttributeValue(Attributes.MOVEMENT_SPEED), (float) (base * (1 + Rules.LASAGNA_SPEED)), "lasagna slows");
         magicHit(p, 10);
@@ -260,10 +263,12 @@ public final class ArsenalGameTests {
         dress(p, ArmorSet.COLLAPSAR);
         ItemStack chest = p.getItemBySlot(EquipmentSlot.CHEST);
         Zombie nearby = target(h, 4.5, 2.5);
+        // Only the horizon's reserve left, which the energy shield must not touch.
+        for (EquipmentSlot slot : ARMOR_SLOTS) Fe.set(p.getItemBySlot(slot), slot == EquipmentSlot.CHEST ? Rules.HORIZON_FE : 0);
         magicHit(p, 100);
         h.assertTrue(p.isAlive(), "lethal hit was not caught");
         near(h, p.getHealth(), 20 * Rules.HORIZON_HEALTH_FRACTION, "health after horizon");
-        h.assertTrue(Fe.stored(chest) == Rules.COLLAPSAR_CAPACITY - Rules.HORIZON_FE, "horizon cost");
+        h.assertTrue(Fe.stored(chest) == 0, "horizon cost");
         h.assertTrue(nearby.getHealth() < 100, "horizon wave missed");
         // During the horizon window nothing lands.
         float during = p.getHealth();
@@ -273,6 +278,43 @@ public final class ArsenalGameTests {
         chest.set(ArsenalData.HORIZON_UNTIL.get(), 0L);
         magicHit(p, 100);
         h.assertTrue(p.isDeadOrDying(), "horizon ignored its cooldown");
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void collapsarSuitPaysForDamageInEnergy(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 2.5);
+        dress(p, ArmorSet.COLLAPSAR);
+        ItemStack head = p.getItemBySlot(EquipmentSlot.HEAD);
+        magicHit(p, 10);
+        near(h, p.getHealth(), 20, "the suit should have paid for the hit");
+        h.assertTrue(Fe.stored(head) == Rules.COLLAPSAR_CAPACITY - 10 * Rules.SHIELD_FE_PER_HP, "the shield's price: " + Fe.stored(head));
+        h.assertTrue(ArsenalData.get(p.getItemBySlot(EquipmentSlot.CHEST), ArsenalData.LOAD) > 0, "a paid hit still strains the lining");
+        // Bare of energy, with the horizon spent, the hit lands.
+        for (EquipmentSlot slot : ARMOR_SLOTS) Fe.set(p.getItemBySlot(slot), 0);
+        magicHit(p, 5);
+        near(h, p.getHealth(), 15, "an empty suit must not shield");
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void metricDriveFliesOnEnergyAlone(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 2.5);
+        var flight = p.getAttribute(net.neoforged.neoforge.common.NeoForgeMod.CREATIVE_FLIGHT);
+        ItemStack chest = charged(ArmorSet.MEISSNER, ArmorItem.Type.CHESTPLATE);
+        Modules.install(chest, List.of(module(ModuleType.METRIC_DRIVE)));
+        Fe.set(chest, Rules.METRIC_FE_PER_10_TICKS * 2);
+        p.setItemSlot(EquipmentSlot.CHEST, chest);
+        p.tickCount = 10;
+        SuitEvents.metricDrive(p);
+        h.assertTrue(flight.getValue() > 0, "no flight from the module");
+        h.assertTrue(Fe.stored(chest) == Rules.METRIC_FE_PER_10_TICKS * 2, "paid while not in the air");
+        p.getAbilities().flying = true;
+        SuitEvents.metricDrive(p);
+        h.assertTrue(Fe.stored(chest) == Rules.METRIC_FE_PER_10_TICKS, "flight is not free");
+        Fe.set(chest, 0);
+        SuitEvents.metricDrive(p);
+        h.assertTrue(flight.getValue() == 0, "flying with an empty tank");
         h.succeed();
     }
 
@@ -422,6 +464,176 @@ public final class ArsenalGameTests {
         h.succeed();
     }
 
+    /** Skips the spool-up: the shot goes off on this call. */
+    private static void ignite(GameTestHelper h, ServerPlayer p, ItemStack cannon) {
+        h.assertTrue(JetLanceItem.tryFire(p), "the shot was refused");
+        cannon.set(ArsenalData.CHARGE_UNTIL.get(), h.getLevel().getGameTime());
+        JetLanceItem.tickShot(cannon, p, h.getLevel());
+    }
+
+    /** Runs one whole shot on a level whose clock the test does not control. */
+    private static void completeShot(GameTestHelper h, ServerPlayer p, ItemStack cannon) {
+        cannon.set(ArsenalData.JET_UNTIL.get(), h.getLevel().getGameTime() - Rules.LANCE_SHOT_GAP);
+        ignite(h, p, cannon);
+        cannon.set(ArsenalData.JET_UNTIL.get(), h.getLevel().getGameTime() + 1);
+        JetLanceItem.tickShot(cannon, p, h.getLevel());
+    }
+
+    @GameTest(template = ARENA)
+    public static void cannonFiresAMagazineThenReloads(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 2.5);
+        ItemStack cannon = hold(p, new ItemStack(ArsenalItems.JET_LANCE.get()));
+        h.assertTrue(JetLanceItem.tryFire(p), "first shot");
+        h.assertTrue(JetLanceItem.jetAge(cannon, h.getLevel().getGameTime(), 0) < 0, "the jet must wait for the spool-up");
+        h.assertTrue(JetLanceItem.chargeProgress(cannon, h.getLevel().getGameTime(), 0) == 0, "the spool-up must start");
+        h.assertTrue(!JetLanceItem.tryFire(p), "started a second charge over the first");
+        h.assertTrue(Fe.stored(cannon) == Rules.LANCE_CAPACITY, "paid before the shot went off");
+        cannon.set(ArsenalData.CHARGE_UNTIL.get(), h.getLevel().getGameTime());
+        JetLanceItem.tickShot(cannon, p, h.getLevel());
+        h.assertTrue(JetLanceItem.jetAge(cannon, h.getLevel().getGameTime(), 0) == 0, "the jet must be lit at the end of the spool-up");
+        h.assertTrue(Fe.stored(cannon) == Rules.LANCE_CAPACITY - Rules.LANCE_SHOT_FE, "shot cost");
+        cannon.remove(ArsenalData.SHOTS.get());
+        for (int i = 0; i < Rules.LANCE_MAGAZINE; i++) {
+            h.assertTrue(JetLanceItem.shotsLeft(cannon) == Rules.LANCE_MAGAZINE - i, "magazine count");
+            completeShot(h, p, cannon);
+        }
+        h.assertTrue(Weapons.reloadProgress(cannon, h.getLevel().getGameTime(), 0) >= 0, "an empty magazine must reload");
+        h.assertTrue(JetLanceItem.shotsLeft(cannon) == Rules.LANCE_MAGAZINE, "the magazine was not refilled");
+        cannon.set(ArsenalData.JET_UNTIL.get(), 0L);
+        h.assertTrue(!JetLanceItem.tryFire(p), "fired during the reload");
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void switchingAwayCannotSkipAnEmptyMagazinesReload(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 2.5);
+        ItemStack cannon = hold(p, new ItemStack(ArsenalItems.JET_LANCE.get()));
+        cannon.set(ArsenalData.SHOTS.get(), Rules.LANCE_MAGAZINE - 1);
+        ignite(h, p, cannon);
+        p.setItemSlot(EquipmentSlot.MAINHAND, ItemStack.EMPTY);
+        cannon.getItem().inventoryTick(cannon, h.getLevel(), p, 1, false);
+        p.setItemSlot(EquipmentSlot.MAINHAND, cannon);
+        h.assertTrue(!JetLanceItem.tryFire(p), "switching away allowed a fifth shot without reloading");
+        h.assertTrue(Weapons.reloadProgress(cannon, h.getLevel().getGameTime(), 0) >= 0, "putting an empty cannon away must start its reload");
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void expiredShotsStillReloadAnEmptyMagazine(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 2.5);
+        ItemStack cannon = hold(p, new ItemStack(ArsenalItems.JET_LANCE.get()));
+        cannon.set(ArsenalData.SHOTS.get(), Rules.LANCE_MAGAZINE);
+        cannon.set(ArsenalData.JET_UNTIL.get(), h.getLevel().getGameTime() - Rules.LANCE_SHOT_GAP);
+        h.assertTrue(!JetLanceItem.tryFire(p), "an expired fourth shot allowed a fifth shot");
+        JetLanceItem.tickShot(cannon, p, h.getLevel());
+        h.assertTrue(Weapons.reloadProgress(cannon, h.getLevel().getGameTime(), 0) >= 0, "missing the final shot tick must not skip the reload");
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void onlyTheFirstInstantOfAShotDrillsTerrain(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 0.5);
+        ItemStack cannon = hold(p, new ItemStack(ArsenalItems.JET_LANCE.get()));
+        var near = new net.minecraft.core.BlockPos(2, 2, 2);
+        var far = new net.minecraft.core.BlockPos(2, 2, 4);
+        var chest = new net.minecraft.core.BlockPos(3, 2, 3);
+        p.setYRot(0);
+        p.setXRot(0);
+        h.setBlock(near, Blocks.STONE);
+        h.setBlock(far, Blocks.OAK_PLANKS);
+        h.setBlock(chest, Blocks.CHEST);
+        ignite(h, p, cannon);
+        h.assertBlockPresent(Blocks.STONE, near);
+        cannon.remove(ArsenalData.JET_UNTIL.get());
+        cannon.set(ArsenalData.TERRAIN_MODE.get(), 1);
+        ignite(h, p, cannon);
+        h.assertBlockPresent(Blocks.AIR, near);
+        h.assertBlockPresent(Blocks.AIR, far);
+        h.assertBlockPresent(Blocks.CHEST, chest);
+        h.setBlock(near, Blocks.STONE);
+        JetLanceItem.pulse(p, h.getLevel());
+        h.assertBlockPresent(Blocks.STONE, near);
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void reaverFocusIsCarriedOnTheStack(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 2.5);
+        ItemStack reaver = hold(p, new ItemStack(ArsenalItems.TIDAL_REAVER.get()));
+        long now = h.getLevel().getGameTime();
+        h.assertTrue(TidalReaverItem.focusProgress(reaver, now, 0) < 0, "focus open before use");
+        reaver.getItem().use(h.getLevel(), p, net.minecraft.world.InteractionHand.MAIN_HAND);
+        h.assertTrue(TidalReaverItem.focusProgress(reaver, now, 0) == 0, "other clients need the focus on the stack");
+        p.stopUsingItem();
+        reaver.getItem().inventoryTick(reaver, h.getLevel(), p, 0, true);
+        h.assertTrue(TidalReaverItem.focusProgress(reaver, now, 0) < 0, "focus stayed open after the hold ended");
+        h.succeed();
+    }
+
+    /** In a batch of its own: its line of fire is longer than the gap to the next test's structure, and machines stop the drill. */
+    @GameTest(template = ARENA, batch = "drilling_alone")
+    public static void drillingGivesOutAtItsDepth(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 0.5);
+        ItemStack cannon = hold(p, new ItemStack(ArsenalItems.JET_LANCE.get()));
+        cannon.set(ArsenalData.TERRAIN_MODE.get(), 1);
+        p.setYRot(0);
+        p.setXRot(0);
+        int depth = (int) Rules.LANCE_BORE_DEPTH;
+        var first = new net.minecraft.core.BlockPos(2, 2, 2);
+        var inside = first.south(depth - 1);
+        var beyond = first.south(depth + 4);
+        h.setBlock(first, Blocks.STONE);
+        h.setBlock(inside, Blocks.STONE);
+        h.setBlock(beyond, Blocks.STONE);
+        // The arena's own barrier wall is unbreakable and would rightly stop the drill.
+        h.setBlock(first.south(3), Blocks.AIR);
+        // GameTests only keep their own structure's chunks loaded, and the drill stops at unloaded ground.
+        var level = h.getLevel();
+        net.minecraft.world.level.ChunkPos start = new net.minecraft.world.level.ChunkPos(h.absolutePos(first)), stop = new net.minecraft.world.level.ChunkPos(h.absolutePos(beyond));
+        int low = Math.min(start.z, stop.z), high = Math.max(start.z, stop.z);
+        for (int z = low; z <= high; z++) for (int x = start.x - 1; x <= start.x + 1; x++) level.setChunkForced(x, z, true);
+        h.runAfterDelay(10, () -> {
+            ignite(h, p, cannon);
+            for (int z = low; z <= high; z++) for (int x = start.x - 1; x <= start.x + 1; x++) level.setChunkForced(x, z, false);
+            h.assertBlockPresent(Blocks.AIR, first);
+            h.assertBlockPresent(Blocks.AIR, inside);
+            h.assertBlockPresent(Blocks.STONE, beyond);
+            h.succeed();
+        });
+    }
+
+    @GameTest(template = ARENA)
+    public static void meltdownGoesOffTheInstantTheShotLands(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 1.5);
+        ItemStack cannon = hold(p, new ItemStack(ArsenalItems.JET_LANCE.get()));
+        Modules.install(cannon, List.of(module(ModuleType.MELTDOWN)));
+        Fe.set(cannon, Rules.LANCE_CAPACITY);
+        p.setYRot(0);
+        p.setXRot(0);
+        h.setBlock(2, 2, 4, Blocks.STONE);
+        Zombie aside = target(h, 4.5, 4.5);
+        ignite(h, p, cannon);
+        h.assertTrue(aside.getHealth() < 100, "the blast must land with the shot");
+        h.assertBlockPresent(Blocks.STONE, new net.minecraft.core.BlockPos(2, 2, 4));
+        h.assertTrue(p.getHealth() == p.getMaxHealth(), "the blast hurt its owner");
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void platingMergesIntoTheArmorValue(GameTestHelper h) {
+        ItemStack chest = charged(ArmorSet.COLLAPSAR, ArmorItem.Type.CHESTPLATE);
+        Modules.install(chest, List.of(module(ModuleType.PLATING), module(ModuleType.PLATING)));
+        int armorLines = 0, toughnessLines = 0;
+        double armor = 0, toughness = 0;
+        for (var entry : chest.getAttributeModifiers().modifiers()) {
+            if (entry.attribute().equals(Attributes.ARMOR)) { armorLines++; armor += entry.modifier().amount(); }
+            if (entry.attribute().equals(Attributes.ARMOR_TOUGHNESS)) { toughnessLines++; toughness += entry.modifier().amount(); }
+        }
+        h.assertTrue(armorLines == 1 && toughnessLines == 1, "armor shown on several lines: " + armorLines + ", " + toughnessLines);
+        h.assertTrue(armor == 10 + 2 * Rules.PLATING_ARMOR && toughness == ArmorSet.COLLAPSAR.toughness + 2 * Rules.PLATING_TOUGHNESS, "merged totals: " + armor + ", " + toughness);
+        h.succeed();
+    }
+
     // ---- Module Integrator -------------------------------------------------------------------------------------------
 
     private static ItemStack module(ModuleType type) {
@@ -468,6 +680,24 @@ public final class ArsenalGameTests {
         int found = 0;
         for (int i = IntegratorBlockEntity.FIRST_SOCKET; i < IntegratorBlockEntity.SLOTS; i++) if (!items.getStackInSlot(i).isEmpty()) found++;
         h.assertTrue(found == 2, "modules lost or duplicated: " + found);
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void legacyIntegratorSaveGainsFiveSocketsWithoutLosingModules(GameTestHelper h) {
+        IntegratorBlockEntity entity = integrator(h);
+        entity.items().setStackInSlot(0, charged(ArmorSet.COLLAPSAR, ArmorItem.Type.CHESTPLATE));
+        for (int slot = 1; slot <= 3; slot++) entity.items().setStackInSlot(slot, module(ModuleType.CAPACITOR));
+        var saved = entity.saveWithoutMetadata(h.getLevel().registryAccess());
+        saved.getCompound("items").putInt("Size", 4);
+        entity.loadWithComponents(saved, h.getLevel().registryAccess());
+        h.assertTrue(entity.items().getSlots() == 6, "a 0.1.0 save must expand to five sockets");
+        for (int slot = 1; slot <= 3; slot++) h.assertTrue(entity.items().getStackInSlot(slot).is(module(ModuleType.CAPACITOR).getItem()), "old socket lost its module");
+        entity.items().setStackInSlot(4, module(ModuleType.INDUCTION));
+        entity.items().setStackInSlot(5, module(ModuleType.COLLECTOR));
+        run(entity);
+        ItemStack gear = entity.items().getStackInSlot(0);
+        h.assertTrue(Modules.installed(gear).size() == 5 && Modules.count(gear, ModuleType.CAPACITOR) == 3, "all five modules must survive the migration and integrate");
         h.succeed();
     }
 
@@ -580,6 +810,330 @@ public final class ArsenalGameTests {
         h.succeed();
     }
 
+    // ---- Tools ---------------------------------------------------------------------------------------------------------
+
+    private static net.minecraft.core.BlockPos abs(GameTestHelper h, int x, int y, int z) {
+        return h.absolutePos(new net.minecraft.core.BlockPos(x, y, z));
+    }
+
+    /** Fills the 3x3 face at z = 3 and aims the player at its centre. */
+    private static ServerPlayer facingWall(GameTestHelper h, net.minecraft.world.level.block.Block block) {
+        ServerPlayer p = player(h, 2.5, 1.5);
+        p.setYRot(0);
+        p.setXRot(0);
+        for (int x = 1; x <= 3; x++) for (int y = 1; y <= 3; y++) h.setBlock(x, y, 3, block);
+        return p;
+    }
+
+    private static void strike(GameTestHelper h, ServerPlayer p) {
+        p.gameMode.destroyBlock(abs(h, 2, 2, 3));
+    }
+
+    @GameTest(template = ARENA)
+    public static void breakerTakesThreeByThreeUnlessSneaking(GameTestHelper h) {
+        ServerPlayer p = facingWall(h, Blocks.STONE);
+        ItemStack breaker = hold(p, new ItemStack(ArsenalItems.DEGENERACY_BREAKER.get()));
+        p.setShiftKeyDown(true);
+        strike(h, p);
+        h.assertBlockPresent(Blocks.AIR, new net.minecraft.core.BlockPos(2, 2, 3));
+        h.assertBlockPresent(Blocks.STONE, new net.minecraft.core.BlockPos(1, 2, 3));
+        h.setBlock(2, 2, 3, Blocks.STONE);
+        p.setShiftKeyDown(false);
+        int before = Fe.stored(breaker);
+        strike(h, p);
+        for (int x = 1; x <= 3; x++) for (int y = 1; y <= 3; y++) h.assertBlockPresent(Blocks.AIR, new net.minecraft.core.BlockPos(x, y, 3));
+        h.assertTrue(before - Fe.stored(breaker) == 9 * Rules.BREAKER_FE, "nine blocks, nine payments: " + (before - Fe.stored(breaker)));
+        h.assertTrue(breaker.getDamageValue() == 0, "powered tools do not wear out");
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void breakerLeavesContainersAlone(GameTestHelper h) {
+        ServerPlayer p = facingWall(h, Blocks.STONE);
+        hold(p, new ItemStack(ArsenalItems.DEGENERACY_BREAKER.get()));
+        h.setBlock(1, 2, 3, Blocks.CHEST);
+        strike(h, p);
+        h.assertBlockPresent(Blocks.CHEST, new net.minecraft.core.BlockPos(1, 2, 3));
+        h.assertBlockPresent(Blocks.AIR, new net.minecraft.core.BlockPos(3, 2, 3));
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void canceledMiningDoesNotBreakNeighborsOrSpendEnergy(GameTestHelper h) {
+        ServerPlayer p = facingWall(h, Blocks.STONE);
+        ItemStack breaker = hold(p, new ItemStack(ArsenalItems.DEGENERACY_BREAKER.get()));
+        int before = Fe.stored(breaker);
+        java.util.function.Consumer<net.neoforged.neoforge.event.level.BlockEvent.BreakEvent> protect = event -> {
+            if (event.getPlayer() == p && event.getPos().equals(abs(h, 2, 2, 3))) event.setCanceled(true);
+        };
+        var bus = net.neoforged.neoforge.common.NeoForge.EVENT_BUS;
+        bus.addListener(net.neoforged.bus.api.EventPriority.LOWEST, protect);
+        try {
+            strike(h, p);
+            for (int x = 1; x <= 3; x++) for (int y = 1; y <= 3; y++)
+                h.assertBlockPresent(Blocks.STONE, new net.minecraft.core.BlockPos(x, y, 3));
+            h.assertTrue(Fe.stored(breaker) == before, "a canceled break must not cost FE");
+        } finally {
+            bus.unregister(protect);
+        }
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void protectedNeighborsDoNotCostMiningEnergy(GameTestHelper h) {
+        ServerPlayer p = facingWall(h, Blocks.STONE);
+        ItemStack breaker = hold(p, new ItemStack(ArsenalItems.DEGENERACY_BREAKER.get()));
+        int before = Fe.stored(breaker);
+        java.util.function.Consumer<net.neoforged.neoforge.event.level.BlockEvent.BreakEvent> protect = event -> {
+            if (event.getPlayer() == p && !event.getPos().equals(abs(h, 2, 2, 3))) event.setCanceled(true);
+        };
+        var bus = net.neoforged.neoforge.common.NeoForge.EVENT_BUS;
+        bus.addListener(protect);
+        try {
+            strike(h, p);
+            h.assertBlockPresent(Blocks.AIR, new net.minecraft.core.BlockPos(2, 2, 3));
+            h.assertBlockPresent(Blocks.STONE, new net.minecraft.core.BlockPos(1, 2, 3));
+            h.assertTrue(before - Fe.stored(breaker) == Rules.BREAKER_FE, "only the permitted block may cost FE: " + (before - Fe.stored(breaker)));
+        } finally {
+            bus.unregister(protect);
+        }
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void sawFellsLivingTreesButNotLogWalls(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 1.5);
+        hold(p, new ItemStack(ArsenalItems.SHEAR_SAW.get()));
+        for (int y = 1; y <= 3; y++) h.setBlock(1, y, 3, Blocks.OAK_LOG);
+        p.gameMode.destroyBlock(abs(h, 1, 1, 3));
+        h.assertBlockPresent(Blocks.OAK_LOG, new net.minecraft.core.BlockPos(1, 2, 3));
+        for (int y = 1; y <= 3; y++) h.setBlock(3, y, 3, Blocks.OAK_LOG);
+        h.setBlock(3, 4, 3, Blocks.OAK_LEAVES.defaultBlockState().setValue(net.minecraft.world.level.block.LeavesBlock.PERSISTENT, false));
+        p.gameMode.destroyBlock(abs(h, 3, 1, 3));
+        h.assertBlockPresent(Blocks.AIR, new net.minecraft.core.BlockPos(3, 3, 3));
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void drillFollowsVeinsIntoThePack(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 1.5);
+        ItemStack drill = hold(p, new ItemStack(ArsenalItems.ACCRETION_DRILL.get()));
+        drill.set(ArsenalData.TOOL_MODE.get(), Rules.DRILL_VEIN);
+        for (int x = 1; x <= 3; x++) h.setBlock(x, 2, 3, Blocks.IRON_ORE);
+        h.setBlock(2, 3, 3, Blocks.STONE);
+        p.gameMode.destroyBlock(abs(h, 1, 2, 3));
+        h.assertBlockPresent(Blocks.AIR, new net.minecraft.core.BlockPos(3, 2, 3));
+        h.assertBlockPresent(Blocks.STONE, new net.minecraft.core.BlockPos(2, 3, 3));
+        h.assertTrue(p.getInventory().countItem(net.minecraft.world.item.Items.RAW_IRON) >= 3, "drops did not reach the pack");
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void toolsWithoutPowerDigAtHandSpeed(GameTestHelper h) {
+        ItemStack pick = new ItemStack(ArsenalItems.SQUID_PICK.get());
+        h.assertTrue(pick.getDestroySpeed(Blocks.STONE.defaultBlockState()) == 1, "an empty tool must not dig at full speed");
+        Fe.set(pick, Fe.capacity(pick));
+        h.assertTrue(pick.getDestroySpeed(Blocks.STONE.defaultBlockState()) == 10, "a charged pick digs at its tier speed");
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void squidPickFindsOresNearestFirst(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 2.5);
+        h.setBlock(4, 2, 4, Blocks.COAL_ORE);
+        h.setBlock(2, 2, 3, Blocks.IRON_ORE);
+        h.setBlock(1, 2, 1, Blocks.DIAMOND_ORE);
+        h.setBlock(3, 2, 1, Blocks.ANCIENT_DEBRIS);
+        var low = io.github.genichimaruo.singuloarsenal.tool.SquidPickItem.scan(p, 1);
+        h.assertTrue(low.ores().size() == 2 && low.hidden() == 2, "sensitivity 1 sees coal and iron only: " + low);
+        h.assertTrue(low.ores().getFirst().equals(abs(h, 2, 2, 3)), "nearest ore must come first: " + low.ores().getFirst());
+        h.assertTrue(io.github.genichimaruo.singuloarsenal.tool.SquidPickItem.scan(p, 2).ores().size() == 3, "sensitivity 2 adds diamond");
+        var full = io.github.genichimaruo.singuloarsenal.tool.SquidPickItem.scan(p, 3);
+        h.assertTrue(full.ores().size() == 4 && full.hidden() == 0, "sensitivity 3 sees everything: " + full);
+        h.succeed();
+    }
+
+    private static ItemStack singulo(String path) {
+        return new ItemStack(BuiltInRegistries.ITEM.get(ResourceLocation.fromNamespaceAndPath("singulo", path)));
+    }
+
+    @GameTest(template = ARENA)
+    public static void sensitivityModulesTuneThePickInTheOtherHand(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 2.5);
+        ItemStack pick = new ItemStack(ArsenalItems.SQUID_PICK.get());
+        p.setItemSlot(EquipmentSlot.OFFHAND, pick);
+        p.setItemSlot(EquipmentSlot.MAINHAND, singulo("scanner_module_3"));
+        p.gameMode.useItem(p, h.getLevel(), p.getMainHandItem(), net.minecraft.world.InteractionHand.MAIN_HAND);
+        h.assertTrue(io.github.genichimaruo.singuloarsenal.tool.SquidPickItem.tier(p.getOffhandItem()) == 3, "Mk3 must raise the pick to 3");
+        h.assertTrue(p.getMainHandItem().isEmpty(), "the module is used up");
+        p.setItemSlot(EquipmentSlot.MAINHAND, singulo("scanner_module_2"));
+        p.gameMode.useItem(p, h.getLevel(), p.getMainHandItem(), net.minecraft.world.InteractionHand.MAIN_HAND);
+        h.assertTrue(io.github.genichimaruo.singuloarsenal.tool.SquidPickItem.tier(p.getOffhandItem()) == 3 && !p.getMainHandItem().isEmpty(),
+                "a lower module neither lowers the pick nor is spent");
+        h.succeed();
+    }
+
+    @SuppressWarnings("unchecked")
+    @GameTest(template = ARENA)
+    public static void pickKeepsTheScannersSensitivity(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 2.5);
+        ItemStack scanner = singulo("neutrino_scanner");
+        var type = (net.minecraft.core.component.DataComponentType<Integer>) BuiltInRegistries.DATA_COMPONENT_TYPE.get(
+                ResourceLocation.fromNamespaceAndPath("singulo", "scanner_tier"));
+        h.assertTrue(type != null, "Singulo's scanner_tier component is gone");
+        scanner.set(type, 2);
+        p.containerMenu = p.inventoryMenu;
+        p.inventoryMenu.getSlot(1).set(scanner);
+        ItemStack pick = new ItemStack(ArsenalItems.SQUID_PICK.get());
+        pick.onCraftedBy(h.getLevel(), p, 1);
+        h.assertTrue(io.github.genichimaruo.singuloarsenal.tool.SquidPickItem.tier(pick) == 2, "the scanner's sensitivity must carry over");
+        p.inventoryMenu.getSlot(1).set(ItemStack.EMPTY);
+        h.succeed();
+    }
+
+    @SuppressWarnings("unchecked")
+    @GameTest(template = ARENA)
+    public static void craftingPickPreservesSensitivityForClickAndShiftClick(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 2.5);
+        var tier = (net.minecraft.core.component.DataComponentType<Integer>) BuiltInRegistries.DATA_COMPONENT_TYPE.get(
+                ResourceLocation.fromNamespaceAndPath("singulo", "scanner_tier"));
+        for (boolean shift : new boolean[]{false, true}) {
+            p.getInventory().clearContent();
+            var menu = new net.minecraft.world.inventory.CraftingMenu(1, p.getInventory(),
+                    net.minecraft.world.inventory.ContainerLevelAccess.create(h.getLevel(), abs(h, 2, 1, 2)));
+            p.containerMenu = menu;
+            ItemStack scanner = singulo("neutrino_scanner");
+            scanner.set(tier, 3);
+            menu.getSlot(1).set(new ItemStack(ArsenalItems.FLUX_WEAVE.get()));
+            menu.getSlot(2).set(scanner);
+            menu.getSlot(3).set(new ItemStack(ArsenalItems.FLUX_WEAVE.get()));
+            menu.getSlot(5).set(singulo("superconducting_coil"));
+            menu.getSlot(8).set(singulo("white_ceramic_composite"));
+            h.assertTrue(menu.getSlot(0).getItem().is(ArsenalItems.SQUID_PICK.get()), "the real recipe must match");
+            menu.clicked(0, 0, shift ? net.minecraft.world.inventory.ClickType.QUICK_MOVE : net.minecraft.world.inventory.ClickType.PICKUP, p);
+            ItemStack crafted = shift ? p.getInventory().items.stream().filter(s -> s.is(ArsenalItems.SQUID_PICK.get())).findFirst().orElse(ItemStack.EMPTY) : menu.getCarried();
+            h.assertTrue(crafted.is(ArsenalItems.SQUID_PICK.get()) && io.github.genichimaruo.singuloarsenal.tool.SquidPickItem.tier(crafted) == 3,
+                    "crafted pick lost sensitivity; shift=" + shift);
+            h.assertTrue(menu.getSlot(2).getItem().isEmpty() && menu.getSlot(0).getItem().isEmpty(), "crafting must consume the scanner exactly once");
+        }
+        p.containerMenu = p.inventoryMenu;
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void canisterStoresPelletsAndFeedsGearFirst(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 2.5);
+        ItemStack canister = new ItemStack(ArsenalItems.PELLET_CANISTER.get());
+        p.setItemSlot(EquipmentSlot.MAINHAND, canister);
+        p.getInventory().add(new ItemStack(Fe.MASS_PELLET.get(), 64));
+        p.getInventory().add(new ItemStack(Fe.MASS_PELLET.get(), 36));
+        canister.use(h.getLevel(), p, net.minecraft.world.InteractionHand.MAIN_HAND);
+        h.assertTrue(io.github.genichimaruo.singuloarsenal.core.PelletCanisterItem.stored(p.getMainHandItem()) == 100, "all pellets go in");
+        h.assertTrue(p.getInventory().countItem(Fe.MASS_PELLET.get()) == 0, "none left loose");
+        p.getInventory().add(new ItemStack(Fe.MASS_PELLET.get(), 5));
+        ItemStack chest = new ItemStack(ArsenalItems.SUITS.get(ArmorSet.COLLAPSAR).get(ArmorItem.Type.CHESTPLATE).get());
+        h.assertTrue(Fe.accrete(p, chest) && Fe.stored(chest) == Rules.PELLET_FE, "accretion must still work");
+        h.assertTrue(io.github.genichimaruo.singuloarsenal.core.PelletCanisterItem.stored(p.getMainHandItem()) == 99
+                && p.getInventory().countItem(Fe.MASS_PELLET.get()) == 5, "the canister pays before loose pellets");
+        p.setShiftKeyDown(true);
+        p.getMainHandItem().use(h.getLevel(), p, net.minecraft.world.InteractionHand.MAIN_HAND);
+        h.assertTrue(io.github.genichimaruo.singuloarsenal.core.PelletCanisterItem.stored(p.getMainHandItem()) == 35
+                && p.getInventory().countItem(Fe.MASS_PELLET.get()) == 69, "sneaking takes one stack back out");
+        h.succeed();
+    }
+
+    // ---- Utility modules ----------------------------------------------------------------------------------------------
+
+    @GameTest(template = ARENA)
+    public static void smelterCooksOresButNotStone(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 1.5);
+        ItemStack pick = new ItemStack(ArsenalItems.SQUID_PICK.get());
+        Modules.install(pick, List.of(module(ModuleType.SMELTER)));
+        pick = hold(p, pick);
+        h.setBlock(2, 2, 3, Blocks.IRON_ORE);
+        h.setBlock(1, 1, 3, Blocks.STONE);
+        int before = Fe.stored(pick);
+        p.gameMode.destroyBlock(abs(h, 2, 2, 3));
+        p.gameMode.destroyBlock(abs(h, 1, 1, 3));
+        var at = new net.minecraft.core.BlockPos(2, 2, 3);
+        h.assertItemEntityPresent(net.minecraft.world.item.Items.IRON_INGOT, at, 2);
+        h.assertItemEntityNotPresent(net.minecraft.world.item.Items.RAW_IRON, at, 3);
+        h.assertItemEntityPresent(net.minecraft.world.item.Items.COBBLESTONE, new net.minecraft.core.BlockPos(1, 1, 3), 2);
+        h.assertTrue(before - Fe.stored(pick) == 2 * Rules.PICK_FE + Rules.SMELT_FE, "two blocks and one smelt: " + (before - Fe.stored(pick)));
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void smeltingKeepsOutputsThatExceedOneStack(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 2.5);
+        ItemStack pick = hold(p, new ItemStack(ArsenalItems.SQUID_PICK.get()));
+        Modules.install(pick, List.of(module(ModuleType.SMELTER)));
+        ItemStack input = new ItemStack(net.minecraft.world.item.Items.RAW_IRON, 40);
+        var recipe = h.getLevel().getRecipeManager().getRecipeFor(net.minecraft.world.item.crafting.RecipeType.SMELTING,
+                new net.minecraft.world.item.crafting.SingleRecipeInput(input), h.getLevel()).orElseThrow();
+        // Model a data pack recipe that yields two ingots per raw item, restoring it before any other test runs.
+        ItemStack result = recipe.value().getResultItem(h.getLevel().registryAccess());
+        int original = result.getCount();
+        int before = Fe.stored(pick);
+        try {
+            result.setCount(2);
+            Vec3 at = h.absoluteVec(new Vec3(2.5, 2, 3.5));
+            var drops = new java.util.ArrayList<net.minecraft.world.entity.item.ItemEntity>();
+            drops.add(new net.minecraft.world.entity.item.ItemEntity(h.getLevel(), at.x, at.y, at.z, input));
+            var event = new net.neoforged.neoforge.event.level.BlockDropsEvent(h.getLevel(), abs(h, 2, 2, 3), Blocks.IRON_ORE.defaultBlockState(), null, drops, p, pick.copy());
+            net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(event);
+            h.assertTrue(drops.stream().allMatch(d -> d.getItem().is(net.minecraft.world.item.Items.IRON_INGOT)
+                    && d.getItem().getCount() <= d.getItem().getMaxStackSize()), "smelting must produce valid ingot stacks");
+            h.assertTrue(drops.stream().mapToInt(d -> d.getItem().getCount()).sum() == 80, "smelting discarded output above the stack limit");
+            h.assertTrue(before - Fe.stored(pick) == 40 * Rules.SMELT_FE, "smelting must charge for inputs, not output stacks");
+        } finally {
+            result.setCount(original);
+        }
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void inductionFeedsTheHeldToolFromTheChest(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 2.5);
+        ItemStack chest = charged(ArmorSet.COLLAPSAR, ArmorItem.Type.CHESTPLATE);
+        Modules.install(chest, List.of(module(ModuleType.INDUCTION)));
+        Fe.set(chest, Fe.capacity(chest));
+        p.setItemSlot(EquipmentSlot.CHEST, chest);
+        p.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(ArsenalItems.SQUID_PICK.get()));
+        int chestBefore = Fe.stored(p.getItemBySlot(EquipmentSlot.CHEST));
+        SuitEvents.induct(p);
+        int got = Fe.stored(p.getMainHandItem());
+        h.assertTrue(got == Rules.INDUCTION_FE_PER_SECOND, "one coil, one second: " + got);
+        h.assertTrue(chestBefore - Fe.stored(p.getItemBySlot(EquipmentSlot.CHEST)) == got, "the charge must come out of the chest");
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void collectorPullsLooseItemsButNotThrownOnes(GameTestHelper h) {
+        ServerPlayer p = player(h, 1.5, 1.5);
+        ItemStack boots = charged(ArmorSet.MEISSNER, ArmorItem.Type.BOOTS);
+        Modules.install(boots, List.of(module(ModuleType.COLLECTOR)));
+        Fe.set(boots, Fe.capacity(boots));
+        p.setItemSlot(EquipmentSlot.FEET, boots);
+        Vec3 far = h.absoluteVec(new Vec3(4.5, 1, 4.5));
+        var loose = new net.minecraft.world.entity.item.ItemEntity(h.getLevel(), far.x, far.y, far.z, new ItemStack(net.minecraft.world.item.Items.DIAMOND));
+        var thrown = new net.minecraft.world.entity.item.ItemEntity(h.getLevel(), far.x, far.y, far.z, new ItemStack(net.minecraft.world.item.Items.EMERALD));
+        for (var item : List.of(loose, thrown)) {
+            item.setNoPickUpDelay();
+            item.setDeltaMovement(Vec3.ZERO);
+            h.getLevel().addFreshEntity(item);
+        }
+        thrown.setThrower(p);
+        p.setShiftKeyDown(true);
+        SuitEvents.collect(p);
+        h.assertTrue(loose.distanceTo(p) > 3, "sneaking must hold the field off");
+        p.setShiftKeyDown(false);
+        SuitEvents.collect(p);
+        h.assertTrue(loose.distanceTo(p) < 1, "a loose item must be brought in: " + loose.distanceTo(p));
+        h.assertTrue(thrown.distanceTo(p) > 3, "what the wearer threw away stays put");
+        h.succeed();
+    }
+
     // ---- Recipes against the real base mod ---------------------------------------------------------------------------
 
     @GameTest(template = ARENA)
@@ -591,7 +1145,7 @@ public final class ArsenalGameTests {
             h.assertTrue(recipes.byKey(id).isPresent(), "recipe failed to load: " + id);
             found++;
         }
-        h.assertTrue(found == 28, "unexpected item count " + found);
+        h.assertTrue(found == 39, "unexpected item count " + found);
         var lamina = recipes.byKey(SinguloArsenal.id("collapsar_lamina")).orElseThrow().value();
         h.assertTrue(BuiltInRegistries.RECIPE_SERIALIZER.getKey(lamina.getSerializer()).toString().equals("singulo:machine"), "lamina must be a Singulo machine recipe");
         h.succeed();

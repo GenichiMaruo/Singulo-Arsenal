@@ -27,6 +27,22 @@ public final class ArsenalData {
     /** When the current reload animation ends, and how long it runs. On the stack so other players' clients see it too. */
     public static final Supplier<DataComponentType<Long>> RELOAD_UNTIL = time("reload_until");
     public static final Supplier<DataComponentType<Integer>> RELOAD_TICKS = integer("reload_ticks");
+    /** When the reaver's Roche focus opened; absent when it is closed. On the stack, so every client sees the same focus. */
+    public static final Supplier<DataComponentType<Long>> FOCUS_START = time("focus_start");
+    /** When the cannon's spool-up ends and the shot goes off. */
+    public static final Supplier<DataComponentType<Long>> CHARGE_UNTIL = time("charge_until");
+    /** When the current cannon shot goes out. Other players' clients draw the jet from this. */
+    public static final Supplier<DataComponentType<Long>> JET_UNTIL = time("jet_until");
+    /** Shots fired since the last reload. */
+    public static final Supplier<DataComponentType<Integer>> SHOTS = integer("shots");
+    /** How much the accretion drill takes per block: one of {@code Rules.DRILL_*}. */
+    public static final Supplier<DataComponentType<Integer>> TOOL_MODE = integer("tool_mode");
+    /** The SQUID pick's sensitivity, 1 to 3 as on Singulo's neutrino scanner; missing reads as 1. */
+    public static final Supplier<DataComponentType<Integer>> SCAN_TIER = integer("scan_tier");
+    /** Mass pellets held in a pellet canister. */
+    public static final Supplier<DataComponentType<Integer>> PELLETS = integer("pellets");
+    /** 0 spares the terrain, 1 melts it. */
+    public static final Supplier<DataComponentType<Integer>> TERRAIN_MODE = integer("terrain_mode");
 
     public static final Supplier<DataComponentType<ItemContainerContents>> MODULES = REGISTER.registerComponentType("modules",
             b -> b.persistent(ItemContainerContents.CODEC).networkSynchronized(ItemContainerContents.STREAM_CODEC).cacheEncoding());
