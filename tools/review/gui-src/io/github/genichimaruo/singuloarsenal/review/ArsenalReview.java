@@ -215,6 +215,23 @@ public final class ArsenalReview {
         step(2, () -> Tips.detail = () -> true);
         at += 3;
         shot("tooltip-detail");
+        // Check the actual scan packet and overlay against ore hidden under the floor.
+        step(2, () -> {
+            Tips.detail = net.minecraft.client.gui.screens.Screen::hasShiftDown;
+            mc.setScreen(null);
+            local(mc, p -> {
+                ItemStack pick = charged(ArsenalItems.SQUID_PICK.get());
+                ArsenalData.set(pick, ArsenalData.SCAN_TIER, 3);
+                p.getInventory().setItem(0, pick);
+                p.getInventory().selected = 0;
+                for (int x = -3; x <= 3; x += 2) p.serverLevel().setBlock(new BlockPos(x, 79, -2), Blocks.DIAMOND_ORE.defaultBlockState(), 3);
+                p.connection.teleport(OX, 81, -5, 0, 25);
+            });
+        });
+        step(10, () -> selectSlot(mc, 0));
+        step(10, () -> mc.gameMode.useItem(mc.player, InteractionHand.MAIN_HAND));
+        at += 10;
+        shot("scan-through-floor");
         step(4, () -> done = true);
     }
 
@@ -531,6 +548,7 @@ public final class ArsenalReview {
         }
         step(2, () -> local(mc, p -> {
             for (int i = 0; i < 4; i++) p.getInventory().setItem(5 + i, charged(tools().get(i)));
+            ArsenalData.set(p.getInventory().getItem(5), ArsenalData.SCAN_TIER, 3);
             for (int x = -3; x <= 3; x += 2) p.serverLevel().setBlock(new BlockPos(x, 80, -2), Blocks.DIAMOND_ORE.defaultBlockState(), 3);
             p.connection.teleport(OX, 81, -5, 0, 25);
         }));
