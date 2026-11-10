@@ -862,6 +862,69 @@ public final class ArsenalGameTests {
         h.succeed();
     }
 
+    // ---- Utility modules ----------------------------------------------------------------------------------------------
+
+    @GameTest(template = ARENA)
+    public static void smelterCooksOresButNotStone(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 1.5);
+        ItemStack pick = new ItemStack(ArsenalItems.SQUID_PICK.get());
+        Modules.install(pick, List.of(module(ModuleType.SMELTER)));
+        pick = hold(p, pick);
+        h.setBlock(2, 2, 3, Blocks.IRON_ORE);
+        h.setBlock(1, 1, 3, Blocks.STONE);
+        int before = Fe.stored(pick);
+        p.gameMode.destroyBlock(abs(h, 2, 2, 3));
+        p.gameMode.destroyBlock(abs(h, 1, 1, 3));
+        var at = new net.minecraft.core.BlockPos(2, 2, 3);
+        h.assertItemEntityPresent(net.minecraft.world.item.Items.IRON_INGOT, at, 2);
+        h.assertItemEntityNotPresent(net.minecraft.world.item.Items.RAW_IRON, at, 3);
+        h.assertItemEntityPresent(net.minecraft.world.item.Items.COBBLESTONE, new net.minecraft.core.BlockPos(1, 1, 3), 2);
+        h.assertTrue(before - Fe.stored(pick) == 2 * Rules.PICK_FE + Rules.SMELT_FE, "two blocks and one smelt: " + (before - Fe.stored(pick)));
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void inductionFeedsTheHeldToolFromTheChest(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 2.5);
+        ItemStack chest = charged(ArmorSet.COLLAPSAR, ArmorItem.Type.CHESTPLATE);
+        Modules.install(chest, List.of(module(ModuleType.INDUCTION)));
+        Fe.set(chest, Fe.capacity(chest));
+        p.setItemSlot(EquipmentSlot.CHEST, chest);
+        p.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(ArsenalItems.SQUID_PICK.get()));
+        int chestBefore = Fe.stored(p.getItemBySlot(EquipmentSlot.CHEST));
+        SuitEvents.induct(p);
+        int got = Fe.stored(p.getMainHandItem());
+        h.assertTrue(got == Rules.INDUCTION_FE_PER_SECOND, "one coil, one second: " + got);
+        h.assertTrue(chestBefore - Fe.stored(p.getItemBySlot(EquipmentSlot.CHEST)) == got, "the charge must come out of the chest");
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void collectorPullsLooseItemsButNotThrownOnes(GameTestHelper h) {
+        ServerPlayer p = player(h, 1.5, 1.5);
+        ItemStack boots = charged(ArmorSet.MEISSNER, ArmorItem.Type.BOOTS);
+        Modules.install(boots, List.of(module(ModuleType.COLLECTOR)));
+        Fe.set(boots, Fe.capacity(boots));
+        p.setItemSlot(EquipmentSlot.FEET, boots);
+        Vec3 far = h.absoluteVec(new Vec3(4.5, 1, 4.5));
+        var loose = new net.minecraft.world.entity.item.ItemEntity(h.getLevel(), far.x, far.y, far.z, new ItemStack(net.minecraft.world.item.Items.DIAMOND));
+        var thrown = new net.minecraft.world.entity.item.ItemEntity(h.getLevel(), far.x, far.y, far.z, new ItemStack(net.minecraft.world.item.Items.EMERALD));
+        for (var item : List.of(loose, thrown)) {
+            item.setNoPickUpDelay();
+            item.setDeltaMovement(Vec3.ZERO);
+            h.getLevel().addFreshEntity(item);
+        }
+        thrown.setThrower(p);
+        p.setShiftKeyDown(true);
+        SuitEvents.collect(p);
+        h.assertTrue(loose.distanceTo(p) > 3, "sneaking must hold the field off");
+        p.setShiftKeyDown(false);
+        SuitEvents.collect(p);
+        h.assertTrue(loose.distanceTo(p) < 1, "a loose item must be brought in: " + loose.distanceTo(p));
+        h.assertTrue(thrown.distanceTo(p) > 3, "what the wearer threw away stays put");
+        h.succeed();
+    }
+
     // ---- Recipes against the real base mod ---------------------------------------------------------------------------
 
     @GameTest(template = ARENA)
@@ -873,7 +936,7 @@ public final class ArsenalGameTests {
             h.assertTrue(recipes.byKey(id).isPresent(), "recipe failed to load: " + id);
             found++;
         }
-        h.assertTrue(found == 35, "unexpected item count " + found);
+        h.assertTrue(found == 38, "unexpected item count " + found);
         var lamina = recipes.byKey(SinguloArsenal.id("collapsar_lamina")).orElseThrow().value();
         h.assertTrue(BuiltInRegistries.RECIPE_SERIALIZER.getKey(lamina.getSerializer()).toString().equals("singulo:machine"), "lamina must be a Singulo machine recipe");
         h.succeed();

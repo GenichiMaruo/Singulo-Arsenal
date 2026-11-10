@@ -27,6 +27,8 @@ import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.ExperienceOrb;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
@@ -39,6 +41,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.EventPriority;
+import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.common.NeoForgeMod;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.entity.ProjectileImpactEvent;
@@ -133,6 +136,7 @@ public final class SuitEvents {
         if (!(event.getEntity() instanceof ServerPlayer player) || !player.isAlive() || player.isSpectator()) return;
         if (player.tickCount % 10 == 0) applyAttributes(player);
         metricDrive(player);
+        if (player.tickCount % Rules.COLLECT_INTERVAL == 0) collect(player);
         if (player.tickCount % 20 == 0) upkeep(player);
     }
 
@@ -144,6 +148,7 @@ public final class SuitEvents {
         if (!(held.getItem() instanceof SuitItem)) Fe.accrete(player, held);
 
         fireBits(player);
+        induct(player);
         shareCurrent(player);
         filterHelmets(player);
         relaxLining(player);
@@ -164,6 +169,64 @@ public final class SuitEvents {
             Mob target = targets.get(bit % targets.size());
             target.hurt(source, Rules.BIT_DAMAGE);
             FxPayload.sendEntity(player.serverLevel(), FxPayload.BIT_SHOT, player, target.getBoundingBox().getCenter(), bit);
+        }
+    }
+
+    /**
+     * Induction coils feed the chestpiece's charge into whatever the wearer carries that takes FE, this mod's or any other's,
+     * the held items first. Public so GameTests can drive it.
+     */
+    public static void induct(ServerPlayer player) {
+        ItemStack chest = player.getItemBySlot(EquipmentSlot.CHEST);
+        int coils = Modules.count(chest, ModuleType.INDUCTION);
+        if (coils == 0) return;
+        int budget = Rules.induced(Fe.stored(chest), Integer.MAX_VALUE, coils);
+        List<ItemStack> carried = new ArrayList<>(List.of(player.getMainHandItem(), player.getOffhandItem()));
+        for (ItemStack stack : player.getInventory().items) if (stack != carried.getFirst()) carried.add(stack);
+        for (ItemStack stack : carried) {
+            if (budget <= 0) return;
+            if (stack.isEmpty()) continue;
+            var storage = stack.getCapability(Capabilities.EnergyStorage.ITEM);
+            if (storage == null || !storage.canReceive()) continue;
+            int got = storage.receiveEnergy(budget, false);
+            if (got <= 0) continue;
+            Fe.set(chest, Fe.stored(chest) - got);
+            budget -= got;
+        }
+    }
+
+    /**
+     * Collector modules on any worn pieces add up to one field that brings loose items and experience to the wearer. Sneaking
+     * turns it off, and what the wearer threw away stays where it fell. Public so GameTests can drive it.
+     */
+    public static void collect(ServerPlayer player) {
+        if (player.isShiftKeyDown()) return;
+        int modules = 0;
+        ItemStack payer = ItemStack.EMPTY;
+        for (EquipmentSlot slot : SLOTS) {
+            ItemStack piece = player.getItemBySlot(slot);
+            int n = Modules.count(piece, ModuleType.COLLECTOR);
+            if (n == 0) continue;
+            modules += n;
+            if (Fe.stored(piece) > Fe.stored(payer)) payer = piece;
+        }
+        double radius = Rules.collectRadius(modules);
+        if (radius <= 0 || payer.isEmpty()) return;
+        var box = player.getBoundingBox().inflate(radius);
+        double reach = radius * radius;
+        Vec3 at = player.position();
+        var inventory = player.getInventory();
+        for (ItemEntity item : player.level().getEntitiesOfClass(ItemEntity.class, box, e -> e.isAlive() && !e.hasPickUpDelay()
+                && e.getOwner() != player && e.distanceToSqr(player) <= reach && e.distanceToSqr(player) > 2.25)) {
+            // Anything that could not be picked up would only be dragged along, and paid for again every time.
+            if (inventory.getSlotWithRemainingSpace(item.getItem()) < 0 && inventory.getFreeSlot() < 0) continue;
+            if (!Fe.spend(payer, Rules.COLLECT_FE)) return;
+            item.teleportTo(at.x, at.y, at.z);
+        }
+        for (ExperienceOrb orb : player.level().getEntitiesOfClass(ExperienceOrb.class, box, e -> e.isAlive()
+                && e.distanceToSqr(player) <= reach && e.distanceToSqr(player) > 2.25)) {
+            if (!Fe.spend(payer, Rules.COLLECT_FE)) return;
+            orb.teleportTo(at.x, at.y, at.z);
         }
     }
 

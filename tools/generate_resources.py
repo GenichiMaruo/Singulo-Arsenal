@@ -15,7 +15,7 @@ PARTS = ['helmet', 'chestplate', 'leggings', 'boots']
 WEAPONS = ['quench_saber', 'casimir_blade', 'tidal_reaver', 'jet_lance']
 TOOLS = ['squid_pick', 'degeneracy_breaker', 'shear_saw', 'accretion_drill']
 MATERIALS = ['flux_weave', 'pressure_lattice', 'collapsar_lamina', 'jet_collimator', 'tidal_edge']
-MODULES = ['bit_drone_module', 'capacitor_module', 'plating_module', 'thruster_module', 'coolant_module', 'amplifier_module', 'metric_drive_module', 'meltdown_module', 'overclock_module']
+MODULES = ['bit_drone_module', 'capacitor_module', 'plating_module', 'thruster_module', 'coolant_module', 'amplifier_module', 'metric_drive_module', 'meltdown_module', 'overclock_module', 'smelter_module', 'induction_module', 'collector_module']
 DAMAGE = ['quench', 'collapse', 'jet', 'shear', 'horizon', 'bit']
 MATERIAL_SIZE = 32
 FINE_SIZE = 64
@@ -170,6 +170,9 @@ machine('amplifier_module', ASSEMBLER, 3, 200, 400, [(s('quantum_computing_modul
 machine('metric_drive_module', ASSEMBLER, 5, 400, 200_000, [(s('metric_drive'), 1), (s('gravity_field_stabilizer'), 2), (s('superconducting_coil'), 4), (s('quantum_computing_module'), 1)], s('metric_drive'))
 machine('meltdown_module', ASSEMBLER, 5, 400, 200_000, [(s('jet_condensate'), 4), (s('heat_exchange_core'), 2), (s('entangled_element'), 2), (s('confinement_ring'), 1)], s('jet_condensate'))
 machine('overclock_module', ASSEMBLER, 3, 200, 400, [(s('precision_actuator'), 2), (s('quantum_computing_module'), 1), (s('superconducting_coil'), 2)], s('precision_actuator'))
+machine('smelter_module', ASSEMBLER, 3, 200, 400, [(s('heat_exchange_core'), 2), (s('white_ceramic_composite'), 2), (s('steel_plate'), 2), (s('superconducting_wire'), 1)], s('heat_exchange_core'))
+machine('induction_module', ASSEMBLER, 3, 200, 400, [(s('superconducting_coil'), 4), (s('superconducting_wire'), 2), (s('ceramic_substrate'), 1), (s('nihonium_plate'), 1)], s('superconducting_coil'))
+machine('collector_module', ASSEMBLER, 3, 200, 400, [(s('superconducting_coil'), 3), (s('entangled_element'), 1), (s('steel_plate'), 2)], s('entangled_element'))
 write(f'data/{MOD}/loot_table/blocks/module_integrator.json', {
     'type': 'minecraft:block',
     'pools': [{'rolls': 1, 'entries': [{'type': 'minecraft:item', 'name': own('module_integrator')}], 'conditions': [{'condition': 'minecraft:survives_explosion'}]}],
@@ -368,6 +371,9 @@ for name, j, e, tj, te, dj, de in [
     ('coolant_module', '冷却モジュール', 'Coolant Module', '武器：再使用時間 -25%', 'Weapons: -25% cooldown', '重複可。', 'Stacks.'),
     ('amplifier_module', '出力増幅器', 'Output Amplifier', '武器：ダメージ +15%', 'Weapons: +15% damage', '重複可。', 'Stacks.'),
     ('metric_drive_module', 'メトリックドライブ・モジュール', 'Metric Drive Module', '防具：電力で飛行', 'Armor: flight on FE', 'エキゾチック物質は不要。飛行中 400 FE/t、落下ダメージ無効。', 'No exotic matter. 400 FE/t while flying, no fall damage.'),
+    ('smelter_module', '熔融精錬モジュール', 'Smelting Module', '工具：鉱石を精錬して落とす', 'Tools: ores drop smelted', '鉱石と原石だけが対象。1個 400 FE、経験値も出る。', 'Ores and raw metal only. 400 FE each, with the experience.'),
+    ('induction_module', '誘導給電コイル', 'Induction Coil', '胴：持ち物の電力機器を充電', 'Chest: charges what you carry', '胴の電力から毎秒 20k FE（重複で加算）。他MODのFE機器も対象、手に持つものが先。', 'Up to 20k FE/s from the chestpiece, more per coil. Any FE item, held ones first.'),
+    ('collector_module', '重力集積モジュール', 'Gravity Collector', '防具：周りのアイテムを引き寄せる', 'Armor: pulls in nearby items', '半径6（1個ごとに+3、最大16）。アイテムと経験値、1個 20 FE。スニーク中と自分で捨てた物は対象外。', 'Radius 6 (+3 per module, up to 16). Items and experience, 20 FE each. Not while sneaking, nor what you threw.'),
     ('overclock_module', '掘削オーバークロック', 'Mining Overclock', '工具：採掘速度 +40%', 'Tools: +40% mining speed', '重複可。', 'Stacks.'),
     ('meltdown_module', '融解起爆モジュール', 'Meltdown Module', 'ジェット砲：着弾点が大爆発', 'Jet Cannon: first hit detonates', '発射と同時に着弾点が爆発（半径7、最大60ダメージ）。地形破壊モードでは貫通した一番奥で爆発し、石は溶岩になる。', 'Explodes at the impact the moment it fires (radius 7, up to 60 damage). In destruction mode it goes off at the deepest point, and stone turns to lava.'),
 ]:
@@ -456,7 +462,7 @@ def rgb(value):
     return ((value >> 16) & 255, (value >> 8) & 255, value & 255, 255)
 
 
-GLOWS = {'overclock_module': 'c', 'metric_drive_module': 'cW', 'meltdown_module': 'OyW', 'flux_weave': 'c', 'pressure_lattice': 'a', 'collapsar_lamina': 'oy', 'jet_collimator': 'cW', 'tidal_edge': 'sy',
+GLOWS = {'overclock_module': 'c', 'smelter_module': 'oyW', 'induction_module': 'c', 'collector_module': 'c', 'metric_drive_module': 'cW', 'meltdown_module': 'OyW', 'flux_weave': 'c', 'pressure_lattice': 'a', 'collapsar_lamina': 'oy', 'jet_collimator': 'cW', 'tidal_edge': 'sy',
          'bit_drone_module': 'cW', 'capacitor_module': 'c', 'thruster_module': 'cW', 'coolant_module': 'c', 'amplifier_module': 'c'}
 FRAMES = 8
 
@@ -718,6 +724,63 @@ sprite('amplifier_module', [
     '................',
     '................',
 ], {'I': 0xC2CDD9, 'V': 0x262430, 'P': 0xE7D8B0, 'c': 0x7CE8FF})
+# A crucible over its burner, the melt glowing at the brim.
+sprite('smelter_module', [
+    '................',
+    '................',
+    '..II........II..',
+    '..IIIIIIIIIIII..',
+    '..IVyyyWWyyyVI..',
+    '..IVoyyyyyyoVI..',
+    '..IVooooooooVI..',
+    '..IVVVVVVVVVVI..',
+    '...IVVVVVVVVI...',
+    '...IVVVVVVVVI...',
+    '....IIIIIIII....',
+    '.....SSSSSS.....',
+    '....o.o..o.o....',
+    '.....o.oo.o.....',
+    '....SSSSSSSS....',
+    '................',
+], {'I': 0xC2CDD9, 'V': 0x3A3648, 'S': 0x8D9AA8, 'o': 0xFF8A3D, 'y': 0xFFC36B, 'W': 0xFFF2D0})
+# A wound coil on its core, with field lines looping out from the poles.
+sprite('induction_module', [
+    '................',
+    '.....IIIIII.....',
+    '..cc.IEEEEI.cc..',
+    '.c...SSSSSS...c.',
+    '.c...VVVVVV...c.',
+    '.c...SSSSSS...c.',
+    '.c...VVVVVV...c.',
+    '.c...SSSSSS...c.',
+    '.c...VVVVVV...c.',
+    '.c...SSSSSS...c.',
+    '.c...VVVVVV...c.',
+    '.c...SSSSSS...c.',
+    '..cc.IEEEEI.cc..',
+    '.....IIIIII.....',
+    '................',
+    '................',
+], {'I': 0xC2CDD9, 'E': 0x3A4656, 'S': 0xD08A4A, 'V': 0x6A4630, 'c': 0x7CE8FF})
+# A small well of bent space, with what it gathers falling in from every side.
+sprite('collector_module', [
+    '................',
+    '................',
+    '..c....cc....c..',
+    '...c...cc...c...',
+    '....c......c....',
+    '......IIII......',
+    '....IIVVVVII....',
+    '.cc.IVEEEEVI.cc.',
+    '.cc.IVEEEEVI.cc.',
+    '....IIVVVVII....',
+    '......IIII......',
+    '....c......c....',
+    '...c...cc...c...',
+    '..c....cc....c..',
+    '................',
+    '................',
+], {'I': 0xE7D8B0, 'V': 0x3A3648, 'E': 0x0E0D14, 'c': 0xFFC36B})
 # A drive gear with a rising arrow in its hub.
 sprite('overclock_module', [
     '................',

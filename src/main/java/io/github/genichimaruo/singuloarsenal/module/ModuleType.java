@@ -19,7 +19,10 @@ public enum ModuleType {
     AMPLIFIER("amplifier_module", item -> item instanceof ArsenalWeapon),
     METRIC_DRIVE("metric_drive_module", item -> item instanceof SuitItem),
     MELTDOWN("meltdown_module", item -> item instanceof JetLanceItem),
-    OVERCLOCK("overclock_module", item -> item instanceof PoweredTool);
+    OVERCLOCK("overclock_module", item -> item instanceof PoweredTool),
+    SMELTER("smelter_module", item -> item instanceof PoweredTool),
+    INDUCTION("induction_module", item -> item instanceof SuitItem suit && suit.getType() == ArmorItem.Type.CHESTPLATE),
+    COLLECTOR("collector_module", item -> item instanceof SuitItem);
 
     public final String id;
     private final Predicate<Item> fits;

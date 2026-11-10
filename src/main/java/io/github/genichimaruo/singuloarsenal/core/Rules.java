@@ -363,6 +363,26 @@ public final class Rules {
         return 1 + OVERCLOCK_BONUS * Math.max(0, modules);
     }
 
+    // ---- Utility modules ---------------------------------------------------------------------------------------------------
+
+    /** Per item smelted on the way out of the block. */
+    public static final int SMELT_FE = 400;
+    /** What one induction coil moves out of the chestpiece each second. */
+    public static final int INDUCTION_FE_PER_SECOND = 20_000;
+    /** Per item or orb the collector brings in. */
+    public static final int COLLECT_FE = 20;
+    public static final int COLLECT_INTERVAL = 4;
+    public static final double COLLECT_RADIUS = 6, COLLECT_RADIUS_STEP = 3, COLLECT_RADIUS_MAX = 16;
+
+    public static double collectRadius(int modules) {
+        return modules <= 0 ? 0 : Math.min(COLLECT_RADIUS_MAX, COLLECT_RADIUS + COLLECT_RADIUS_STEP * (modules - 1));
+    }
+
+    /** How much one second of induction may move: no more than the coils carry, the chestpiece holds, or the item has room for. */
+    public static int induced(int available, int room, int coils) {
+        return (int) Math.max(0, Math.min(Math.min(available, room), (long) INDUCTION_FE_PER_SECOND * Math.max(0, coils)));
+    }
+
     // ---- Readouts ----------------------------------------------------------------------------------------------------------
 
     private static final String[] ENERGY_UNITS = {"k", "M", "G", "T", "P"};

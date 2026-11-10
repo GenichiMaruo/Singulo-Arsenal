@@ -112,6 +112,9 @@ public final class RulesTest {
         check(Rules.lanceKick(-1) == 0, "no recoil before firing");
         check(Rules.lanceKick(0) == 1 && Rules.lanceKick(Rules.LANCE_PULSE) < 1 && Rules.lanceKick(Rules.LANCE_PULSE * 2) == 0, "one kick per shot");
         check(Rules.moduleSlots(1) == 0 && Rules.moduleSlots(2) == 1 && Rules.moduleSlots(4) == 3 && Rules.moduleSlots(5) == 5, "socket tiers");
+        check(Rules.collectRadius(0) == 0 && Rules.collectRadius(1) == 6 && Rules.collectRadius(2) == 9 && Rules.collectRadius(9) == 16, "collector reach");
+        check(Rules.induced(1_000_000, Integer.MAX_VALUE, 1) == 20_000 && Rules.induced(1_000_000, Integer.MAX_VALUE, 3) == 60_000, "coils add up");
+        check(Rules.induced(5_000, Integer.MAX_VALUE, 2) == 5_000 && Rules.induced(1_000_000, 300, 2) == 300 && Rules.induced(100, 50, 0) == 0, "induction never moves more than there is");
         check(Rules.capacityWith(1000, 0) == 1000 && Rules.capacityWith(1000, 2) == 2000, "capacitor bonus");
         check(Rules.capacityWith(Integer.MAX_VALUE, 3) == Integer.MAX_VALUE, "capacity overflow");
         check(Rules.cooled(160, 0) == 160 && Rules.cooled(160, 1) == 120 && Rules.cooled(1, 9) == 1, "coolant");
