@@ -161,12 +161,18 @@ public final class Canvas {
             strip(ox, oy, oz, ux, uy, uz, vx, vy, vz, nx, ny, nz, seed, 0, width, 0, height, width, height, top, bottom);
             return;
         }
-        strip(ox, oy, oz, ux, uy, uz, vx, vy, vz, nx, ny, nz, seed, e, width - e, e, height - e, width, height, top, bottom);
         int high = shade(rgb, 1.28F), low = shade(rgb, 0.58F);
-        strip(ox, oy, oz, ux, uy, uz, vx, vy, vz, nx, ny, nz, seed, 0, width, 0, e, width, height, high, high);
-        strip(ox, oy, oz, ux, uy, uz, vx, vy, vz, nx, ny, nz, seed, 0, width, height - e, height, width, height, low, low);
-        strip(ox, oy, oz, ux, uy, uz, vx, vy, vz, nx, ny, nz, seed, 0, e, e, height - e, width, height, shade(top, 0.86F), shade(bottom, 0.86F));
-        strip(ox, oy, oz, ux, uy, uz, vx, vy, vz, nx, ny, nz, seed, width - e, width, e, height - e, width, height, shade(top, 0.78F), shade(bottom, 0.78F));
+        // Nine patches, every neighbour sharing whole edges. A long bevel strip beside short ones leaves T-junctions, and those open
+        // one-pixel cracks that sparkle as the object moves.
+        float[] across = {0, e, width - e, width}, down = {0, e, height - e, height};
+        for (int row = 0; row < 3; row++) {
+            for (int column = 0; column < 3; column++) {
+                float side = column == 0 ? 0.86F : column == 2 ? 0.78F : 1;
+                int upper = row == 0 ? high : row == 2 ? low : column == 1 ? top : shade(top, side);
+                int lower = row == 0 ? high : row == 2 ? low : column == 1 ? bottom : shade(bottom, side);
+                strip(ox, oy, oz, ux, uy, uz, vx, vy, vz, nx, ny, nz, seed, across[column], across[column + 1], down[row], down[row + 1], width, height, upper, lower);
+            }
+        }
     }
 
     private void strip(float ox, float oy, float oz, float ux, float uy, float uz, float vx, float vy, float vz, float nx, float ny, float nz,
