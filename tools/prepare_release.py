@@ -16,7 +16,7 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 CF_VERSIONS = 'https://minecraft.curseforge.com/api/game/versions'
 CF_PROJECT_ID = '1793647'
-CF_VERSION_NAMES = ['1.21.1', 'NeoForge', 'Java 21']
+CF_VERSION_NAMES = ['1.21.1', 'NeoForge', 'Java 21', 'Client', 'Server']
 
 
 def prepare(root, jar_dir, release_type):
@@ -85,7 +85,7 @@ def check_api(project_id, token):
         raise ValueError('CurseForge returned an unexpected version catalogue')
     # The same display name can belong to Minecraft, Bukkit or addon version types.
     ids = []
-    for name, category in zip(CF_VERSION_NAMES, ['minecraft', 'modloader', 'java']):
+    for name, category in zip(CF_VERSION_NAMES, ['minecraft', 'modloader', 'java', 'environment', 'environment']):
         type_ids = {entry['id'] for entry in types if isinstance(entry, dict) and type(entry.get('id')) is int
                     and isinstance(entry.get('slug'), str) and entry['slug'].startswith(category)}
         matches = {entry['id'] for entry in versions if isinstance(entry, dict) and entry.get('name') == name
