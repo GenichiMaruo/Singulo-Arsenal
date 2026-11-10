@@ -37,7 +37,7 @@ GitHub Environment **`curseforge`** に以下を設定します。2026-11-10 時
 
 アップロードは自動再試行しません。通信が途切れても CurseForge 側では受理されている場合があるため、失敗後に再実行する前に Files 一覧を確認してください。同時公開は concurrency で直列化します。GitHub のタグ・Release はこのワークフローでは作成しません。
 
-`tools/prepare_release.py` は [CurseForge Upload API](https://support.curseforge.com/support/solutions/articles/9000197321-curseforge-upload-api) に従って送信します。`gameVersionNames` に対応環境を設定し、必須依存が拒否された場合も依存指定を外すフォールバックは行いません。
+`tools/prepare_release.py` は [CurseForge Upload API](https://support.curseforge.com/support/solutions/articles/9000197321-curseforge-upload-api) に従って送信します。バージョン一覧とカテゴリから正しい `gameVersions` の数値 ID を解決し、必須依存が拒否された場合も依存指定を外すフォールバックは行いません。
 
 ## 初回 0.1.0 の公開情報
 
