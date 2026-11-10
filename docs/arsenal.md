@@ -1,5 +1,7 @@
 # 装備仕様（0.2.0 開発中）
 
+[README](../README.md) · [日本語の説明書](player/ja.md) · [English guide](player/en.md) · [ドキュメント案内](README.md)
+
 対象は Singulo 0.16.0 / Minecraft 1.21.1 / NeoForge です。数値の正本は `core/Rules.java` で、この文書はそこから書き起こしています。
 防御値の並びは頭／胴／脚／足です。
 
@@ -239,3 +241,5 @@
 - `tools/check.py`：計算チェック、レシピと本体の ID の照合、日英の翻訳キーと書式の一致、再生成の決定性。
 - `runGameTestServer`：本体 JAR と同時ロードして48テスト。
 - `tools/review`：実クライアントで全状態を撮影するハーネス。
+
+実行方法は[テスト手順](development/testing.md)を参照してください。

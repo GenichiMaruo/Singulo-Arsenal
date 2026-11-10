@@ -1,0 +1,53 @@
+# テスト手順
+
+変更したら、少なくとも `build`（オフライン検査を含む）と GameTest を通してください。見た目を変えたときは実クライアントでの撮影も行います。
+
+## オフライン検査
+
+ゲームを起動せずに実行できます。`build` からも自動で呼ばれます。
+
+```sh
+python3 tools/check.py
+# 本体のソースがあれば、レシピに使う本体の素材 ID も照合する
+SINGULO_SOURCE=/absolute/path/to/Singulo python3 tools/check.py
+```
+
+- `tests/RulesTest.java`：`Rules.java` の能力計算（現在 5,331 チェック）。
+- レシピ・モデル・アイコン・翻訳キーの揃い、日英の書式記号の一致、要約の長さ。
+- `generate_resources.py` を再実行しても差分が出ないこと（生成物の直接編集を検出する）。
+
+## GameTest
+
+本体 JAR と同時に読み込んだ実サーバーで、装備の能力を実際に動かして確かめます。現在は必須テスト 48 件です。
+
+```sh
+./gradlew runGameTestServer -PsinguloJar=/absolute/path/Singulo-0.16.0-1.21.1N.jar
+```
+
+電力、保存と読み込み、降着と質量ペレット缶、飛び道具の反発、チャンドラセカール限界、核パスタ相、事象の地平面、ジェット噴射、電力シールド、武器の能力、地形破壊、工具の範囲採掘・鉱石探査と感度、モジュール統合と各モジュールの効果、容量の違う装備の電力分配、武器とドローンの効果分離、全レシピの読み込みを検証します。
+テストクラスとテスト用構造物は配布 JAR から除外しています。
+
+テストを足すときの注意：
+- モックプレイヤーはネットワーク経由で tick されません。tick に依存する処理は、`SuitEvents.upkeep` のように公開した入口を直接呼びます。
+- 対象のブロックやアイテムはテスト用構造物（アリーナ）の内側に置きます。外側は読み込まれていないことがあります。
+- 他のテストと干渉する重い処理（地形を大きく壊すものなど）は別の `batch` に分けます。
+
+## 実クライアントでの撮影
+
+`tools/review` は、開発クライアントを起動して全装備・全状態を撮影するハーネスです。アイコンの大きさ、構えたときの位置、面の重なり（Z ファイティング）も検査します。
+
+```sh
+python3 tools/review/prepare_gui.py
+./gradlew --no-daemon -I tools/review/gui.gradle runClient -PsinguloJar=/absolute/path/Singulo-0.16.0-1.21.1N.jar
+```
+
+撮影結果は `build/gui-review/screenshots/` に出ます。面の重なりの報告は `zfight.txt`、アイコン単体の撮影は `icons-bare.png` です。静止画なので、動いているときのちらつきは実際に操作して確認してください。
+
+## CI
+
+GitHub Actions（`.github/workflows/build.yml`）は `1.21.1` と `feature/**` への push、`1.21.1` への pull request で動きます。
+
+- **build**：`build`（オフライン検査を含む）を実行し、JAR を成果物として保存する。
+- **integration**：固定した本体コミットを別にビルドし、本体の素材 ID の照合と GameTest を実行する。ログを成果物として保存する。
+
+Gradle 配布ファイルの取得は、失敗しても最大 5 回まで再試行します。
