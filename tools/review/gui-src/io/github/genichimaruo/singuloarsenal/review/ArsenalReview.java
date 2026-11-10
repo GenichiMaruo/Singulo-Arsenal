@@ -8,6 +8,7 @@ import io.github.genichimaruo.singuloarsenal.core.ArsenalData;
 import io.github.genichimaruo.singuloarsenal.client.art.Canvas;
 import io.github.genichimaruo.singuloarsenal.client.art.WeaponArt;
 import io.github.genichimaruo.singuloarsenal.core.Fe;
+import io.github.genichimaruo.singuloarsenal.core.Rules;
 import io.github.genichimaruo.singuloarsenal.core.Tips;
 import io.github.genichimaruo.singuloarsenal.net.FxPayload;
 import io.github.genichimaruo.singuloarsenal.weapon.JetLanceItem;
@@ -232,6 +233,12 @@ public final class ArsenalReview {
         step(10, () -> mc.gameMode.useItem(mc.player, InteractionHand.MAIN_HAND));
         at += 10;
         shot("scan-through-floor");
+        step(4, () -> local(mc, p -> p.getInventory().setItem(0, charged(ArsenalItems.JET_LANCE.get()))));
+        step(10, () -> { selectSlot(mc, 0); teleport(mc, OX, OZ - 4, 0, 4); });
+        step(10, () -> mc.options.keyAttack.setDown(true));
+        step(2, () -> mc.options.keyAttack.setDown(false));
+        at += Rules.LANCE_CHARGE_TICKS + 12;
+        shot("jet-translucency");
         step(4, () -> done = true);
     }
 

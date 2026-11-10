@@ -11,6 +11,7 @@ Ports the 0.2.0 features and fixes to Minecraft 1.20.1. Select the N file for Ne
 - Added a Collapsar suit energy shield, and reworked the Accretion Jet Cannon with a four-shot magazine, charge-up and terrain protection/breaking modes.
 - Improved equipment models, drones, effects, sounds, the Module Integrator screen and tooltips. Expanded the Japanese and English guides.
 - Fixed protected area mining, energy costs for canceled blocks, interrupted-shot reload bypasses, and lost smelting output above a stack limit.
+- Added the Minecraft 1.20.1 shader blend configuration so the cannon's jet remains translucent and glows over the background.
 - Existing Module Integrators retain their contents when upgrading from 0.1.0.
 
 ## 日本語
@@ -21,4 +22,5 @@ Ports the 0.2.0 features and fixes to Minecraft 1.20.1. Select the N file for Ne
 - コラプサー装甲に電力シールドを追加。降着ジェット砲は4発マガジン、チャージ、地形保護／破壊モードに対応しました。
 - 装備モデル、ドローン、エフェクト、音、統合台画面、ツールチップを改善し、日英ガイドを拡充しました。
 - 採掘保護、キャンセルされたブロックへの電力消費、持ち替えによるリロード回避、精錬結果のスタック上限による消失を修正しました。
+- 1.20.1用のシェーダー合成設定を追加し、ジェットが不透明な筒にならず、背景が透ける発光として描画されるよう修正しました。
 - 0.1.0のモジュール統合台は内容を維持したまま移行できます。

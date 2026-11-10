@@ -37,7 +37,9 @@ final class JetTube extends RenderType {
 
     static void registerShaders(RegisterShadersEvent event) {
         try {
-            event.registerShader(new ShaderInstance(event.getResourceProvider(), new ResourceLocation("singulo", "jet_beam"),
+            // In 1.20.1 ShaderInstance.apply() overrides RenderType's blend state.
+            // Our descriptor reuses Singulo's programs and explicitly enables additive blending.
+            event.registerShader(new ShaderInstance(event.getResourceProvider(), new ResourceLocation("singulo_arsenal", "jet_beam"),
                     DefaultVertexFormat.POSITION_TEX_COLOR), s -> shader = s);
         } catch (IOException e) {
             LogUtils.getLogger().error("Could not load Singulo's jet shader; jets fall back to plain tubes", e);
