@@ -111,12 +111,19 @@ public final class Rules {
     public static final double JET_BURST_REAR_RANGE = 10;
     public static final float JET_BURST_DAMAGE = 24;
     public static final int CLEANSE_FE = 10_000;
+    /** A full suit pays for damage instead of the wearer taking it. Deliberately ruinous: a full set holds 320 points. */
+    public static final int SHIELD_FE_PER_HP = 200_000;
     public static final int HORIZON_FE = 8_000_000;
     public static final int HORIZON_TICKS = 60;
     public static final int HORIZON_COOLDOWN = 12_000;
     public static final float HORIZON_HEALTH_FRACTION = 0.4F;
     public static final double HORIZON_RADIUS = 9;
     public static final float HORIZON_DAMAGE = 60;
+
+    /** How much of {@code damage} {@code fe} can pay for. */
+    public static float shieldable(float damage, long fe) {
+        return !Float.isFinite(damage) || damage <= 0 ? 0 : Math.min(damage, Math.max(0, fe) / (float) SHIELD_FE_PER_HP);
+    }
 
     public static int phaseOf(int load) {
         int value = clamp(load, LOAD_MAX);
@@ -187,35 +194,54 @@ public final class Rules {
     }
 
     /** Render-only: how far a body is drawn out. Compressed sideways so the volume stays constant. */
-    public static float stretchFor(int stress, float shearFade) {
-        return 1 + clamp(stress, STRESS_MAX) * 0.09F + Math.max(0, shearFade) * 1.1F;
+    public static float stretchFor(float stress, float shearFade) {
+        return 1 + Math.max(0, Math.min(STRESS_MAX, stress)) * 0.09F + Math.max(0, shearFade) * 1.1F;
+    }
+
+    /** A stretched body eases back to its own shape over this long once the stress lets go. */
+    public static final int STRETCH_RELAX_TICKS = 50;
+
+    /** 1 up to the moment of release, then a smooth fall to 0 over {@code ticks}. */
+    public static float relaxing(float age, int ticks) {
+        return 1 - ramp(age, 0, ticks);
     }
 
     // ---- Bipolar jet lance -------------------------------------------------------------------------------------
 
-    public static final int LANCE_IGNITE = 10;
-    public static final int LANCE_COLLIMATE = 30;
-    public static final int LANCE_MAX_HOLD = 150;
+    /** How long one shot burns. The jet is at full length from its first tick. */
+    public static final int LANCE_SHOT_TICKS = 40;
+    public static final int LANCE_SHOT_GAP = 6;
+    public static final int LANCE_MAGAZINE = 4;
     public static final int LANCE_PULSE = 5;
     public static final float LANCE_DAMAGE = 14;
     public static final float LANCE_ARMOR_KEPT = 0.4F;
     public static final double LANCE_RANGE = 80;
     /** Added to target hitboxes along the beam, so what looks hit is hit. */
     public static final double LANCE_HIT_WIDTH = 0.45;
-    public static final int LANCE_FE_PER_10_TICKS = 250_000;
+    public static final int LANCE_SHOT_FE = 1_000_000;
     public static final int LANCE_COOLDOWN = 160;
     public static final int LANCE_SHORT_COOLDOWN = 20;
+    /** How far past the first surface the shot can drill in breaking mode; the meltdown goes off where it gives out. */
+    public static final double LANCE_BORE_DEPTH = 20;
+    /** Half-width of the tunnel the shot drills in breaking mode. */
+    public static final double LANCE_BORE_RADIUS = 1.75;
+    /** The rings spool up for this long before the shot goes off. */
+    public static final int LANCE_CHARGE_TICKS = 28;
+    /** Singulo's beam charge at its own low pitch. It runs longer than the spool-up and is cut off the instant the shot goes off. */
+    public static final float LANCE_CHARGE_PITCH = 1F;
+    /** The Jet Forge's coil-and-drone spool under it, for weight. Slowed so its burst falls after the shot has already cut it off. */
+    public static final float LANCE_CHARGE_BODY_PITCH = 0.8F;
+    public static final float LANCE_BLAST_DAMAGE = 60;
+    public static final double LANCE_BLAST_RADIUS = 7;
+    public static final double LANCE_BLAST_RADIUS_PER_EXTRA = 1.5;
 
-    public static final int LANCE_IDLE = 0;
-    public static final int LANCE_IGNITING = 1;
-    public static final int LANCE_COLLIMATING = 2;
-    public static final int LANCE_FIRING = 3;
+    public static double blastRadius(int modules) {
+        return LANCE_BLAST_RADIUS + LANCE_BLAST_RADIUS_PER_EXTRA * Math.max(0, modules - 1);
+    }
 
-    public static int lanceStage(int heldTicks) {
-        if (heldTicks <= 0) return LANCE_IDLE;
-        if (heldTicks < LANCE_IGNITE) return LANCE_IGNITING;
-        if (heldTicks < LANCE_COLLIMATE) return LANCE_COLLIMATING;
-        return LANCE_FIRING;
+    /** Full damage at the centre, 40% at the edge. */
+    public static float blastFalloff(double distance, double radius) {
+        return (float) (1 - 0.6 * Math.max(0, Math.min(1, distance / radius)));
     }
 
     // ---- Modules and the Module Integrator ---------------------------------------------------------------------------------
@@ -231,13 +257,17 @@ public final class Rules {
     public static final float COOLANT_FACTOR = 0.75F;
     public static final float AMPLIFIER_BONUS = 0.15F;
     public static final int BITS_PER_MODULE = 2;
+    /** Width of the fan of bits behind the wearer. */
+    public static final double BIT_FAN_DEGREES = 110;
     public static final double BIT_RANGE = 16;
     public static final float BIT_DAMAGE = 5;
     public static final int BIT_FE = 1_500;
 
-    /** Sockets grow with what the gear cost to make: one at stage 2, two at stage 4, three at stage 5. */
+    public static final int METRIC_FE_PER_10_TICKS = 4_000;
+
+    /** Sockets grow with what the gear cost to make: one at stage 2, three at stage 4, five at stage 5. */
     public static int moduleSlots(int stage) {
-        return stage >= 5 ? 3 : stage >= 4 ? 2 : stage >= 2 ? 1 : 0;
+        return stage >= 5 ? 5 : stage >= 4 ? 3 : stage >= 2 ? 1 : 0;
     }
 
     public static int capacityWith(int base, int capacitors) {
@@ -289,19 +319,90 @@ public final class Rules {
         return ramp(p, 0.72F, 0.8F) * (1 - ramp(p, 0.82F, 0.9F));
     }
 
-    /** Recoil of one damage pulse, 1 as it fires and easing to 0 before the next. */
-    public static float lanceKick(float held) {
-        if (held < LANCE_COLLIMATE) return 0;
-        float phase = ((held - LANCE_COLLIMATE) % LANCE_PULSE) / LANCE_PULSE;
-        return (1 - phase) * (1 - phase);
+    /** The one kick of a shot going off: 1 as it fires, gone within half a second. */
+    public static float lanceKick(float age) {
+        if (age < 0 || age >= 10) return 0;
+        float left = 1 - age / 10;
+        return left * left;
     }
 
-    /** The beam is narrowed by three rings, stepping down exactly as the Accretion Jet Forge's does. */
-    public static float lanceRadius(int heldTicks) {
-        if (heldTicks < LANCE_IGNITE) return 0.72F;
-        if (heldTicks < LANCE_IGNITE + 7) return 0.66F;
-        if (heldTicks < LANCE_IGNITE + 14) return 0.52F;
-        if (heldTicks < LANCE_COLLIMATE) return 0.42F;
-        return 0.34F;
+    /** The jet flashes wide as it lights, settles within a few ticks, and pinches off over the last few. */
+    public static float lanceRadius(float age) {
+        if (age < 0) return 0;
+        float settle = Math.min(1, age / 4);
+        float tail = Math.max(0, Math.min(1, (LANCE_SHOT_TICKS - age) / 8));
+        return (0.8F + (0.44F - 0.8F) * settle) * tail;
+    }
+
+    /** 0 for a broad turbulent jet, 1 for a tight white beam. */
+    public static float lanceFocus(float age) {
+        return Math.max(0, Math.min(1, age / 3));
+    }
+
+    // ---- Mining tools -------------------------------------------------------------------------------------------------------
+
+    public static final int PICK_CAPACITY = 240_000;
+    public static final int TIER4_TOOL_CAPACITY = 2_000_000;
+    public static final int DRILL_CAPACITY = 16_000_000;
+    public static final int PICK_FE = 150;
+    public static final int BREAKER_FE = 1_000;
+    public static final int SAW_FE = 800;
+    public static final int DRILL_FE = 2_500;
+    public static final int SCAN_FE = 20_000;
+    public static final int SCAN_RADIUS = 16;
+    public static final int SCAN_MAX = 256;
+    public static final int SCAN_COOLDOWN = 60;
+    /** Sensitivity steps, as on Singulo's neutrino scanner. */
+    public static final int SCAN_MAX_TIER = 3;
+    /** How long the scan's markers stay up. */
+    public static final int SCAN_TICKS = 200;
+    public static final int TREE_LIMIT = 256;
+    public static final int VEIN_LIMIT = 64;
+    public static final int DRILL_SINGLE = 0, DRILL_AREA = 1, DRILL_VEIN = 2;
+    public static final float OVERCLOCK_BONUS = 0.4F;
+
+    public static float overclocked(int modules) {
+        return 1 + OVERCLOCK_BONUS * Math.max(0, modules);
+    }
+
+    /** Pellets one canister holds: sixty-four stacks. */
+    public static final int CANISTER_CAPACITY = 4_096;
+
+    // ---- Utility modules ---------------------------------------------------------------------------------------------------
+
+    /** Per item smelted on the way out of the block. */
+    public static final int SMELT_FE = 400;
+    /** What one induction coil moves out of the chestpiece each second. */
+    public static final int INDUCTION_FE_PER_SECOND = 20_000;
+    /** Per item or orb the collector brings in. */
+    public static final int COLLECT_FE = 20;
+    public static final int COLLECT_INTERVAL = 4;
+    public static final double COLLECT_RADIUS = 6, COLLECT_RADIUS_STEP = 3, COLLECT_RADIUS_MAX = 16;
+
+    public static double collectRadius(int modules) {
+        return modules <= 0 ? 0 : Math.min(COLLECT_RADIUS_MAX, COLLECT_RADIUS + COLLECT_RADIUS_STEP * (modules - 1));
+    }
+
+    /** How much one second of induction may move: no more than the coils carry, the chestpiece holds, or the item has room for. */
+    public static int induced(int available, int room, int coils) {
+        return (int) Math.max(0, Math.min(Math.min(available, room), (long) INDUCTION_FE_PER_SECOND * Math.max(0, coils)));
+    }
+
+    // ---- Readouts ----------------------------------------------------------------------------------------------------------
+
+    private static final String[] ENERGY_UNITS = {"k", "M", "G", "T", "P"};
+
+    /** 999, 12.3k, 4.5M: three significant digits, as Singulo shows energy. */
+    public static String compactEnergy(long fe) {
+        double value = Math.abs((double) fe);
+        if (value < 1000) return Long.toString(fe);
+        int unit = -1;
+        while (value >= 999.5 && unit < ENERGY_UNITS.length - 1) {
+            value /= 1000;
+            unit++;
+        }
+        String number = String.format(java.util.Locale.ROOT, value < 9.995 ? "%.2f" : value < 99.95 ? "%.1f" : "%.0f", value);
+        if (number.contains(".")) number = number.replaceAll("0+$", "").replaceAll("\\.$", "");
+        return (fe < 0 ? "-" : "") + number + ENERGY_UNITS[unit];
     }
 }

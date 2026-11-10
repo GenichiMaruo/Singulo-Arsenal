@@ -52,14 +52,16 @@ public final class MachineArt {
         }
     }
 
-    /** A bit drone: a small diamond hull with a sensor eye and two stabilisers. Pixels, centred. */
+    /** A bit drone, the shape of a Singulo android's: a slender stepped hull with small wings, nose toward -Z. Pixels, centred. */
     public static void bit(Canvas c, boolean firing) {
-        c.box(-1.5, -1, -1.5, 1.5, 1, 1.5, FRAME);
-        c.box(-1, 1, -1, 1, 2, 1, FRAME_LIGHT);
-        c.box(-1, -2, -1, 1, -1, 1, FRAME_LIGHT);
-        c.box(-3, -0.5, -0.5, -1.5, 0.5, 0.5, IVORY);
-        c.box(1.5, -0.5, -0.5, 3, 0.5, 0.5, IVORY);
-        for (double z : new double[]{-1.55, 1.5}) c.lit(-0.75, -0.5, z, 0.75, 0.5, z + 0.05, firing ? WHITE : COLD);
-        c.halo(0, 0, 0, 1, 3, 1, COLD, firing ? 0.7F : 0.25F);
+        c.box(-0.625, -0.625, -2, 0.625, 0.625, 2, FRAME);
+        c.box(-0.375, -0.375, -3.25, 0.375, 0.375, -2, FRAME);
+        c.box(-0.125, -0.125, -4.25, 0.125, 0.125, -3.25, IVORY);
+        c.box(-1.125, -0.125, 0.25, 1.125, 0.125, 2, FRAME_LIGHT);
+        c.box(-0.5, -0.5, 2, 0.5, 0.5, 2.5, DEEP);
+        int core = firing ? WHITE : COLD;
+        c.lit(-0.25, 0.625, -1.5, 0.25, 0.75, 1, core);
+        c.lit(-0.25, -0.25, 2.5, 0.25, 0.25, 2.625, core);
+        c.halo(0, 0, 2.75, 2, 0.5, 0.5, COLD, firing ? 0.8F : 0.4F);
     }
 }

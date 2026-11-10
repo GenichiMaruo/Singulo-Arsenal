@@ -5,7 +5,10 @@ import io.github.genichimaruo.singuloarsenal.armor.SuitEvents;
 import io.github.genichimaruo.singuloarsenal.core.ArsenalData;
 import io.github.genichimaruo.singuloarsenal.module.ModuleContent;
 import io.github.genichimaruo.singuloarsenal.net.AbilityPayload;
+import io.github.genichimaruo.singuloarsenal.net.FirePayload;
 import io.github.genichimaruo.singuloarsenal.net.FxPayload;
+import io.github.genichimaruo.singuloarsenal.net.ScanPayload;
+import io.github.genichimaruo.singuloarsenal.tool.Mining;
 import io.github.genichimaruo.singuloarsenal.weapon.Weapons;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.eventbus.api.IEventBus;
@@ -25,6 +28,7 @@ public final class SinguloArsenal {
         ArsenalItems.register(bus);
         SuitEvents.register();
         Weapons.register();
+        io.github.genichimaruo.singuloarsenal.tool.SquidPickItem.register();
         io.github.genichimaruo.singuloarsenal.net.ArsenalNetwork.register();
         if (net.minecraftforge.fml.loading.FMLEnvironment.dist == net.minecraftforge.api.distmarker.Dist.CLIENT) {
             io.github.genichimaruo.singuloarsenal.client.ArsenalClient.register();

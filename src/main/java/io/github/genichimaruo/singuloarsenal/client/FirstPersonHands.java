@@ -37,9 +37,11 @@ final class FirstPersonHands {
         float x = 0, y = 12.5F, z = -4.5F;
         if (reload >= 0) {
             float reach = Rules.reloadReach(reload), cock = Rules.reloadCock(reload);
+            // Under the magazine, following it as it comes out.
             y += (7.25F - y) * reach;
-            z += (-9 - z) * reach;
-            x += (4.5F - x) * cock;
+            z += (-9.5F - Rules.reloadMagazine(reload) * 6 - z) * reach;
+            // Out to the side first and only then along the gun, so the hand travels round the chamber and never through it.
+            x += ((right ? -6F : 6F) - x) * (float) Math.sqrt(cock);
             y += (3F - y) * cock;
             z += (1 - z) * cock;
         }

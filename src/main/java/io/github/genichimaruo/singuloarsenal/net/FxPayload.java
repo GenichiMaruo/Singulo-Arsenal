@@ -13,7 +13,7 @@ import java.util.function.Supplier;
 /** A server-confirmed visual event. Purely cosmetic; the client never learns anything it could act on. */
 public record FxPayload(int kind, Vec3 a, Vec3 b, float value, int entity) {
     public static final int RIPPLE = 0, COLLAPSE = 1, HORIZON = 2, JET_BURST = 3, QUENCH = 4, SLAM = 5, RUPTURE = 6, SHEAR = 7;
-    public static final int STRETCH = 8, BIT_SHOT = 9;
+    public static final int STRETCH = 8, BIT_SHOT = 9, MELTDOWN = 11;
     private static final double VIEW_DISTANCE = 128;
 
     public static void encode(FxPayload fx, FriendlyByteBuf buf) {

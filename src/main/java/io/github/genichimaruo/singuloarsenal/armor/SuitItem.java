@@ -2,6 +2,8 @@ package io.github.genichimaruo.singuloarsenal.armor;
 
 import io.github.genichimaruo.singuloarsenal.core.Fe;
 import io.github.genichimaruo.singuloarsenal.core.Powered;
+import io.github.genichimaruo.singuloarsenal.core.Tips;
+import io.github.genichimaruo.singuloarsenal.module.Modules;
 import java.util.List;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.Holder;
@@ -51,13 +53,19 @@ public final class SuitItem extends ArmorItem implements Powered {
 
     @Override
     public void appendHoverText(ItemStack stack, net.minecraft.world.level.Level context, List<Component> lines, TooltipFlag flag) {
-        lines.add(Component.translatable("tooltip.singulo_arsenal.stage", set.stage).withStyle(ChatFormatting.GOLD));
-        lines.add(Component.translatable("tooltip.singulo_arsenal." + set.id + "." + getType().getName()).withStyle(ChatFormatting.GRAY));
-        lines.add(Component.translatable("tooltip.singulo_arsenal.energy", Fe.stored(stack), Fe.capacity(stack)).withStyle(ChatFormatting.AQUA));
+        String id = set.id + "." + getType().getName();
+        lines.add(Component.translatable("tooltip.singulo_arsenal." + id + ".summary").withStyle(ChatFormatting.GRAY));
+        Tips.energyLine(stack, lines);
+        Modules.describe(stack, lines);
+        if (!Tips.detail()) {
+            Tips.hint(lines);
+            return;
+        }
+        lines.add(Component.translatable("tooltip.singulo_arsenal." + id).withStyle(ChatFormatting.DARK_AQUA));
+        lines.add(Component.translatable("tooltip.singulo_arsenal.full_set." + set.id).withStyle(ChatFormatting.LIGHT_PURPLE));
         if (accretes()) lines.add(Component.translatable("tooltip.singulo_arsenal.accretion").withStyle(ChatFormatting.DARK_AQUA));
         lines.add(Component.translatable("tooltip.singulo_arsenal.charge").withStyle(ChatFormatting.DARK_GRAY));
-        lines.add(Component.translatable("tooltip.singulo_arsenal.full_set." + set.id).withStyle(ChatFormatting.LIGHT_PURPLE));
-        io.github.genichimaruo.singuloarsenal.module.Modules.describe(stack, lines);
+        lines.add(Component.translatable("tooltip.singulo_arsenal.stage", set.stage).withStyle(ChatFormatting.GOLD));
     }
     @Override public void initializeClient(java.util.function.Consumer<net.minecraftforge.client.extensions.common.IClientItemExtensions> consumer) {
         io.github.genichimaruo.singuloarsenal.client.ArsenalClient.extensions(consumer);

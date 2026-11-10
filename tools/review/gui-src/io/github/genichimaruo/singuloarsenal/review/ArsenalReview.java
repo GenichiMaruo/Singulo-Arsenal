@@ -5,7 +5,15 @@ import io.github.genichimaruo.singuloarsenal.ArsenalItems;
 import io.github.genichimaruo.singuloarsenal.SinguloArsenal;
 import io.github.genichimaruo.singuloarsenal.armor.ArmorSet;
 import io.github.genichimaruo.singuloarsenal.core.ArsenalData;
+import io.github.genichimaruo.singuloarsenal.client.art.Canvas;
+import io.github.genichimaruo.singuloarsenal.client.art.WeaponArt;
 import io.github.genichimaruo.singuloarsenal.core.Fe;
+import io.github.genichimaruo.singuloarsenal.core.Rules;
+import io.github.genichimaruo.singuloarsenal.core.Tips;
+import io.github.genichimaruo.singuloarsenal.net.FxPayload;
+import io.github.genichimaruo.singuloarsenal.weapon.JetLanceItem;
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
 import io.github.genichimaruo.singuloarsenal.module.IntegratorBlockEntity;
 import io.github.genichimaruo.singuloarsenal.module.ModuleContent;
 import io.github.genichimaruo.singuloarsenal.module.ModuleType;
@@ -56,6 +64,8 @@ public final class ArsenalReview {
     private static Husk dummy;
     private static String capture;
     private static boolean done;
+    private static ItemStack tip;
+    private static boolean bare;
 
     private static ItemStack charged(Item item) {
         ItemStack stack = new ItemStack(item);
@@ -65,6 +75,10 @@ public final class ArsenalReview {
 
     private static List<Item> weapons() {
         return List.of(ArsenalItems.QUENCH_SABER.get(), ArsenalItems.CASIMIR_BLADE.get(), ArsenalItems.TIDAL_REAVER.get(), ArsenalItems.JET_LANCE.get());
+    }
+
+    private static List<Item> tools() {
+        return List.of(ArsenalItems.SQUID_PICK.get(), ArsenalItems.DEGENERACY_BREAKER.get(), ArsenalItems.SHEAR_SAW.get(), ArsenalItems.ACCRETION_DRILL.get());
     }
 
     private static void dress(LivingEntity who, ArmorSet set, int load) {
@@ -180,7 +194,7 @@ public final class ArsenalReview {
                 all.add(ArsenalItems.TIDAL_EDGE.get());
                 all.add(ModuleContent.INTEGRATOR_ITEM.get());
                 for (var module : ModuleContent.MODULES.values()) all.add(module.get());
-                for (int i = 0; i < all.size(); i++) p.getInventory().setItem(9 + i, charged(all.get(i)));
+                for (int i = 0; i < all.size(); i++) p.getInventory().setItem(i, charged(all.get(i)));
             });
         });
         step(20, () -> {
@@ -192,7 +206,112 @@ public final class ArsenalReview {
         });
         at += 10;
         shot("icons");
+        step(2, () -> bare = true);
+        at += 3;
+        shot("icons-bare");
+        step(2, () -> bare = false);
+        step(2, () -> { audit(); tip = new ItemStack(ArsenalItems.JET_LANCE.get()); Fe.set(tip, Fe.capacity(tip)); });
+        at += 3;
+        shot("tooltip-brief");
+        step(2, () -> Tips.detail = () -> true);
+        at += 3;
+        shot("tooltip-detail");
+        // Check the actual scan packet and overlay against ore hidden under the floor.
+        step(2, () -> {
+            Tips.detail = net.minecraft.client.gui.screens.Screen::hasShiftDown;
+            mc.setScreen(null);
+            local(mc, p -> {
+                ItemStack pick = charged(ArsenalItems.SQUID_PICK.get());
+                ArsenalData.set(pick, ArsenalData.SCAN_TIER, 3);
+                p.getInventory().setItem(0, pick);
+                p.getInventory().selected = 0;
+                for (int x = -3; x <= 3; x += 2) p.serverLevel().setBlock(new BlockPos(x, 79, -2), Blocks.DIAMOND_ORE.defaultBlockState(), 3);
+                p.connection.teleport(OX, 81, -5, 0, 25);
+            });
+        });
+        step(10, () -> selectSlot(mc, 0));
+        step(10, () -> mc.gameMode.useItem(mc.player, InteractionHand.MAIN_HAND));
+        at += 10;
+        shot("scan-through-floor");
+        step(4, () -> local(mc, p -> p.getInventory().setItem(0, charged(ArsenalItems.JET_LANCE.get()))));
+        step(10, () -> { selectSlot(mc, 0); teleport(mc, OX, OZ - 4, 0, 4); });
+        step(10, () -> mc.options.keyAttack.setDown(true));
+        step(2, () -> mc.options.keyAttack.setDown(false));
+        at += Rules.LANCE_CHARGE_TICKS + 12;
+        shot("jet-translucency");
         step(4, () -> done = true);
+    }
+
+    /** Reports faces of the weapons that lie in the same plane and overlap, which is what shimmers at a distance. */
+    private static void audit() {
+        record Quad(int axis, float plane, float a0, float a1, float b0, float b1) {}
+        java.util.Map<String, java.util.function.Consumer<Canvas>> art = new java.util.LinkedHashMap<>();
+        art.put("quench", c -> WeaponArt.quench(c, 0, 0.5F, -1));
+        art.put("casimir", c -> WeaponArt.casimir(c, 0.5F, false, 3));
+        art.put("reaver", c -> WeaponArt.reaver(c, 0, -1, 0));
+        art.put("lance", c -> WeaponArt.lance(c, 0, -1, 0, -1));
+        art.put("pick", io.github.genichimaruo.singuloarsenal.client.art.ToolArt::squidPick);
+        art.put("breaker", io.github.genichimaruo.singuloarsenal.client.art.ToolArt::degeneracyBreaker);
+        art.put("saw", c -> io.github.genichimaruo.singuloarsenal.client.art.ToolArt.shearSaw(c, false, 0));
+        art.put("drill", c -> io.github.genichimaruo.singuloarsenal.client.art.ToolArt.accretionDrill(c, false, 0));
+        StringBuilder out = new StringBuilder();
+        art.forEach((name, draw) -> {
+            List<float[]> points = new ArrayList<>();
+            List<float[]> normals = new ArrayList<>();
+            VertexConsumer sink = new VertexConsumer() {
+                @Override public VertexConsumer vertex(double x, double y, double z) { points.add(new float[]{(float)x, (float)y, (float)z}); normals.add(new float[3]); return this; }
+                @Override public VertexConsumer color(int r, int g, int b, int a) { return this; }
+                @Override public VertexConsumer uv(float u, float v) { return this; }
+                @Override public VertexConsumer overlayCoords(int u, int v) { return this; }
+                @Override public VertexConsumer uv2(int u, int v) { return this; }
+                @Override public VertexConsumer normal(float x, float y, float z) { normals.set(normals.size() - 1, new float[]{x, y, z}); return this; }
+                @Override public void endVertex() {}
+                @Override public void defaultColor(int r, int g, int b, int a) {}
+                @Override public void unsetDefaultColor() {}
+            };
+            Canvas.drawFine(new PoseStack(), type -> sink, 0, 0, Canvas.noOverlay(), false, draw);
+            List<Quad> quads = new ArrayList<>();
+            for (int i = 0; i + 3 < points.size(); i += 4) {
+                for (int axis = 0; axis < 3; axis++) {
+                    int u = (axis + 1) % 3, v = (axis + 2) % 3;
+                    float[][] q = {points.get(i), points.get(i + 1), points.get(i + 2), points.get(i + 3)};
+                    if (Math.abs(q[0][axis] - q[1][axis]) + Math.abs(q[0][axis] - q[2][axis]) + Math.abs(q[0][axis] - q[3][axis]) > 1e-4F) continue;
+                    float a0 = 1e9F, a1 = -1e9F, b0 = 1e9F, b1 = -1e9F;
+                    for (float[] p : q) { a0 = Math.min(a0, p[u]); a1 = Math.max(a1, p[u]); b0 = Math.min(b0, p[v]); b1 = Math.max(b1, p[v]); }
+                    // A pair facing opposite ways is a joint between two parts, hidden from every side.
+                    float facing = normals.get(i)[axis];
+                    if (facing != 0) quads.add(new Quad(axis, facing > 0 ? q[0][axis] : -q[0][axis] - 1000, a0, a1, b0, b1));
+                }
+            }
+            java.util.Set<String> seen = new java.util.TreeSet<>();
+            for (int i = 0; i < quads.size(); i++) for (int j = i + 1; j < quads.size(); j++) {
+                Quad p = quads.get(i), q = quads.get(j);
+                if (p.axis != q.axis || Math.abs(p.plane - q.plane) > 0.06F) continue;
+                if (Math.min(p.a1, q.a1) - Math.max(p.a0, q.a0) < 0.02F || Math.min(p.b1, q.b1) - Math.max(p.b0, q.b0) < 0.02F) continue;
+                seen.add("xyz".charAt(p.axis) + "=" + p.plane + " near " + "xyz".charAt((p.axis + 1) % 3) + Math.max(p.a0, q.a0) + " " + "xyz".charAt((p.axis + 2) % 3) + Math.max(p.b0, q.b0));
+            }
+            out.append(name).append(": ").append(seen.size()).append('\n');
+            seen.forEach(line -> out.append("  ").append(line).append('\n'));
+        });
+        try {
+            Files.writeString(Minecraft.getInstance().gameDirectory.toPath().resolve("screenshots/zfight.txt"), out);
+        } catch (java.io.IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
+    }
+
+    @SubscribeEvent
+    public static void screen(net.minecraftforge.client.event.ScreenEvent.Render.Post event) {
+        var mc = Minecraft.getInstance();
+        if (bare) {
+            // Every gear icon on a plain ground and without its charge bar, so it can be measured against the slot.
+            var g = event.getGuiGraphics();
+            g.fill(0, 0, g.guiWidth(), g.guiHeight(), 0xFF8B8B8B);
+            List<Item> gear = ArsenalItems.powered();
+            for (int i = 0; i < gear.size(); i++) g.renderItem(new ItemStack(gear.get(i)), 8 + 18 * (i % 9), 8 + 18 * (i / 9));
+        }
+        if (tip == null) return;
+        event.getGuiGraphics().renderComponentTooltip(mc.font, net.minecraft.client.gui.screens.Screen.getTooltipFromItem(mc, tip), 40, 20);
     }
 
     private static void script(Minecraft mc) {
@@ -247,30 +366,39 @@ public final class ArsenalReview {
 
         step(30, () -> server(mc, o -> hold(o, weapons().get(2))));
         step(2, () -> watch(mc, -100, 5));
-        step(12, () -> server(mc, o -> o.startUsingItem(InteractionHand.MAIN_HAND)));
+        // Through use(), as a right click arrives on the server.
+        step(12, () -> server(mc, o -> o.getMainHandItem().getItem().use(o.serverLevel(), o, InteractionHand.MAIN_HAND)));
         at += 35;
         shot("other-reaver-focus");
+        at += 15;
+        shot("other-reaver-focus-late");
         step(2, () -> server(mc, ServerPlayer::releaseUsingItem));
         at += 3;
         shot("other-reaver-shear");
 
         step(40, () -> server(mc, o -> hold(o, weapons().get(3))));
+        // Four shots, each seen from another side; the fourth empties the magazine and starts the reload.
         step(2, () -> watch(mc, -100, 6));
-        step(10, () -> server(mc, o -> o.startUsingItem(InteractionHand.MAIN_HAND)));
-        at += 16;
-        shot("other-lance-collimating");
-        at += 22;
+        step(10, () -> server(mc, JetLanceItem::tryFire));
+        at += 14;
+        shot("other-lance-charging");
+        at += 13;
+        shot("other-lance-firing-lit");
+        at += 12;
         shot("other-lance-firing-side");
-        step(2, () -> watch(mc, -40, 6));
-        at += 8;
+        step(40, () -> watch(mc, -40, 6));
+        step(4, () -> server(mc, JetLanceItem::tryFire));
+        at += 42;
         shot("other-lance-firing-right");
-        step(2, () -> watch(mc, 165, 6));
-        at += 8;
+        step(40, () -> watch(mc, 165, 6));
+        step(4, () -> server(mc, JetLanceItem::tryFire));
+        at += 42;
         shot("other-lance-firing-behind");
-        step(2, () -> watch(mc, 30, 5));
-        at += 8;
+        step(40, () -> watch(mc, 30, 5));
+        step(4, () -> server(mc, JetLanceItem::tryFire));
+        at += 42;
         shot("other-lance-firing-front");
-        step(2, () -> server(mc, ServerPlayer::releaseUsingItem));
+        at += 26;
         step(2, () -> watch(mc, -70, 3.2));
         for (int[] cue : new int[][]{{20, 1}, {22, 2}, {26, 3}, {30, 4}, {22, 5}}) {
             at += cue[0];
@@ -315,18 +443,23 @@ public final class ArsenalReview {
 
         step(10, () -> selectSlot(mc, 3));
         at += 26;
-        step(2, () -> press(mc));
-        at += 16;
-        shot("self-lance-collimating");
-        at += 22;
+        // Through the real left-click path: key, client tick, packet.
+        step(2, () -> mc.options.keyAttack.setDown(true));
+        step(2, () -> mc.options.keyAttack.setDown(false));
+        at += 12;
+        shot("self-lance-charging");
+        at += 15;
+        shot("self-lance-firing-lit");
+        at += 12;
         shot("self-lance-firing");
-        step(2, () -> mc.options.setCameraType(CameraType.THIRD_PERSON_BACK));
-        at += 8;
+        step(40, () -> { local(mc, JetLanceItem::tryFire); mc.options.setCameraType(CameraType.THIRD_PERSON_BACK); });
+        at += 42;
         shot("self-lance-firing-third-back");
-        step(2, () -> mc.options.setCameraType(CameraType.THIRD_PERSON_FRONT));
-        at += 8;
+        step(40, () -> { local(mc, JetLanceItem::tryFire); mc.options.setCameraType(CameraType.THIRD_PERSON_FRONT); });
+        at += 42;
         shot("self-lance-firing-third-front");
-        step(2, () -> { mc.options.keyUse.setDown(false); mc.options.setCameraType(CameraType.FIRST_PERSON); });
+        step(40, () -> { local(mc, JetLanceItem::tryFire); mc.options.setCameraType(CameraType.FIRST_PERSON); });
+        at += 70;
         for (int[] cue : new int[][]{{20, 1}, {22, 2}, {26, 3}, {30, 4}, {22, 5}}) {
             at += cue[0];
             shot("self-lance-reload-" + cue[1]);
@@ -351,9 +484,12 @@ public final class ArsenalReview {
         }));
         step(2, () -> watch(mc, -40, 4.5));
         at += 14;
-        shot("other-bits-orbit");
+        shot("other-bits-behind");
         at += 4;
-        shot("other-bits-orbit-2");
+        shot("other-bits-behind-2");
+        step(2, () -> watch(mc, 180, 3.5));
+        at += 8;
+        shot("other-bits-rear");
         step(2, () -> local(mc, p -> {
             var level = p.serverLevel();
             BlockPos at = new BlockPos(3, 81, 3);
@@ -361,7 +497,7 @@ public final class ArsenalReview {
             var entity = (IntegratorBlockEntity) level.getBlockEntity(at);
             entity.energy().receiveEnergy(400_000, false);
             entity.items().setStackInSlot(0, charged(ArsenalItems.JET_LANCE.get()));
-            entity.items().setStackInSlot(1, new ItemStack(ModuleContent.MODULES.get(ModuleType.COOLANT).get()));
+            entity.items().setStackInSlot(1, new ItemStack(ModuleContent.MODULES.get(ModuleType.MELTDOWN).get()));
             entity.items().setStackInSlot(2, new ItemStack(ModuleContent.MODULES.get(ModuleType.AMPLIFIER).get()));
             p.connection.teleport(3.5, 81, 0.6, 0, 18);
             p.getInventory().selected = 8;
@@ -378,6 +514,72 @@ public final class ArsenalReview {
         step(2, () -> mc.setScreen(null));
         step(2, () -> { selectSlot(mc, 3); teleport(mc, OX, OZ - 4, 0, 4); });
         at += 24;
+
+        // A meltdown shot through a mixed hill: tunnel, deepest-point blast, stone melting and planks blowing apart.
+        step(2, () -> server(mc, o -> {
+            var level = o.serverLevel();
+            for (int x = -6; x <= 6; x++) for (int y = 81; y <= 90; y++) for (int z = 22; z <= 32; z++) {
+                level.setBlock(new BlockPos(x, y, z), (z < 27 ? Blocks.OAK_PLANKS : Blocks.STONE).defaultBlockState(), 3);
+            }
+            hold(o, weapons().get(3));
+            ItemStack cannon = o.getMainHandItem();
+            Modules.install(cannon, List.of(new ItemStack(ModuleContent.MODULES.get(ModuleType.MELTDOWN).get())));
+            Fe.set(cannon, Fe.capacity(cannon));
+            ArsenalData.set(cannon, ArsenalData.TERRAIN_MODE, 1);
+        }));
+        step(2, () -> teleport(mc, OX + 18, 36, 90, 2));
+        step(20, () -> server(mc, JetLanceItem::tryFire));
+        at += 30;
+        shot("meltdown-1");
+        at += 3;
+        shot("meltdown-2");
+        at += 6;
+        shot("meltdown-3");
+        at += 30;
+        step(2, () -> teleport(mc, OX, 14, 0, 0));
+        at += 20;
+        shot("meltdown-tunnel");
+
+        // The tools: held by another player from two sides, in the wearer's own hand, and the ore scan through the floor.
+        String[] toolNames = {"pick", "breaker", "saw", "drill"};
+        step(2, () -> { selectSlot(mc, 0); teleport(mc, OX, OZ - 4, 0, 4); });
+        for (int i = 0; i < 4; i++) {
+            int index = i;
+            step(2, () -> server(mc, o -> hold(o, tools().get(index))));
+            step(2, () -> watch(mc, -55, 3.2));
+            at += 10;
+            shot("other-tool-" + toolNames[i] + "-right");
+            step(2, () -> watch(mc, 60, 3.2));
+            at += 8;
+            shot("other-tool-" + toolNames[i] + "-left");
+        }
+        step(2, () -> local(mc, p -> {
+            for (int i = 0; i < 4; i++) p.getInventory().setItem(5 + i, charged(tools().get(i)));
+            ArsenalData.set(p.getInventory().getItem(5), ArsenalData.SCAN_TIER, 3);
+            for (int x = -3; x <= 3; x += 2) p.serverLevel().setBlock(new BlockPos(x, 80, -2), Blocks.DIAMOND_ORE.defaultBlockState(), 3);
+            p.connection.teleport(OX, 81, -5, 0, 25);
+        }));
+        for (int i = 0; i < 4; i++) {
+            int slot = 5 + i;
+            step(4, () -> selectSlot(mc, slot));
+            at += 26;
+            shot("self-tool-" + toolNames[i]);
+        }
+        step(4, () -> selectSlot(mc, 5));
+        at += 20;
+        step(2, () -> mc.gameMode.useItem(mc.player, InteractionHand.MAIN_HAND));
+        at += 10;
+        shot("self-tool-scan");
+
+        // Every effect, on open ground in front of the camera.
+        step(2, () -> teleport(mc, OX + 5, 6, 0, 8));
+        at += 10;
+        int[][] effects = {{FxPayload.RIPPLE, 1, 6}, {FxPayload.COLLAPSE, 5, 8}, {FxPayload.QUENCH, 4, 6}, {FxPayload.HORIZON, 8, 16}, {FxPayload.SHEAR, 8, 7}, {FxPayload.MELTDOWN, 7, 6}, {FxPayload.MELTDOWN, 7, 12}};
+        for (int[] effect : effects) {
+            step(30, () -> server(mc, o -> FxPayload.send(o.serverLevel(), effect[0], new net.minecraft.world.phys.Vec3(OX, 82.5, 18), new net.minecraft.world.phys.Vec3(0, 0, -1), effect[1])));
+            at += effect[2];
+            shot("fx-" + effect[0] + "-" + effect[2]);
+        }
 
         // Black holes on the suits, close up, front and back.
         step(10, () -> local(mc, p -> dress(p, ArmorSet.COLLAPSAR, 10)));

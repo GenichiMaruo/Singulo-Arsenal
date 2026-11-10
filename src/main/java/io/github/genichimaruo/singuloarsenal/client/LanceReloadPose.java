@@ -27,10 +27,9 @@ public final class LanceReloadPose {
         ModelPart support = rightHanded ? model.leftArm : model.rightArm;
         float tilt = Rules.reloadTilt(progress), reach = Rules.reloadReach(progress), cock = Rules.reloadCock(progress);
         main.xRot += 0.28F * tilt;
-        // Down to the magazine well, then across to the charging handle on the far side.
-        support.xRot += 0.75F * reach - 0.2F * cock;
-        support.yRot += (rightHanded ? -0.35F : 0.35F) * reach + (rightHanded ? -0.55F : 0.55F) * cock;
-        support.zRot += (rightHanded ? -0.12F : 0.12F) * reach;
+        // Under the gun to the magazine, then up to the charging handle on this hand's own side. Neither path crosses the receiver.
+        support.xRot += 0.5F * reach - 0.07F * cock;
+        support.yRot += (rightHanded ? -0.28F : 0.28F) * cock;
     }
 
     static HumanoidModel.ArmPose pose() {
