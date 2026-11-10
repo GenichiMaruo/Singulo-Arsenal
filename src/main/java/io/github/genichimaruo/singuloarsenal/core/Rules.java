@@ -352,6 +352,8 @@ public final class Rules {
     public static final int SCAN_RADIUS = 16;
     public static final int SCAN_MAX = 256;
     public static final int SCAN_COOLDOWN = 60;
+    /** Sensitivity steps, as on Singulo's neutrino scanner. */
+    public static final int SCAN_MAX_TIER = 3;
     /** How long the scan's markers stay up. */
     public static final int SCAN_TICKS = 200;
     public static final int TREE_LIMIT = 256;

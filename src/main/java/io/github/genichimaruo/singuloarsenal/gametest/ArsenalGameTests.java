@@ -854,11 +854,54 @@ public final class ArsenalGameTests {
     @GameTest(template = ARENA)
     public static void squidPickFindsOresNearestFirst(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 2.5);
-        h.setBlock(4, 2, 4, Blocks.DIAMOND_ORE);
+        h.setBlock(4, 2, 4, Blocks.COAL_ORE);
         h.setBlock(2, 2, 3, Blocks.IRON_ORE);
-        var found = io.github.genichimaruo.singuloarsenal.tool.SquidPickItem.scan(p);
-        h.assertTrue(found.size() >= 2, "ores missed: " + found.size());
-        h.assertTrue(found.getFirst().equals(abs(h, 2, 2, 3)), "nearest ore must come first: " + found.getFirst());
+        h.setBlock(1, 2, 1, Blocks.DIAMOND_ORE);
+        h.setBlock(3, 2, 1, Blocks.ANCIENT_DEBRIS);
+        var low = io.github.genichimaruo.singuloarsenal.tool.SquidPickItem.scan(p, 1);
+        h.assertTrue(low.ores().size() == 2 && low.hidden() == 2, "sensitivity 1 sees coal and iron only: " + low);
+        h.assertTrue(low.ores().getFirst().equals(abs(h, 2, 2, 3)), "nearest ore must come first: " + low.ores().getFirst());
+        h.assertTrue(io.github.genichimaruo.singuloarsenal.tool.SquidPickItem.scan(p, 2).ores().size() == 3, "sensitivity 2 adds diamond");
+        var full = io.github.genichimaruo.singuloarsenal.tool.SquidPickItem.scan(p, 3);
+        h.assertTrue(full.ores().size() == 4 && full.hidden() == 0, "sensitivity 3 sees everything: " + full);
+        h.succeed();
+    }
+
+    private static ItemStack singulo(String path) {
+        return new ItemStack(BuiltInRegistries.ITEM.get(ResourceLocation.fromNamespaceAndPath("singulo", path)));
+    }
+
+    @GameTest(template = ARENA)
+    public static void sensitivityModulesTuneThePickInTheOtherHand(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 2.5);
+        ItemStack pick = new ItemStack(ArsenalItems.SQUID_PICK.get());
+        p.setItemSlot(EquipmentSlot.OFFHAND, pick);
+        p.setItemSlot(EquipmentSlot.MAINHAND, singulo("scanner_module_3"));
+        p.gameMode.useItem(p, h.getLevel(), p.getMainHandItem(), net.minecraft.world.InteractionHand.MAIN_HAND);
+        h.assertTrue(io.github.genichimaruo.singuloarsenal.tool.SquidPickItem.tier(p.getOffhandItem()) == 3, "Mk3 must raise the pick to 3");
+        h.assertTrue(p.getMainHandItem().isEmpty(), "the module is used up");
+        p.setItemSlot(EquipmentSlot.MAINHAND, singulo("scanner_module_2"));
+        p.gameMode.useItem(p, h.getLevel(), p.getMainHandItem(), net.minecraft.world.InteractionHand.MAIN_HAND);
+        h.assertTrue(io.github.genichimaruo.singuloarsenal.tool.SquidPickItem.tier(p.getOffhandItem()) == 3 && !p.getMainHandItem().isEmpty(),
+                "a lower module neither lowers the pick nor is spent");
+        h.succeed();
+    }
+
+    @SuppressWarnings("unchecked")
+    @GameTest(template = ARENA)
+    public static void pickKeepsTheScannersSensitivity(GameTestHelper h) {
+        ServerPlayer p = player(h, 2.5, 2.5);
+        ItemStack scanner = singulo("neutrino_scanner");
+        var type = (net.minecraft.core.component.DataComponentType<Integer>) BuiltInRegistries.DATA_COMPONENT_TYPE.get(
+                ResourceLocation.fromNamespaceAndPath("singulo", "scanner_tier"));
+        h.assertTrue(type != null, "Singulo's scanner_tier component is gone");
+        scanner.set(type, 2);
+        p.containerMenu = p.inventoryMenu;
+        p.inventoryMenu.getSlot(1).set(scanner);
+        ItemStack pick = new ItemStack(ArsenalItems.SQUID_PICK.get());
+        pick.onCraftedBy(h.getLevel(), p, 1);
+        h.assertTrue(io.github.genichimaruo.singuloarsenal.tool.SquidPickItem.tier(pick) == 2, "the scanner's sensitivity must carry over");
+        p.inventoryMenu.getSlot(1).set(ItemStack.EMPTY);
         h.succeed();
     }
 

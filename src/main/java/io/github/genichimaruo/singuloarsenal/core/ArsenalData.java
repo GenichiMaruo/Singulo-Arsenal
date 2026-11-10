@@ -37,6 +37,8 @@ public final class ArsenalData {
     public static final Supplier<DataComponentType<Integer>> SHOTS = integer("shots");
     /** How much the accretion drill takes per block: one of {@code Rules.DRILL_*}. */
     public static final Supplier<DataComponentType<Integer>> TOOL_MODE = integer("tool_mode");
+    /** The SQUID pick's sensitivity, 1 to 3 as on Singulo's neutrino scanner; missing reads as 1. */
+    public static final Supplier<DataComponentType<Integer>> SCAN_TIER = integer("scan_tier");
     /** 0 spares the terrain, 1 melts it. */
     public static final Supplier<DataComponentType<Integer>> TERRAIN_MODE = integer("terrain_mode");
 

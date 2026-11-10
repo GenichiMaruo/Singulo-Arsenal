@@ -1,30 +1,68 @@
 package io.github.genichimaruo.singuloarsenal.tool;
 
+import io.github.genichimaruo.singuloarsenal.core.ArsenalData;
 import io.github.genichimaruo.singuloarsenal.core.Fe;
 import io.github.genichimaruo.singuloarsenal.core.Rules;
 import io.github.genichimaruo.singuloarsenal.net.ScanPayload;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.tags.TagKey;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.CraftingContainer;
+import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Rarity;
+import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.common.Tags;
+import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 
-/** A superconducting pick with a SQUID in its head. Right click reads the field around you and shows every ore nearby through the rock. */
+/**
+ * A superconducting pick with a SQUID in its head. Right click reads the field around you and shows the ores nearby through the rock.
+ * Which ores show depends on its sensitivity, raised exactly as on Singulo's neutrino scanner: use a sensitivity module with the
+ * pick in the other hand. A pick made from an already tuned scanner keeps that scanner's sensitivity.
+ */
 public final class SquidPickItem extends PoweredTool {
+    private static final TagKey<Block> TIER_2 = BlockTags.create(ResourceLocation.fromNamespaceAndPath("singulo", "scanner_tier_2"));
+    private static final TagKey<Block> TIER_3 = BlockTags.create(ResourceLocation.fromNamespaceAndPath("singulo", "scanner_tier_3"));
+    private static final ResourceLocation SCANNER_TIER = ResourceLocation.fromNamespaceAndPath("singulo", "scanner_tier");
+
+    /** What a scan found. {@code hidden} counts the ores there that the pick is not yet sensitive enough to show. */
+    public record Scan(List<BlockPos> ores, int hidden) {}
+
     public SquidPickItem() {
         super(ToolTier.SQUID, BlockTags.MINEABLE_WITH_PICKAXE, 5, -2.8F, Rules.PICK_CAPACITY, 2, Rules.PICK_FE, Rarity.UNCOMMON);
+    }
+
+    public static void register() {
+        NeoForge.EVENT_BUS.addListener(SquidPickItem::tune);
+    }
+
+    public static int tier(ItemStack stack) {
+        return Math.max(1, Math.min(Rules.SCAN_MAX_TIER, ArsenalData.get(stack, ArsenalData.SCAN_TIER)));
+    }
+
+    /** The same rule as Singulo's scanner, so an ore shows at the same sensitivity on both. */
+    public static int oreTier(BlockState state) {
+        if (state.is(TIER_3) || state.is(BlockTags.NEEDS_DIAMOND_TOOL)) return 3;
+        return state.is(TIER_2) ? 2 : 1;
     }
 
     @Override
@@ -36,25 +74,93 @@ public final class SquidPickItem extends PoweredTool {
                 player.displayClientMessage(Component.translatable("message.singulo_arsenal.no_energy"), true);
                 return InteractionResultHolder.fail(stack);
             }
-            List<BlockPos> ores = scan(server);
+            Scan found = scan(server, tier(stack));
             player.getCooldowns().addCooldown(this, Rules.SCAN_COOLDOWN);
-            player.displayClientMessage(Component.translatable("message.singulo_arsenal.scan", ores.size()), true);
+            var message = Component.translatable("message.singulo_arsenal.scan", found.ores().size());
+            if (found.hidden() > 0) message.append(Component.translatable("message.singulo_arsenal.scan_hidden", found.hidden()));
+            player.displayClientMessage(message, true);
             level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.SCULK_CLICKING, SoundSource.PLAYERS, 1, 0.7F);
-            if (server.connection.hasChannel(ScanPayload.TYPE)) PacketDistributor.sendToPlayer(server, new ScanPayload(ores));
+            if (server.connection.hasChannel(ScanPayload.TYPE)) PacketDistributor.sendToPlayer(server, new ScanPayload(found.ores()));
         }
         return InteractionResultHolder.consume(stack);
     }
 
     /** Public so GameTests exercise the real search. The nearest ores come first and the list is capped. */
-    public static List<BlockPos> scan(ServerPlayer player) {
+    public static Scan scan(ServerPlayer player, int tier) {
         Level level = player.level();
         BlockPos center = player.blockPosition();
         int r = Rules.SCAN_RADIUS;
         List<BlockPos> found = new ArrayList<>();
+        int hidden = 0;
         for (BlockPos pos : BlockPos.betweenClosed(center.offset(-r, -r, -r), center.offset(r, r, r))) {
-            if (level.isLoaded(pos) && level.getBlockState(pos).is(Tags.Blocks.ORES)) found.add(pos.immutable());
+            if (!level.isLoaded(pos)) continue;
+            BlockState state = level.getBlockState(pos);
+            if (!state.is(Tags.Blocks.ORES)) continue;
+            if (oreTier(state) <= tier) found.add(pos.immutable());
+            else hidden++;
         }
         found.sort(Comparator.comparingDouble(pos -> pos.distSqr(center)));
-        return found.size() > Rules.SCAN_MAX ? List.copyOf(found.subList(0, Rules.SCAN_MAX)) : found;
+        return new Scan(found.size() > Rules.SCAN_MAX ? List.copyOf(found.subList(0, Rules.SCAN_MAX)) : found, hidden);
+    }
+
+    /**
+     * A Singulo sensitivity module used with this pick in the other hand tunes the pick, as it would the scanner. Caught before the
+     * module's own use, which would only complain that there is no scanner.
+     */
+    private static void tune(PlayerInteractEvent.RightClickItem event) {
+        ItemStack module = event.getItemStack();
+        int tier = moduleTier(module);
+        if (tier == 0) return;
+        Player player = event.getEntity();
+        ItemStack pick = player.getItemInHand(event.getHand() == InteractionHand.MAIN_HAND ? InteractionHand.OFF_HAND : InteractionHand.MAIN_HAND);
+        if (!(pick.getItem() instanceof SquidPickItem)) return;
+        Level level = event.getLevel();
+        event.setCanceled(true);
+        int now = tier(pick);
+        if (now >= tier) {
+            if (!level.isClientSide) player.displayClientMessage(Component.translatable("message.singulo.scanner_module.already", now), true);
+            event.setCancellationResult(InteractionResult.FAIL);
+            return;
+        }
+        event.setCancellationResult(InteractionResult.sidedSuccess(level.isClientSide));
+        if (level.isClientSide) return;
+        pick.set(ArsenalData.SCAN_TIER.get(), tier);
+        if (!player.getAbilities().instabuild) module.shrink(1);
+        player.displayClientMessage(Component.translatable("message.singulo.scanner_module.done", tier), true);
+        level.playSound(null, player.blockPosition(), SoundEvents.AMETHYST_BLOCK_RESONATE, SoundSource.PLAYERS, 1, 1.2F);
+    }
+
+    /** 2 or 3 for Singulo's Mk2 and Mk3 sensitivity modules, 0 for anything else. */
+    public static int moduleTier(ItemStack stack) {
+        ResourceLocation id = BuiltInRegistries.ITEM.getKey(stack.getItem());
+        if (!id.getNamespace().equals("singulo")) return 0;
+        return switch (id.getPath()) {
+            case "scanner_module_2" -> 2;
+            case "scanner_module_3" -> 3;
+            default -> 0;
+        };
+    }
+
+    /**
+     * Called while the ingredients are still in the grid, by a plain take and a shift-click alike: the scanner that went into the
+     * head passes its sensitivity on.
+     */
+    @Override
+    public void onCraftedBy(ItemStack stack, Level level, Player player) {
+        var type = BuiltInRegistries.DATA_COMPONENT_TYPE.get(SCANNER_TIER);
+        if (type == null) return;
+        for (Slot slot : player.containerMenu.slots) {
+            if (!(slot.container instanceof CraftingContainer)) continue;
+            Object value = slot.getItem().get(type);
+            if (value instanceof Integer scanner && scanner > tier(stack)) {
+                stack.set(ArsenalData.SCAN_TIER.get(), Math.min(Rules.SCAN_MAX_TIER, scanner));
+            }
+        }
+    }
+
+    @Override
+    public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> lines, TooltipFlag flag) {
+        super.appendHoverText(stack, context, lines, flag);
+        lines.add(1, Component.translatable("tooltip.singulo_arsenal.scan_tier", tier(stack), Rules.SCAN_MAX_TIER).withStyle(ChatFormatting.GRAY));
     }
 }

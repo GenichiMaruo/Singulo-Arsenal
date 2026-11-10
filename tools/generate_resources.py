@@ -328,8 +328,8 @@ for t in SETS:
 
 weapon_text = {
     'squid_pick': ('SQUID探査ピック', 'SQUID Prospector', '右クリックで周囲の鉱石を透視', 'Right click reveals nearby ores',
-                   ['採掘速度10、ダイヤモンド級まで。1ブロック 150 FE。', '右クリック：半径16の鉱石を壁越しに10秒表示（20k FE、再使用3秒）。', '耐久なし。電力切れは素手の速度になる。'],
-                   ['Mining speed 10, up to diamond. 150 FE per block.', 'Right click: shows ores within 16 blocks for 10s (20k FE, 3s cooldown).', 'No durability. Out of power it digs at hand speed.']),
+                   ['採掘速度10、ダイヤモンド級まで。1ブロック 150 FE。', '右クリック：半径16の鉱石を壁越しに10秒表示（20k FE、再使用3秒）。', '感度はスキャナと同じく本家の感度モジュールで上がる（もう片方の手に持って使う）。'],
+                   ['Mining speed 10, up to diamond. 150 FE per block.', 'Right click: shows ores within 16 blocks for 10s (20k FE, 3s cooldown).', 'Sensitivity rises with Singulo\'s sensitivity modules, used with the pick in the other hand.']),
     'degeneracy_breaker': ('縮退圧ブレーカー', 'Degeneracy Breaker', '3×3を一撃で崩す', 'Caves in 3x3 at a blow',
                            ['採掘速度16、ツルハシとシャベルを兼ねる。1ブロック 1k FE。', '掘った面の3×3をまとめて壊す。スニークで1ブロック。', 'チェストや機械、極端に硬いブロックは巻き込まない。'],
                            ['Mining speed 16, pickaxe and shovel in one. 1k FE per block.', 'Breaks a 3x3 of the face you mine. Sneak for one block.', 'Leaves containers, machines and far harder blocks alone.']),
@@ -389,6 +389,8 @@ common = {
     'tooltip.singulo_arsenal.terrain_protect': ('地形保護', 'Terrain protected'),
     'tooltip.singulo_arsenal.terrain_break': ('地形破壊', 'Terrain destruction'),
     'message.singulo_arsenal.scan': ('鉱石を %s 個検出', '%s ores found'),
+    'message.singulo_arsenal.scan_hidden': ('（感度が足りず映らない鉱石が %s 個）', ' (%s more too faint to show)'),
+    'tooltip.singulo_arsenal.scan_tier': ('感度 %s / %s', 'Sensitivity %s / %s'),
     'message.singulo_arsenal.drill_mode': ('採掘モード：%s', 'Mining mode: %s'),
     'tool.singulo_arsenal.drill_mode.0': ('単体', 'Single'),
     'tool.singulo_arsenal.drill_mode.1': ('3×3', '3x3'),

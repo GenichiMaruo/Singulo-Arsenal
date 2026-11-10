@@ -29,6 +29,7 @@ public final class SinguloArsenal {
         SuitEvents.register();
         Weapons.register();
         Mining.register();
+        io.github.genichimaruo.singuloarsenal.tool.SquidPickItem.register();
         bus.addListener(SinguloArsenal::payloads);
         LOGGER.info("Singulo Arsenal initialized");
     }
