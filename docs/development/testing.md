@@ -48,7 +48,16 @@ python3 tools/review/prepare_gui.py
 
 GitHub Actions（`.github/workflows/build.yml`）は `1.21.1` と `feature/**` への push、`1.21.1` への pull request で動きます。
 
-- **build**：`build`（オフライン検査を含む）を実行し、JAR を成果物として保存する。
+- **build**：`build`（オフライン検査を含む）、公開検査スクリプトの回帰テスト、JAR・変更履歴の検査を実行し、JAR を成果物として保存する。
 - **integration**：固定した本体コミットを別にビルドし、本体の素材 ID の照合と GameTest を実行する。ログを成果物として保存する。
 
 Gradle 配布ファイルの取得は、失敗しても最大 5 回まで再試行します。
+
+公開ワークフローも同じ CI を呼び出し、build / integration の両方が成功したときだけ次に進みます。公開検査だけをローカルで確認するには、Python 3.12 で以下を実行します（秘密情報・ネットワークは不要）。
+
+```sh
+python3 -m unittest discover -s tests -p 'test_release.py' -v
+python3 tools/prepare_release.py
+```
+
+公開処理の回帰テストは21件です。古い JAR の取り違え、バージョン・依存関係の不一致、テスト資材の混入、変更履歴の欠落、誤った公開先を拒否することを検証します。API 確認が GET のみであること、アップロード時の multipart が正しいこと、失敗時に再送や必須依存の除去を行わないこともモックで確認します。実際の API 設定確認と公開手順は [公開・配布手順](../curseforge.md) を参照してください。
