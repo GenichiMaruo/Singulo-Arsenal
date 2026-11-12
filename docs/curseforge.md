@@ -8,11 +8,11 @@ GitHub Releases の後続リリースには MOD JAR を添付しません。GitH
 
 CurseForge のプロジェクト ID は `1793647`、配布先は [Singulo Arsenal](https://www.curseforge.com/minecraft/mc-mods/singulo-arsenal) です。
 
-## 0.2.0 の公開準備
+## 0.2.1 の公開準備
 
-Minecraft 1.20.1 / NeoForge・Forge / Java 17 向けです。`gradle.properties` の `mod_version` と CI の成果物は `0.2.0`、配布ファイルは `build/neoforge/libs/Singulo-Arsenal-0.2.0-1.20.1N.jar` と `build/forge/libs/Singulo-Arsenal-0.2.0-1.20.1F.jar` です。必須依存は Singulo 0.16.x です。
+Minecraft 1.20.1 / NeoForge・Forge / Java 17 向けです。`gradle.properties` の `mod_version` と CI の成果物は `0.2.1`、配布ファイルは `build/neoforge/libs/Singulo-Arsenal-0.2.1-1.20.1N.jar` と `build/forge/libs/Singulo-Arsenal-0.2.1-1.20.1F.jar` です。必須依存は Singulo 0.16.x または 0.17.x です。
 
-PR のレビュー、build / integration、実クライアントの確認結果を判断してからマージします。公開用の変更履歴は [`changelog-0.2.0.md`](curseforge/changelog-0.2.0.md) です。GitHub の `v0.2.0` には変更履歴と配布リンクを掲載し、MOD JAR は添付しません。
+PR のレビュー、build / integration、実クライアントの確認結果を判断してからマージします。公開用の変更履歴は [`changelog-0.2.1.md`](curseforge/changelog-0.2.1.md) です。GitHub の `v0.2.1` には変更履歴と配布リンクを掲載し、MOD JAR は添付しません。
 
 各ローダーは別々に公開します。片方が成功した後は、もう片方だけを選び、成功済みのファイルを再送しないでください。
 
@@ -80,3 +80,7 @@ K・L案も同じ設定ファイルに保存しています。`python tools/arse
 3. 次回以降の GitHub リリースでは、タグと変更履歴を公開し、CurseForge の該当バージョンへのリンクを記載します。添付アセットへ MOD JAR を追加しない運用とします。
 
 通常の CI は検証と開発用成果物の保存を行います。CurseForge への公開は上記の手動ワークフローで行います。GitHub Releases への JAR 添付を初回限定とする方針は変わりません。
+
+## 0.2.1 compatibility update
+
+Singulo 0.16.x / 0.17.x に対応する互換性更新です。公開は上記の検証付き手動ワークフローから行い、各ファイルの URL と公開状態を確認します。[互換性記録](development/singulo-0.17-compatibility.md)と[変更履歴](curseforge/changelog-0.2.1.md)を参照してください。

@@ -3,7 +3,7 @@
 Minecraft 1.20.1 / NeoForge 47.1.106・Forge 47.4.26 / Java 17。MOD ID は `singulo_arsenal`。作業対象のブランチと `gradle.properties` を最初に確認してください。
 このブランチは `1.20.1` 向けです。Gradle 実行には Java 21、ゲームとコンパイルには Java 17 toolchain を使用します。ローダーを切り替えるビルドは同じ作業ディレクトリで同時実行しないでください。
 
-Singulo 本体はコンパイル時の依存にしていません。本体の ID・タグ・NBTは名前で参照し、実行時にだけ本体 JAR を読み込みます（`[0.16.0,0.17.0)`）。本体を Arsenal の JAR に同梱・再配布しません。
+Singulo 本体はコンパイル時の依存にしていません。本体の ID・タグ・NBTは名前で参照し、実行時にだけ本体 JAR を読み込みます（`[0.16.0,0.18.0)`）。本体を Arsenal の JAR に同梱・再配布しません。
 
 ## 正となる生成元
 
@@ -45,8 +45,8 @@ Windows は `gradlew.bat build`。`build` は `tools/check.py` も実行する�
 同じ Minecraft・ローダー向けの Singulo 本体 JAR を指定します。未指定や存在しないパスはエラーになります。
 
 ```sh
-./gradlew runClient -PsinguloJar=/absolute/path/Singulo-0.16.0-1.20.1N.jar
-./gradlew runServer -PsinguloJar=/absolute/path/Singulo-0.16.0-1.20.1N.jar
+./gradlew runClient -PsinguloJar=/absolute/path/Singulo-0.17.0-1.20.1N.jar
+./gradlew runServer -PsinguloJar=/absolute/path/Singulo-0.17.0-1.20.1N.jar
 ```
 
 クリエイティブモードのワールドを作ると、専用タブから充電済みの装備を試せます。起動ログの `Singulo Arsenal initialized` と MOD 一覧で、本体と同時に読み込めたことを確認してください。
@@ -64,7 +64,7 @@ PC ごとの設定は Git 管理外の `.local/environment.cmd` に置きます�
 set "JAVA_HOME=C:\path\to\jdk-21"
 set "GRADLE_USER_HOME=%USERPROFILE%\.gradle"
 set "ARSENAL_PYTHON=C:\path\to\python.exe"
-set "ARSENAL_SINGULO=%~dp0..\libs\Singulo-0.16.0-1.20.1N.jar"
+set "ARSENAL_SINGULO=%~dp0..\libs\Singulo-0.17.0-1.20.1N.jar"
 ```
 
 Java や Python のシステム全体の設定は変えず、これらのスクリプトの中で指定します。
