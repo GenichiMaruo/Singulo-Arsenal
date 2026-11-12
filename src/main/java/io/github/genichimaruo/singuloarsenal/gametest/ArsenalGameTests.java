@@ -285,22 +285,29 @@ public final class ArsenalGameTests {
         dress(p, ArmorSet.COLLAPSAR);
         ItemStack chest = p.getItemBySlot(EquipmentSlot.CHEST);
         Zombie nearby = target(h, 4.5, 2.5);
-        // Only the horizon's reserve left, which the energy shield must not touch.
-        for (EquipmentSlot slot : ARMOR_SLOTS) Fe.set(p.getItemBySlot(slot), slot == EquipmentSlot.CHEST ? Rules.HORIZON_FE : 0);
-        magicHit(p, 100);
-        h.assertTrue(p.isAlive(), "lethal hit was not caught");
-        near(h, p.getHealth(), 20 * Rules.HORIZON_HEALTH_FRACTION, "health after horizon");
-        h.assertTrue(Fe.stored(chest) == 0, "horizon cost");
-        h.assertTrue(nearby.getHealth() < 100, "horizon wave missed");
-        // During the horizon window nothing lands.
-        float during = p.getHealth();
-        magicHit(p, 100);
-        near(h, p.getHealth(), during, "invulnerable window");
-        // Past the window the cooldown holds, so a second lethal hit kills.
-        ArsenalData.set(chest, ArsenalData.HORIZON_UNTIL, 0L);
-        magicHit(p, 100);
-        h.assertTrue(p.isDeadOrDying(), "horizon ignored its cooldown");
-        h.succeed();
+        // Freshly forced test chunks may not expose their entity sections until the next
+        // server update. Fire the one-shot wave only after the real spatial query sees its target.
+        h.startSequence().thenWaitUntil(() -> h.assertTrue(
+                io.github.genichimaruo.singuloarsenal.core.ArsenalDamage.around(
+                        p, p.getBoundingBox().getCenter(), Rules.HORIZON_RADIUS).contains(nearby),
+                "horizon target not yet visible in the loaded entity section"))
+                .thenExecute(() -> {
+                    // Only the horizon's reserve left, which the energy shield must not touch.
+                    for (EquipmentSlot slot : ARMOR_SLOTS) Fe.set(p.getItemBySlot(slot), slot == EquipmentSlot.CHEST ? Rules.HORIZON_FE : 0);
+                    magicHit(p, 100);
+                    h.assertTrue(p.isAlive(), "lethal hit was not caught");
+                    near(h, p.getHealth(), 20 * Rules.HORIZON_HEALTH_FRACTION, "health after horizon");
+                    h.assertTrue(Fe.stored(chest) == 0, "horizon cost");
+                    h.assertTrue(nearby.getHealth() < 100, "horizon wave missed");
+                    // During the horizon window nothing lands.
+                    float during = p.getHealth();
+                    magicHit(p, 100);
+                    near(h, p.getHealth(), during, "invulnerable window");
+                    // Past the window the cooldown holds, so a second lethal hit kills.
+                    ArsenalData.set(chest, ArsenalData.HORIZON_UNTIL, 0L);
+                    magicHit(p, 100);
+                    h.assertTrue(p.isDeadOrDying(), "horizon ignored its cooldown");
+                }).thenSucceed();
     }
 
     @GameTest(template = ARENA, batch = "collapsarSuitPaysForDamageInEnergy")
