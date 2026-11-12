@@ -80,3 +80,7 @@ K・L案も同じ設定ファイルに保存しています。`python tools/arse
 3. 次回以降の GitHub リリースでは、タグと変更履歴を公開し、CurseForge の該当バージョンへのリンクを記載します。添付アセットへ MOD JAR を追加しない運用とします。
 
 通常の CI は検証と開発用成果物の保存を行います。CurseForge への公開は上記の手動ワークフローで行います。GitHub Releases への JAR 添付を初回限定とする方針は変わりません。
+
+## 0.2.1 compatibility build — unpublished
+
+Singulo 0.16.x / 0.17.x に対応する検証用ビルドです。この作業ではタグ・GitHub Release・CurseForge・Modrinth の公開は行いません。[互換性記録](development/singulo-0.17-compatibility.md)と[変更履歴](curseforge/changelog-0.2.1.md)を参照してください。

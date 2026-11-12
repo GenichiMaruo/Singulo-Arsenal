@@ -91,6 +91,23 @@ public final class ArsenalReview {
         who.setItemSlot(EquipmentSlot.FEET, charged(pieces.get(ArmorItem.Type.BOOTS).get()));
     }
 
+    private static void verifySinguloClientLink() {
+        try {
+            Class<?> bridge = Class.forName("io.github.genichimaruo.singuloarsenal.client.Lensing");
+            var pos = Minecraft.getInstance().player.position();
+            for (String name : List.of("HOLE", "DISTORTION")) {
+                var field = bridge.getDeclaredField(name);
+                field.setAccessible(true);
+                var handle = (java.lang.invoke.MethodHandle) field.get(null);
+                if (handle == null) throw new IllegalStateException("Missing Singulo lens bridge: " + name);
+                handle.invokeExact(pos, 0.1F, 0.1F, 0.5F);
+            }
+            System.out.println("ARSENAL_SINGULO_LENS_LINK_OK");
+        } catch (Throwable failure) {
+            throw new IllegalStateException("Singulo client integration is incompatible", failure);
+        }
+    }
+
     private static void prepare(Minecraft mc) {
         var server = mc.getSingleplayerServer();
         ServerPlayer p = server.getPlayerList().getPlayer(mc.player.getUUID());
@@ -620,6 +637,7 @@ public final class ArsenalReview {
         }
         if (mc.player == null || mc.level == null || mc.getSingleplayerServer() == null) return;
         if (!preparing) {
+            verifySinguloClientLink();
             preparing = true;
             mc.getSingleplayerServer().execute(() -> prepare(mc));
             return;
