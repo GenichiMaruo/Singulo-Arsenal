@@ -21,7 +21,7 @@ SINGULO_SOURCE=/absolute/path/to/Singulo python3 tools/check.py
 本体 JAR と同時に読み込んだ実サーバーで、装備の能力を実際に動かして確かめます。現在は必須テスト 55 件です。
 
 ```sh
-./gradlew runGameTestServer -PsinguloJar=/absolute/path/Singulo-0.16.0-1.21.1N.jar
+./gradlew runGameTestServer -PsinguloJar=/absolute/path/Singulo-0.17.0-1.21.1N.jar
 ```
 
 電力、保存と読み込み、降着と質量ペレット缶、飛び道具の反発、チャンドラセカール限界、核パスタ相、事象の地平面、ジェット噴射、電力シールド、武器の能力、地形破壊、工具の範囲採掘・鉱石探査と感度、モジュール統合と各モジュールの効果、容量の違う装備の電力分配、武器とドローンの効果分離、全レシピの読み込みを検証します。
@@ -39,7 +39,7 @@ SINGULO_SOURCE=/absolute/path/to/Singulo python3 tools/check.py
 
 ```sh
 python3 tools/review/prepare_gui.py
-./gradlew --no-daemon -I tools/review/gui.gradle runClient -PsinguloJar=/absolute/path/Singulo-0.16.0-1.21.1N.jar
+./gradlew --no-daemon -I tools/review/gui.gradle runClient -PsinguloJar=/absolute/path/Singulo-0.17.0-1.21.1N.jar
 ```
 
 撮影結果は `build/gui-review/screenshots/` に出ます。面の重なりの報告は `zfight.txt`、アイコン単体の撮影は `icons-bare.png` です。静止画なので、動いているときのちらつきは実際に操作して確認してください。

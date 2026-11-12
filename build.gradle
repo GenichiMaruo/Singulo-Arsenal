@@ -28,7 +28,7 @@ if (providers.gradleProperty('singuloJar').isPresent()) {
 def requireSingulo = tasks.register('requireSingulo') {
     doLast {
         if (!providers.gradleProperty('singuloJar').isPresent()) {
-            throw new GradleException('Starting the addon requires -PsinguloJar=/absolute/path/to/Singulo-0.16.0-1.21.1N.jar')
+            throw new GradleException('Starting the addon requires -PsinguloJar=/absolute/path/to/Singulo-0.17.0-1.21.1N.jar')
         }
     }
 }
@@ -77,3 +77,14 @@ tasks.register('offlineTest', Exec) {
     commandLine providers.gradleProperty('pythonExecutable').getOrElse('python3'), '-X', 'utf8', 'tools/check.py'
 }
 tasks.named('check') { dependsOn 'offlineTest' }
+
+// A successful process startup alone does not prove the integration suite ran.
+tasks.named('runGameTestServer') {
+    doFirst { delete layout.buildDirectory.file('gametest/logs/latest.log') }
+    doLast {
+        def log = layout.buildDirectory.file('gametest/logs/latest.log').get().asFile
+        if (!log.isFile() || !log.text.contains('All 55 required tests passed')) {
+            throw new GradleException('Expected all 55 required Arsenal GameTests to pass. Inspect the GameTest server log.')
+        }
+    }
+}
