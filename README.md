@@ -10,13 +10,13 @@ Minecraft 1.21.1（NeoForge）向け。Singulo の工場で作った素材から
 Singulo 本体が必須です。Minecraft・ローダー・Singulo の版が合うファイルを選んでください。
 Singulo is required. Choose the file that matches your Minecraft version, loader and Singulo version.
 
-以下は未公開の **0.2.1 対応版**の範囲です。既存の 0.2.0 は Singulo 0.16.x 専用です。
-The table describes the unpublished **0.2.1 compatibility build**. Existing 0.2.0 files require Singulo 0.16.x.
+以下は **0.2.1 対応版**の範囲です。既存の 0.2.0 は Singulo 0.16.x 専用です。
+The table describes the **0.2.1 compatibility update**. Existing 0.2.0 files require Singulo 0.16.x.
 
 | Minecraft | ローダー / Loader | Java | Singulo | ソース / Source | ダウンロード / Download |
 | --- | --- | --- | --- | --- | --- |
-| **1.21.1** | **NeoForge** 21.1.256+ | **21** | 0.16.x / 0.17.x | [1.21.1](https://github.com/GenichiMaruo/Singulo-Arsenal/tree/1.21.1) | 未公開 / Not published |
-| 1.20.1 | Forge / NeoForge | 17 | 0.16.x / 0.17.x | [1.20.1](https://github.com/GenichiMaruo/Singulo-Arsenal/tree/1.20.1) | 未公開 / Not published |
+| **1.21.1** | **NeoForge** 21.1.256+ | **21** | 0.16.x / 0.17.x | [1.21.1](https://github.com/GenichiMaruo/Singulo-Arsenal/tree/1.21.1) | [CurseForge](https://www.curseforge.com/minecraft/mc-mods/singulo-arsenal/files) |
+| 1.20.1 | Forge / NeoForge | 17 | 0.16.x / 0.17.x | [1.20.1](https://github.com/GenichiMaruo/Singulo-Arsenal/tree/1.20.1) | [CurseForge](https://www.curseforge.com/minecraft/mc-mods/singulo-arsenal/files) |
 
 ファイル名は `Singulo-Arsenal-<版>-<Minecraft><ローダー>` で、末尾の `N` は NeoForge です。マルチプレイではクライアントとサーバーの両方に導入してください。
 初回の 0.1.0 は GitHub Releases で配布しています。以後の版の配布先は [CurseForge](https://www.curseforge.com/minecraft/mc-mods/singulo-arsenal) です。0.2.0 は Minecraft 1.21.1 と 1.20.1 に対応しています。
@@ -54,6 +54,6 @@ Java 21 の JDK と Python 3 を用意し、Singulo 本体の JAR を指定し�
 
 ## 0.2.1 compatibility update / 互換性更新
 
-Singulo 0.17.0 対応版を準備しています。依存範囲を 0.16.x–0.17.x に広げ、CI の本体をレビュー済み 0.17.0 コミットへ固定しました。この対応版は未公開です。
+Singulo 0.17.0 に対応しました。依存範囲を 0.16.x–0.17.x に広げ、CI の本体をレビュー済み 0.17.0 コミットへ固定しました。
 
-The 0.2.1 compatibility build accepts Singulo 0.16.x and 0.17.x and validates integration against the released 0.17.0 source. It has not been published. See [verification notes](docs/development/singulo-0.17-compatibility.md).
+The 0.2.1 compatibility build accepts Singulo 0.16.x and 0.17.x and validates integration against the released 0.17.0 source. See [verification notes](docs/development/singulo-0.17-compatibility.md).
