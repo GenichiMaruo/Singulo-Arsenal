@@ -85,7 +85,13 @@ def generateModMetadata = tasks.register('generateModMetadata', ProcessResources
 }
 sourceSets.main.resources.srcDir generateModMetadata
 legacyForge.ideSyncTask generateModMetadata
-tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8'; options.compilerArgs += ['-Xmaxerrs', '1000'] }
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.compilerArgs += ['-Xmaxerrs', '1000']
+    // Do not reuse classes compiled before the LF source checkout rule.
+    inputs.file('.gitattributes').withPropertyName('sourceLineEndingPolicy')
+            .withPathSensitivity(PathSensitivity.RELATIVE).normalizeLineEndings()
+}
 tasks.register('offlineTest', Exec) {
     environment 'JAVA_HOME', javaToolchains.launcherFor(java.toolchain).get().metadata.installationPath.asFile.absolutePath
     commandLine providers.gradleProperty('pythonExecutable').getOrElse('python3'), '-X', 'utf8', 'tools/check.py'
