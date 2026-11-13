@@ -8,7 +8,7 @@ Integration CI is pinned to Singulo `v0.18.0`, commit `1a94e63423183c4fe2174b868
 
 The actual CurseForge dependency is [file 9596414](https://www.curseforge.com/minecraft/mc-mods/singulo/files/9596414), `Singulo-0.18.0-1.21.1N.jar`, SHA-256 `1ebf3ffcc50c73a6ac6e4cbcf35e6ed8b1fc98fefcf52c5b6202205bafc7ff7a`. The CDN download matches the base release's CI artifact. Local integration against that exact binary passes all 56 required GameTests, 5,331 offline rule assertions, 108 Singulo material references, resource regeneration and both locales. Release validation passes 23 unit tests.
 
-The real-client review against the same published dependency completed all 85 captures, including the final inventory capture, and both actual lens method handles resolved and were invoked successfully. The release still waits for the dependency file to become generally available.
+The real-client review against the same published dependency completed all 85 captures, including the final inventory capture, and both actual lens method handles resolved and were invoked successfully. The dependency file is approved and generally available on CurseForge.
 
 Java sources now use LF checkouts on all platforms. The previous Windows/Linux release comparison found only a compiler-generated local-variable debug name difference caused by CRLF offsets in `FxClient.java`; LF avoids that source of artifact drift without changing the executable code.
 
