@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: GenichiMaruo/Singulo
-          ref: 1e8f1cbbd5f0f87913e4e35362e6fc987dacdfad
+          ref: 357c7d197cf0a465efe4f735effea117a7a967fd
           path: singulo-source
       - uses: actions/setup-java@v4
         with:
@@ -53,7 +53,7 @@ jobs:
       - name: Build and run all Arsenal GameTests
         env:
           SINGULO_SOURCE: ${{ github.workspace }}/singulo-source
-        run: ./gradlew --no-daemon --max-workers=4 build runGameTestServer -Ploader=${{ matrix.loader }} -PsinguloJar="$GITHUB_WORKSPACE/singulo-source/build/${{ matrix.loader }}/libs/Singulo-0.17.0-1.20.1${{ matrix.suffix }}.jar"
+        run: ./gradlew --no-daemon --max-workers=4 build runGameTestServer -Ploader=${{ matrix.loader }} -PsinguloJar="$GITHUB_WORKSPACE/singulo-source/build/${{ matrix.loader }}/libs/Singulo-0.18.0-1.20.1${{ matrix.suffix }}.jar"
       - name: Test release validation
         run: python3 -m unittest discover -s tests -p 'test_release.py' -v
       - name: Validate release JAR and changelog

@@ -135,6 +135,59 @@ public final class ArsenalGameTests {
         h.succeed();
     }
 
+    /** Exercises the real 0.18 SMES charging slots without a production dependency on its classes. */
+    @GameTest(template = ARENA, batch = "singuloSmesCharging")
+    public static void singuloSmesChargesArsenalAndPreservesModules(GameTestHelper h) {
+        try {
+            var at = new net.minecraft.core.BlockPos(2, 1, 2);
+            var block = BuiltInRegistries.BLOCK.get(new ResourceLocation("singulo", "smes_cell"));
+            h.assertTrue(block != Blocks.AIR, "Singulo SMES missing");
+            h.setBlock(at, block);
+            var be = h.getLevel().getBlockEntity(h.absolutePos(at));
+            Class<?> smes = Class.forName("io.github.genichimaruo.singulo.machine.SmesCellBlockEntity");
+            h.assertTrue(smes.isInstance(be), "Unexpected SMES block entity");
+            var energy = (net.minecraftforge.energy.IEnergyStorage) smes.getMethod("energy").invoke(be);
+            var slots = (net.minecraftforge.items.IItemHandlerModifiable) smes.getMethod("chargeSlots").invoke(be);
+            var tick = smes.getMethod("serverTick", net.minecraft.world.level.Level.class,
+                    net.minecraft.core.BlockPos.class, net.minecraft.world.level.block.state.BlockState.class, smes);
+
+            ItemStack gear = charged(ArmorSet.COLLAPSAR, ArmorItem.Type.CHESTPLATE);
+            Modules.install(gear, List.of(module(ModuleType.CAPACITOR)));
+            int capacity = Fe.capacity(gear);
+            Fe.set(gear, 0);
+            h.assertTrue(slots.isItemValid(0, gear) && slots.insertItem(0, gear, false).isEmpty(),
+                    "Arsenal gear rejected by SMES charge input");
+            h.assertTrue(energy.receiveEnergy(5_000, false) == 5_000, "SMES fixture could not receive energy");
+            tick.invoke(null, h.getLevel(), be.getBlockPos(), be.getBlockState(), be);
+            h.assertTrue(Fe.stored(slots.getStackInSlot(0)) == 5_000 && energy.getEnergyStored() == 0,
+                    "SMES must transfer exactly the available FE to Arsenal gear");
+            h.assertTrue(slots.getStackInSlot(1).isEmpty(), "Partially charged gear moved to output");
+
+            Fe.set(slots.getStackInSlot(0), capacity - 700);
+            h.assertTrue(energy.receiveEnergy(5_000, false) == 5_000, "SMES fixture could not refill");
+            tick.invoke(null, h.getLevel(), be.getBlockPos(), be.getBlockState(), be);
+            h.assertTrue(Fe.stored(slots.getStackInSlot(0)) == capacity && energy.getEnergyStored() == 4_300,
+                    "SMES must pay only the FE accepted before the capacity limit");
+            ItemStack blocker = new ItemStack(net.minecraft.world.item.Items.STONE);
+            slots.setStackInSlot(1, blocker);
+            tick.invoke(null, h.getLevel(), be.getBlockPos(), be.getBlockState(), be);
+            h.assertTrue(!slots.getStackInSlot(0).isEmpty() && slots.getStackInSlot(1) == blocker
+                    && energy.getEnergyStored() == 4_300, "Blocked output must not lose gear or consume energy");
+
+            slots.setStackInSlot(1, ItemStack.EMPTY);
+            tick.invoke(null, h.getLevel(), be.getBlockPos(), be.getBlockState(), be);
+            ItemStack out = slots.getStackInSlot(1);
+            h.assertTrue(slots.getStackInSlot(0).isEmpty() && out.is(gear.getItem()), "Full Arsenal gear did not move to output");
+            h.assertTrue(Fe.stored(out) == capacity && Fe.capacity(out) == capacity, "Output charge or capacity changed");
+            h.assertTrue(Modules.installed(out).size() == 1 && Modules.count(out, ModuleType.CAPACITOR) == 1,
+                    "SMES charging lost the installed capacitor module");
+            h.assertTrue(energy.getEnergyStored() == 4_300, "Output transfer consumed more energy");
+            h.succeed();
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Singulo 0.18 charging API unavailable", e);
+        }
+    }
+
     @GameTest(template = ARENA, batch = "stateSurvivesSaveAndLoad")
     public static void stateSurvivesSaveAndLoad(GameTestHelper h) {
         ItemStack chest = charged(ArmorSet.COLLAPSAR, ArmorItem.Type.CHESTPLATE);
@@ -641,11 +694,19 @@ public final class ArsenalGameTests {
         p.setXRot(0);
         h.setBlock(2, 2, 4, Blocks.STONE);
         Zombie aside = target(h, 4.5, 4.5);
-        ignite(h, p, cannon);
-        h.assertTrue(aside.getHealth() < 100, "the blast must land with the shot");
-        h.assertBlockPresent(Blocks.STONE, new net.minecraft.core.BlockPos(2, 2, 4));
-        h.assertTrue(p.getHealth() == p.getMaxHealth(), "the blast hurt its owner");
-        h.succeed();
+        // As with the horizon wave, do not fire a one-shot blast before the freshly
+        // forced test chunk exposes the spawned target to the actual spatial query.
+        h.startSequence().thenWaitUntil(() -> h.assertTrue(
+                io.github.genichimaruo.singuloarsenal.core.ArsenalDamage.around(
+                        p, aside.position(), Rules.blastRadius(1)).contains(aside),
+                "meltdown target not yet visible in the loaded entity section"))
+                .thenExecute(() -> {
+                    h.assertTrue(aside.getHealth() == 100, "meltdown target was damaged before firing");
+                    ignite(h, p, cannon);
+                    h.assertTrue(aside.getHealth() < 100, "the blast must land with the shot");
+                    h.assertBlockPresent(Blocks.STONE, new net.minecraft.core.BlockPos(2, 2, 4));
+                    h.assertTrue(p.getHealth() == p.getMaxHealth(), "the blast hurt its owner");
+                }).thenSucceed();
     }
 
     @GameTest(template = ARENA, batch = "platingMergesIntoTheArmorValue")
