@@ -8,11 +8,11 @@ GitHub Releases の後続リリースには MOD JAR を添付しません。GitH
 
 CurseForge のプロジェクト ID は `1793647`、配布先は [Singulo Arsenal](https://www.curseforge.com/minecraft/mc-mods/singulo-arsenal) です。
 
-## 0.2.1 の公開準備
+## 0.2.2 の公開準備
 
-Minecraft 1.21.1 / NeoForge / Java 21 向けです。`gradle.properties` の `mod_version` と CI の成果物は `0.2.1`、配布ファイルは `build/libs/Singulo-Arsenal-0.2.1-1.21.1N.jar` です。必須依存は Singulo 0.16.x または 0.17.x です。
+Minecraft 1.21.1 / NeoForge / Java 21 向けです。`gradle.properties` の `mod_version` と CI の成果物は `0.2.2`、配布ファイルは `build/libs/Singulo-Arsenal-0.2.2-1.21.1N.jar` です。必須依存は Singulo 0.16.x / 0.17.x / 0.18.x です。
 
-PR のレビュー、build / integration、実クライアントの確認結果を判断してからマージします。公開用の変更履歴は [`changelog-0.2.1.md`](curseforge/changelog-0.2.1.md) です。GitHub の `v0.2.1` には変更履歴と配布リンクを掲載し、MOD JAR は添付しません。
+PR のレビュー、build / integration、実クライアントの確認結果を判断してからマージします。公開用の変更履歴は [`changelog-0.2.2.md`](curseforge/changelog-0.2.2.md) です。GitHub の `v0.2.2` には変更履歴と配布リンクを掲載し、MOD JAR は添付しません。
 
 ## Actions から CurseForge に公開する
 
@@ -30,7 +30,7 @@ GitHub Environment **`curseforge`** に以下を設定します。2026-11-10 時
 1. Actions → **Publish CurseForge** → **Run workflow** を開き、ブランチを `1.21.1` にします。
 2. 最初は `dry_run=true`（既定値）、`release_type=beta`（既定値）で実行します。build、integration、公開用 JAR の検査、設定済みトークンを使った CurseForge バージョン一覧の GET を確認します。このモードはアップロードしません。GET の成功だけでは対象プロジェクトのアップロード権限や審査状態までは確認できません。
 3. 公開するときは同じブランチで `dry_run=false` にして実行します。リリース種別は `alpha` / `beta` / `release` から選べます。アップロードは `1.21.1` ブランチに限定します。
-4. 実行ごとに選択時のコミットをビルドし、通常 CI と同じ build / integration（本体素材 ID 照合・55 GameTest）を通します。同じ実行で生成・検査した JAR だけをアップロードします。確認モードと公開の間にコミットが進んでいれば、公開時のコミットで再検証されます。
+4. 実行ごとに選択時のコミットをビルドし、通常 CI と同じ build / integration（本体素材 ID 照合・56 GameTest）を通します。同じ実行で生成・検査した JAR だけをアップロードします。確認モードと公開の間にコミットが進んでいれば、公開時のコミットで再検証されます。
 5. Actions の Summary でコミット、ファイル名、SHA-256 と公開ファイル URL を確認します。CurseForge の審査・公開状態を確認してから README や GitHub リリースノートから案内します。
 
 公開ファイルには Minecraft `1.21.1`、NeoForge、Java `21`、必須依存 `singulo` を設定します。`gradle.properties` のバージョンと一致する JAR・変更履歴が必要で、JAR 内の依存関係とテスト用クラスの除外も検査します。次回リリースでは `mod_version` と `docs/curseforge/changelog-<version>.md` を更新してください。
@@ -82,3 +82,7 @@ K・L案も同じ設定ファイルに保存しています。`python tools/arse
 ## 0.2.1 compatibility update
 
 Singulo 0.16.x / 0.17.x に対応する互換性更新です。公開は上記の検証付き手動ワークフローから行い、各ファイルの URL と公開状態を確認します。[互換性記録](development/singulo-0.17-compatibility.md)と[変更履歴](curseforge/changelog-0.2.1.md)を参照してください。
+
+## 0.2.2 compatibility update
+
+Singulo 0.18.x 対応版です。公開前に、確定した本体コミットと実際の配布 JAR を使う検証を完了します。[互換性記録](development/singulo-0.18-compatibility.md)と[変更履歴](curseforge/changelog-0.2.2.md)を参照してください。

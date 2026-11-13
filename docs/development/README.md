@@ -45,8 +45,8 @@ Windows は `gradlew.bat build`。`build` は `tools/check.py` も実行する�
 同じ Minecraft・ローダー向けの Singulo 本体 JAR を指定します。未指定や存在しないパスはエラーになります。
 
 ```sh
-./gradlew runClient -PsinguloJar=/absolute/path/Singulo-0.17.0-1.21.1N.jar
-./gradlew runServer -PsinguloJar=/absolute/path/Singulo-0.17.0-1.21.1N.jar
+./gradlew runClient -PsinguloJar=/absolute/path/Singulo-0.18.0-1.21.1N.jar
+./gradlew runServer -PsinguloJar=/absolute/path/Singulo-0.18.0-1.21.1N.jar
 ```
 
 クリエイティブモードのワールドを作ると、専用タブから充電済みの装備を試せます。起動ログの `Singulo Arsenal initialized` と MOD 一覧で、本体と同時に読み込めたことを確認してください。
@@ -64,7 +64,7 @@ PC ごとの設定は Git 管理外の `.local/environment.cmd` に置きます�
 set "JAVA_HOME=C:\path\to\jdk-21"
 set "GRADLE_USER_HOME=%USERPROFILE%\.gradle"
 set "ARSENAL_PYTHON=C:\path\to\python.exe"
-set "ARSENAL_SINGULO=%~dp0..\libs\Singulo-0.17.0-1.21.1N.jar"
+set "ARSENAL_SINGULO=%~dp0..\libs\Singulo-0.18.0-1.21.1N.jar"
 ```
 
 Java や Python のシステム全体の設定は変えず、これらのスクリプトの中で指定します。
