@@ -5,6 +5,7 @@ import io.github.genichimaruo.singuloarsenal.SinguloArsenal;
 import io.github.genichimaruo.singuloarsenal.armor.ArmorSet;
 import io.github.genichimaruo.singuloarsenal.armor.SuitEvents;
 import io.github.genichimaruo.singuloarsenal.core.ArsenalData;
+import io.github.genichimaruo.singuloarsenal.core.ArsenalDamage;
 import io.github.genichimaruo.singuloarsenal.core.Fe;
 import io.github.genichimaruo.singuloarsenal.core.Rules;
 import io.github.genichimaruo.singuloarsenal.module.IntegratorBlockEntity;
@@ -122,6 +123,34 @@ public final class ArsenalGameTests {
         h.assertTrue(Math.abs(actual - expected) < 0.01F, message + ": expected " + expected + " got " + actual);
     }
 
+    /** Wait only for fixture visibility; attacks and their assertions run exactly once. */
+    private static void whenCombatReady(GameTestHelper h, java.util.function.BooleanSupplier visible,
+                                        Runnable attackAndAssert, Zombie... targets) {
+        h.startSequence().thenWaitUntil(() -> h.assertTrue(visible.getAsBoolean(), "combat fixture not yet visible to its spatial query"))
+                .thenExecute(() -> {
+                    for (Zombie target : targets) h.assertTrue(target.getHealth() == 100, "combat target damaged before attack");
+                    attackAndAssert.run();
+                }).thenSucceed();
+    }
+
+    /** Same clipped segment and width used by JetLanceItem.pulse. */
+    private static boolean beamSees(ServerPlayer player, Zombie target) {
+        Vec3 eye = player.getEyePosition();
+        Vec3 end = player.level().clip(new net.minecraft.world.level.ClipContext(eye,
+                eye.add(player.getLookAngle().normalize().scale(Rules.LANCE_RANGE)),
+                net.minecraft.world.level.ClipContext.Block.COLLIDER,
+                net.minecraft.world.level.ClipContext.Fluid.NONE, player)).getLocation();
+        return ArsenalDamage.along(player, eye, end, Rules.LANCE_HIT_WIDTH).contains(target);
+    }
+
+    /** Same entity class, bounds and eligibility predicate used by SuitEvents.fireBits. */
+    private static boolean droneSees(ServerPlayer player, Zombie target) {
+        return player.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class,
+                player.getBoundingBox().inflate(Rules.BIT_RANGE),
+                e -> e instanceof net.minecraft.world.entity.monster.Enemy && ArsenalDamage.canHit(player, e)
+                        && player.distanceTo(e) <= Rules.BIT_RANGE && player.hasLineOfSight(e)).contains(target);
+    }
+
     // ---- Energy and data ---------------------------------------------------------------------------------------
 
     @GameTest(template = ARENA, batch = "gearOnlyAcceptsEnergy")
@@ -133,6 +162,59 @@ public final class ArsenalGameTests {
         h.assertTrue(energy.receiveEnergy(Integer.MAX_VALUE, false) == Rules.COLLAPSAR_CAPACITY, "overfill");
         h.assertTrue(!energy.canExtract() && energy.extractEnergy(1000, false) == 0, "gear must not work as a battery for machines");
         h.succeed();
+    }
+
+    /** Exercises the real 0.18 SMES charging slots without a production dependency on its classes. */
+    @GameTest(template = ARENA, batch = "singuloSmesCharging")
+    public static void singuloSmesChargesArsenalAndPreservesModules(GameTestHelper h) {
+        try {
+            var at = new net.minecraft.core.BlockPos(2, 1, 2);
+            var block = BuiltInRegistries.BLOCK.get(new ResourceLocation("singulo", "smes_cell"));
+            h.assertTrue(block != Blocks.AIR, "Singulo SMES missing");
+            h.setBlock(at, block);
+            var be = h.getLevel().getBlockEntity(h.absolutePos(at));
+            Class<?> smes = Class.forName("io.github.genichimaruo.singulo.machine.SmesCellBlockEntity");
+            h.assertTrue(smes.isInstance(be), "Unexpected SMES block entity");
+            var energy = (net.minecraftforge.energy.IEnergyStorage) smes.getMethod("energy").invoke(be);
+            var slots = (net.minecraftforge.items.IItemHandlerModifiable) smes.getMethod("chargeSlots").invoke(be);
+            var tick = smes.getMethod("serverTick", net.minecraft.world.level.Level.class,
+                    net.minecraft.core.BlockPos.class, net.minecraft.world.level.block.state.BlockState.class, smes);
+
+            ItemStack gear = charged(ArmorSet.COLLAPSAR, ArmorItem.Type.CHESTPLATE);
+            Modules.install(gear, List.of(module(ModuleType.CAPACITOR)));
+            int capacity = Fe.capacity(gear);
+            Fe.set(gear, 0);
+            h.assertTrue(slots.isItemValid(0, gear) && slots.insertItem(0, gear, false).isEmpty(),
+                    "Arsenal gear rejected by SMES charge input");
+            h.assertTrue(energy.receiveEnergy(5_000, false) == 5_000, "SMES fixture could not receive energy");
+            tick.invoke(null, h.getLevel(), be.getBlockPos(), be.getBlockState(), be);
+            h.assertTrue(Fe.stored(slots.getStackInSlot(0)) == 5_000 && energy.getEnergyStored() == 0,
+                    "SMES must transfer exactly the available FE to Arsenal gear");
+            h.assertTrue(slots.getStackInSlot(1).isEmpty(), "Partially charged gear moved to output");
+
+            Fe.set(slots.getStackInSlot(0), capacity - 700);
+            h.assertTrue(energy.receiveEnergy(5_000, false) == 5_000, "SMES fixture could not refill");
+            tick.invoke(null, h.getLevel(), be.getBlockPos(), be.getBlockState(), be);
+            h.assertTrue(Fe.stored(slots.getStackInSlot(0)) == capacity && energy.getEnergyStored() == 4_300,
+                    "SMES must pay only the FE accepted before the capacity limit");
+            ItemStack blocker = new ItemStack(net.minecraft.world.item.Items.STONE);
+            slots.setStackInSlot(1, blocker);
+            tick.invoke(null, h.getLevel(), be.getBlockPos(), be.getBlockState(), be);
+            h.assertTrue(!slots.getStackInSlot(0).isEmpty() && slots.getStackInSlot(1) == blocker
+                    && energy.getEnergyStored() == 4_300, "Blocked output must not lose gear or consume energy");
+
+            slots.setStackInSlot(1, ItemStack.EMPTY);
+            tick.invoke(null, h.getLevel(), be.getBlockPos(), be.getBlockState(), be);
+            ItemStack out = slots.getStackInSlot(1);
+            h.assertTrue(slots.getStackInSlot(0).isEmpty() && out.is(gear.getItem()), "Full Arsenal gear did not move to output");
+            h.assertTrue(Fe.stored(out) == capacity && Fe.capacity(out) == capacity, "Output charge or capacity changed");
+            h.assertTrue(Modules.installed(out).size() == 1 && Modules.count(out, ModuleType.CAPACITOR) == 1,
+                    "SMES charging lost the installed capacitor module");
+            h.assertTrue(energy.getEnergyStored() == 4_300, "Output transfer consumed more energy");
+            h.succeed();
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Singulo 0.18 charging API unavailable", e);
+        }
     }
 
     @GameTest(template = ARENA, batch = "stateSurvivesSaveAndLoad")
@@ -226,15 +308,16 @@ public final class ArsenalGameTests {
         dress(p, ArmorSet.DEGENERACY);
         ItemStack chest = p.getItemBySlot(EquipmentSlot.CHEST);
         Zombie nearby = target(h, 4.5, 2.5);
-        ArsenalData.set(chest, ArsenalData.LOAD, Rules.PRESSURE_MAX - 1);
-        magicHit(p, 10);
-        h.assertTrue(ArsenalData.get(chest, ArsenalData.LOAD) == 0, "pressure not released");
-        h.assertTrue(ArsenalData.time(chest, ArsenalData.LOCKED_UNTIL) == h.getLevel().getGameTime() + Rules.COLLAPSE_LOCKOUT, "no lockout");
-        h.assertTrue(nearby.getHealth() < 100, "collapse shockwave missed");
-        p.setHealth(p.getMaxHealth());
-        magicHit(p, 15);
-        near(h, p.getHealth(), 5, "a collapsed suit must not cap hits");
-        h.succeed();
+        whenCombatReady(h, () -> ArsenalDamage.around(p, p.getBoundingBox().getCenter(), Rules.COLLAPSE_RADIUS).contains(nearby), () -> {
+                    ArsenalData.set(chest, ArsenalData.LOAD, Rules.PRESSURE_MAX - 1);
+                    magicHit(p, 10);
+                    h.assertTrue(ArsenalData.get(chest, ArsenalData.LOAD) == 0, "pressure not released");
+                    h.assertTrue(ArsenalData.time(chest, ArsenalData.LOCKED_UNTIL) == h.getLevel().getGameTime() + Rules.COLLAPSE_LOCKOUT, "no lockout");
+                    h.assertTrue(nearby.getHealth() < 100, "collapse shockwave missed");
+                    p.setHealth(p.getMaxHealth());
+                    magicHit(p, 15);
+                    near(h, p.getHealth(), 5, "a collapsed suit must not cap hits");
+                }, nearby);
     }
 
     @GameTest(template = ARENA, batch = "ventRequiresMinimumPressure")
@@ -292,6 +375,7 @@ public final class ArsenalGameTests {
                         p, p.getBoundingBox().getCenter(), Rules.HORIZON_RADIUS).contains(nearby),
                 "horizon target not yet visible in the loaded entity section"))
                 .thenExecute(() -> {
+                    h.assertTrue(nearby.getHealth() == 100, "horizon target damaged before attack");
                     // Only the horizon's reserve left, which the energy shield must not touch.
                     for (EquipmentSlot slot : ARMOR_SLOTS) Fe.set(p.getItemBySlot(slot), slot == EquipmentSlot.CHEST ? Rules.HORIZON_FE : 0);
                     magicHit(p, 100);
@@ -354,18 +438,19 @@ public final class ArsenalGameTests {
         ItemStack chest = p.getItemBySlot(EquipmentSlot.CHEST);
         ItemStack boots = p.getItemBySlot(EquipmentSlot.FEET);
         Zombie behind = target(h, 2.5, 3.5);
-        p.setItemSlot(EquipmentSlot.FEET, ItemStack.EMPTY);
-        SuitEvents.activate(p);
-        h.assertTrue(Fe.stored(chest) == Rules.COLLAPSAR_CAPACITY, "burst without boots");
-        p.setItemSlot(EquipmentSlot.FEET, boots);
-        p.getPersistentData().remove("singulo_arsenal.last_ability");
-        ArsenalData.set(chest, ArsenalData.LOAD, 40);
-        SuitEvents.activate(p);
-        h.assertTrue(Fe.stored(chest) == Rules.COLLAPSAR_CAPACITY - Rules.JET_BURST_FE, "burst cost");
-        h.assertTrue(ArsenalData.get(chest, ArsenalData.LOAD) == 40 - Rules.JET_BURST_LOAD, "burst load");
-        h.assertTrue(behind.getHealth() < 100, "rear jet missed");
-        h.assertTrue(p.getDeltaMovement().length() > 1.5, "no thrust");
-        h.succeed();
+        whenCombatReady(h, () -> ArsenalDamage.along(p, p.getBoundingBox().getCenter(), p.getBoundingBox().getCenter().subtract(p.getLookAngle().normalize().scale(Rules.JET_BURST_REAR_RANGE)), 0.8).contains(behind), () -> {
+                    p.setItemSlot(EquipmentSlot.FEET, ItemStack.EMPTY);
+                    SuitEvents.activate(p);
+                    h.assertTrue(Fe.stored(chest) == Rules.COLLAPSAR_CAPACITY, "burst without boots");
+                    p.setItemSlot(EquipmentSlot.FEET, boots);
+                    p.getPersistentData().remove("singulo_arsenal.last_ability");
+                    ArsenalData.set(chest, ArsenalData.LOAD, 40);
+                    SuitEvents.activate(p);
+                    h.assertTrue(Fe.stored(chest) == Rules.COLLAPSAR_CAPACITY - Rules.JET_BURST_FE, "burst cost");
+                    h.assertTrue(ArsenalData.get(chest, ArsenalData.LOAD) == 40 - Rules.JET_BURST_LOAD, "burst load");
+                    h.assertTrue(behind.getHealth() < 100, "rear jet missed");
+                    h.assertTrue(p.getDeltaMovement().length() > 1.5, "no thrust");
+                }, behind);
     }
 
     @GameTest(template = ARENA, batch = "noHairClearsHarmfulEffects")
@@ -396,14 +481,15 @@ public final class ArsenalGameTests {
         ItemStack saber = hold(p, new ItemStack(ArsenalItems.QUENCH_SABER.get()));
         Zombie first = target(h, 2.5, 4.5);
         Zombie second = target(h, 3.5, 4.5);
-        for (int i = 0; i < 4; i++) saber.getItem().hurtEnemy(saber, first, p);
-        h.assertTrue(second.getHealth() == 100 && ArsenalData.get(saber, ArsenalData.CURRENT) == 4, "quenched early");
-        saber.getItem().hurtEnemy(saber, first, p);
-        h.assertTrue(second.getHealth() < 100, "quench missed bystander");
-        h.assertTrue(ArsenalData.get(saber, ArsenalData.CURRENT) == 0, "current not reset");
-        h.assertTrue(Fe.stored(saber) == Rules.QUENCH_CAPACITY - Rules.QUENCH_FE, "quench cost");
-        h.assertTrue(p.getCooldowns().isOnCooldown(saber.getItem()), "no cooldown");
-        h.succeed();
+        whenCombatReady(h, () -> ArsenalDamage.around(p, first.getBoundingBox().getCenter(), Rules.QUENCH_RADIUS).containsAll(List.of(first, second)), () -> {
+                    for (int i = 0; i < 4; i++) saber.getItem().hurtEnemy(saber, first, p);
+                    h.assertTrue(second.getHealth() == 100 && ArsenalData.get(saber, ArsenalData.CURRENT) == 4, "quenched early");
+                    saber.getItem().hurtEnemy(saber, first, p);
+                    h.assertTrue(second.getHealth() < 100, "quench missed bystander");
+                    h.assertTrue(ArsenalData.get(saber, ArsenalData.CURRENT) == 0, "current not reset");
+                    h.assertTrue(Fe.stored(saber) == Rules.QUENCH_CAPACITY - Rules.QUENCH_FE, "quench cost");
+                    h.assertTrue(p.getCooldowns().isOnCooldown(saber.getItem()), "no cooldown");
+                }, first, second);
     }
 
     @GameTest(template = ARENA, batch = "casimirIgnoresArmorWhenArmed")
@@ -434,22 +520,24 @@ public final class ArsenalGameTests {
         ServerPlayer p = player(h, 2.5, 2.5);
         ItemStack reaver = hold(p, new ItemStack(ArsenalItems.TIDAL_REAVER.get()));
         Zombie victim = target(h, 2.5, 4.5);
-        for (int i = 0; i < Rules.STRESS_MAX + 2; i++) reaver.getItem().hurtEnemy(reaver, victim, p);
-        h.assertTrue(Weapons.stress(victim) == Rules.STRESS_MAX, "stress should clamp at the maximum");
-        victim.setHealth(100);
-        victim.invulnerableTime = 0;
-        victim.hurt(h.getLevel().damageSources().generic(), 10);
-        near(h, 100 - victim.getHealth(), 10 * Rules.stressMultiplier(Rules.STRESS_MAX), "stress multiplier");
-        victim.setHealth(100);
-        victim.invulnerableTime = 0;
         p.lookAt(net.minecraft.commands.arguments.EntityAnchorArgument.Anchor.EYES, victim.getEyePosition());
-        Vec3 focus = io.github.genichimaruo.singuloarsenal.weapon.TidalReaverItem.focus(p, 1);
-        h.assertTrue(io.github.genichimaruo.singuloarsenal.core.ArsenalDamage.around(p, focus, Rules.REAVER_RANGE).contains(victim),
-                "shear target missing from spatial query: focus=" + focus + " target=" + victim.position() + " health=" + victim.getHealth());
-        ((io.github.genichimaruo.singuloarsenal.weapon.TidalReaverItem) reaver.getItem()).shear(p, h.getLevel());
-        h.assertTrue(Weapons.stress(victim) == 0, "shear must spend stress: health=" + victim.getHealth() + " alive=" + victim.isAlive());
-        h.assertTrue(victim.getHealth() <= 100 - Rules.shearDamage(Rules.STRESS_MAX), "shear damage scales with stress");
-        h.succeed();
+        whenCombatReady(h, () -> ArsenalDamage.around(p, TidalReaverItem.focus(p, 1), Rules.REAVER_RANGE).contains(victim), () -> {
+                    for (int i = 0; i < Rules.STRESS_MAX + 2; i++) reaver.getItem().hurtEnemy(reaver, victim, p);
+                    h.assertTrue(Weapons.stress(victim) == Rules.STRESS_MAX, "stress should clamp at the maximum");
+                    victim.setHealth(100);
+                    victim.invulnerableTime = 0;
+                    victim.hurt(h.getLevel().damageSources().generic(), 10);
+                    near(h, 100 - victim.getHealth(), 10 * Rules.stressMultiplier(Rules.STRESS_MAX), "stress multiplier");
+                    victim.setHealth(100);
+                    victim.invulnerableTime = 0;
+                    p.lookAt(net.minecraft.commands.arguments.EntityAnchorArgument.Anchor.EYES, victim.getEyePosition());
+                    Vec3 focus = io.github.genichimaruo.singuloarsenal.weapon.TidalReaverItem.focus(p, 1);
+                    h.assertTrue(io.github.genichimaruo.singuloarsenal.core.ArsenalDamage.around(p, focus, Rules.REAVER_RANGE).contains(victim),
+                            "shear target missing from spatial query: focus=" + focus + " target=" + victim.position() + " health=" + victim.getHealth());
+                    ((io.github.genichimaruo.singuloarsenal.weapon.TidalReaverItem) reaver.getItem()).shear(p, h.getLevel());
+                    h.assertTrue(Weapons.stress(victim) == 0, "shear must spend stress: health=" + victim.getHealth() + " alive=" + victim.isAlive());
+                    h.assertTrue(victim.getHealth() <= 100 - Rules.shearDamage(Rules.STRESS_MAX), "shear damage scales with stress");
+                }, victim);
     }
 
     @GameTest(template = ARENA, batch = "lanceFiresForwardOnlyAndStopsAtWalls")
@@ -460,17 +548,18 @@ public final class ArsenalGameTests {
         p.setXRot(0);
         Zombie front = target(h, 2.5, 4.2);
         Zombie rear = target(h, 2.5, 1);
-        JetLanceItem.pulse(p, h.getLevel());
-        near(h, 100 - front.getHealth(), Rules.LANCE_DAMAGE, "jet");
-        h.assertTrue(rear.getHealth() == 100, "the rear pole is sealed: nothing behind the wielder may be hurt");
-        JetLanceItem.pulse(p, h.getLevel());
-        near(h, 100 - front.getHealth(), Rules.LANCE_DAMAGE * 2, "pulses must not be blocked by hurt cooldown");
-        h.setBlock(2, 3, 3, Blocks.IRON_BLOCK);
-        h.setBlock(2, 2, 3, Blocks.IRON_BLOCK);
-        float before = front.getHealth();
-        JetLanceItem.pulse(p, h.getLevel());
-        h.assertTrue(front.getHealth() == before, "jet passed through a wall");
-        h.succeed();
+        whenCombatReady(h, () -> beamSees(p, front) && ArsenalDamage.around(p, rear.position(), 1).contains(rear), () -> {
+                    JetLanceItem.pulse(p, h.getLevel());
+                    near(h, 100 - front.getHealth(), Rules.LANCE_DAMAGE, "jet");
+                    h.assertTrue(rear.getHealth() == 100, "the rear pole is sealed: nothing behind the wielder may be hurt");
+                    JetLanceItem.pulse(p, h.getLevel());
+                    near(h, 100 - front.getHealth(), Rules.LANCE_DAMAGE * 2, "pulses must not be blocked by hurt cooldown");
+                    h.setBlock(2, 3, 3, Blocks.IRON_BLOCK);
+                    h.setBlock(2, 2, 3, Blocks.IRON_BLOCK);
+                    float before = front.getHealth();
+                    JetLanceItem.pulse(p, h.getLevel());
+                    h.assertTrue(front.getHealth() == before, "jet passed through a wall");
+                }, front, rear);
     }
 
     @GameTest(template = ARENA, batch = "cannonHitsTargetsContainingTheRayOrigin")
@@ -478,10 +567,11 @@ public final class ArsenalGameTests {
         ServerPlayer p = player(h, 2.5, 2.5);
         hold(p, new ItemStack(ArsenalItems.JET_LANCE.get()));
         Zombie mob = target(h, 2.5, 3.0);
-        h.assertTrue(mob.getBoundingBox().inflate(Rules.LANCE_HIT_WIDTH).contains(p.getEyePosition()), "target must contain the ray origin");
-        JetLanceItem.pulse(p, h.getLevel());
-        near(h, 100 - mob.getHealth(), Rules.LANCE_DAMAGE, "point-blank cannon shot missed");
-        h.succeed();
+        whenCombatReady(h, () -> beamSees(p, mob), () -> {
+                    h.assertTrue(mob.getBoundingBox().inflate(Rules.LANCE_HIT_WIDTH).contains(p.getEyePosition()), "target must contain the ray origin");
+                    JetLanceItem.pulse(p, h.getLevel());
+                    near(h, 100 - mob.getHealth(), Rules.LANCE_DAMAGE, "point-blank cannon shot missed");
+                }, mob);
     }
 
     @GameTest(template = ARENA, batch = "lanceNeverHurtsTheWielder")
@@ -641,11 +731,19 @@ public final class ArsenalGameTests {
         p.setXRot(0);
         h.setBlock(2, 2, 4, Blocks.STONE);
         Zombie aside = target(h, 4.5, 4.5);
-        ignite(h, p, cannon);
-        h.assertTrue(aside.getHealth() < 100, "the blast must land with the shot");
-        h.assertBlockPresent(Blocks.STONE, new net.minecraft.core.BlockPos(2, 2, 4));
-        h.assertTrue(p.getHealth() == p.getMaxHealth(), "the blast hurt its owner");
-        h.succeed();
+        // As with the horizon wave, do not fire a one-shot blast before the freshly
+        // forced test chunk exposes the spawned target to the actual spatial query.
+        h.startSequence().thenWaitUntil(() -> h.assertTrue(
+                io.github.genichimaruo.singuloarsenal.core.ArsenalDamage.around(
+                        p, aside.position(), Rules.blastRadius(1)).contains(aside),
+                "meltdown target not yet visible in the loaded entity section"))
+                .thenExecute(() -> {
+                    h.assertTrue(aside.getHealth() == 100, "meltdown target was damaged before firing");
+                    ignite(h, p, cannon);
+                    h.assertTrue(aside.getHealth() < 100, "the blast must land with the shot");
+                    h.assertBlockPresent(Blocks.STONE, new net.minecraft.core.BlockPos(2, 2, 4));
+                    h.assertTrue(p.getHealth() == p.getMaxHealth(), "the blast hurt its owner");
+                }).thenSucceed();
     }
 
     @GameTest(template = ARENA, batch = "platingMergesIntoTheArmorValue")
@@ -752,12 +850,13 @@ public final class ArsenalGameTests {
         ItemStack chest = charged(ArmorSet.COLLAPSAR, ArmorItem.Type.CHESTPLATE);
         Modules.install(chest, java.util.List.of(module(ModuleType.BIT_DRONE)));
         Fe.set(chest, Rules.BIT_FE * 10);
-        p.setItemSlot(EquipmentSlot.CHEST, chest);
         Zombie mob = target(h, 2.5, 4.5);
-        SuitEvents.fireBits(p);
-        h.assertTrue(mob.getHealth() == 100 - Rules.BIT_DAMAGE * Rules.BITS_PER_MODULE, "bits did not land: " + mob.getHealth());
-        h.assertTrue(Fe.stored(chest) == Rules.BIT_FE * (10 - Rules.BITS_PER_MODULE), "bit cost");
-        h.succeed();
+        whenCombatReady(h, () -> droneSees(p, mob), () -> {
+                    p.setItemSlot(EquipmentSlot.CHEST, chest);
+                    SuitEvents.fireBits(p);
+                    h.assertTrue(mob.getHealth() == 100 - Rules.BIT_DAMAGE * Rules.BITS_PER_MODULE, "bits did not land: " + mob.getHealth());
+                    h.assertTrue(Fe.stored(chest) == Rules.BIT_FE * (10 - Rules.BITS_PER_MODULE), "bit cost");
+                }, mob);
     }
 
     @GameTest(template = ARENA, batch = "fluxPinConsumesTheLastPartialCharge")
@@ -817,20 +916,21 @@ public final class ArsenalGameTests {
         ServerPlayer p = player(h, 2.5, 2.5);
         ItemStack blade = hold(p, new ItemStack(ArsenalItems.CASIMIR_BLADE.get()));
         Modules.install(blade, List.of(module(ModuleType.AMPLIFIER)));
-        long armedUntil = h.getLevel().getGameTime() + 100;
-        ArsenalData.set(blade, ArsenalData.ARMED_UNTIL, armedUntil);
         ItemStack chest = charged(ArmorSet.COLLAPSAR, ArmorItem.Type.CHESTPLATE);
         Modules.install(chest, List.of(module(ModuleType.BIT_DRONE)));
-        p.setItemSlot(EquipmentSlot.CHEST, chest);
         Zombie mob = target(h, 2.5, 4.5);
-        SuitEvents.fireBits(p);
-        near(h, 100 - mob.getHealth(), Rules.BIT_DAMAGE * Rules.BITS_PER_MODULE, "weapon bonuses leaked into drones");
-        h.assertTrue(ArsenalData.time(blade, ArsenalData.ARMED_UNTIL) == armedUntil, "a drone consumed the charged blade strike");
-        mob.invulnerableTime = 0;
-        mob.setHealth(100);
-        mob.hurt(p.damageSources().playerAttack(p), 10);
-        near(h, 100 - mob.getHealth(), 10 * Rules.amplified(1) * Rules.CASIMIR_ARMED_BONUS, "actual blade strike lost its bonuses");
-        h.succeed();
+        whenCombatReady(h, () -> droneSees(p, mob), () -> {
+                    p.setItemSlot(EquipmentSlot.CHEST, chest);
+                    long armedUntil = h.getLevel().getGameTime() + 100;
+                    ArsenalData.set(blade, ArsenalData.ARMED_UNTIL, armedUntil);
+                    SuitEvents.fireBits(p);
+                    near(h, 100 - mob.getHealth(), Rules.BIT_DAMAGE * Rules.BITS_PER_MODULE, "weapon bonuses leaked into drones");
+                    h.assertTrue(ArsenalData.time(blade, ArsenalData.ARMED_UNTIL) == armedUntil, "a drone consumed the charged blade strike");
+                    mob.invulnerableTime = 0;
+                    mob.setHealth(100);
+                    mob.hurt(p.damageSources().playerAttack(p), 10);
+                    near(h, 100 - mob.getHealth(), 10 * Rules.amplified(1) * Rules.CASIMIR_ARMED_BONUS, "actual blade strike lost its bonuses");
+                }, mob);
     }
 
     @GameTest(template = ARENA, batch = "cannonPulseUsesItsAmplifier")
@@ -839,9 +939,10 @@ public final class ArsenalGameTests {
         ItemStack cannon = hold(p, new ItemStack(ArsenalItems.JET_LANCE.get()));
         Modules.install(cannon, List.of(module(ModuleType.AMPLIFIER)));
         Zombie mob = target(h, 2.5, 4.5);
-        JetLanceItem.pulse(p, h.getLevel());
-        near(h, 100 - mob.getHealth(), Rules.LANCE_DAMAGE * Rules.amplified(1), "cannon amplification");
-        h.succeed();
+        whenCombatReady(h, () -> beamSees(p, mob), () -> {
+                    JetLanceItem.pulse(p, h.getLevel());
+                    near(h, 100 - mob.getHealth(), Rules.LANCE_DAMAGE * Rules.amplified(1), "cannon amplification");
+                }, mob);
     }
 
     // ---- Tools ---------------------------------------------------------------------------------------------------------
@@ -1218,9 +1319,10 @@ public final class ArsenalGameTests {
         mob.getAttribute(Attributes.ARMOR).setBaseValue(20);
         float armored = net.minecraft.world.damagesource.CombatRules.getDamageAfterAbsorb(Rules.LANCE_DAMAGE, 20, 0);
         float expected = Rules.LANCE_DAMAGE - (Rules.LANCE_DAMAGE - armored) * Rules.LANCE_ARMOR_KEPT;
-        JetLanceItem.pulse(p, h.getLevel());
-        near(h, 100 - mob.getHealth(), expected, "cannon armor penetration");
-        h.succeed();
+        whenCombatReady(h, () -> beamSees(p, mob), () -> {
+                    JetLanceItem.pulse(p, h.getLevel());
+                    near(h, 100 - mob.getHealth(), expected, "cannon armor penetration");
+                }, mob);
     }
 
     @GameTest(template = ARENA, batch = "everyRecipeLoadsAgainstRealSingulo")

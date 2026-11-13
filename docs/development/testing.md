@@ -18,10 +18,10 @@ SINGULO_SOURCE=/absolute/path/to/Singulo python3 tools/check.py
 
 ## GameTest
 
-本体 JAR と同時に読み込んだ実サーバーで、装備の能力を実際に動かして確かめます。現在は必須テスト 56 件（各ローダー）です。
+本体 JAR と同時に読み込んだ実サーバーで、装備の能力を実際に動かして確かめます。現在は必須テスト 57 件（各ローダー）です。
 
 ```sh
-./gradlew runGameTestServer -PsinguloJar=/absolute/path/Singulo-0.17.0-1.20.1N.jar
+./gradlew runGameTestServer -PsinguloJar=/absolute/path/Singulo-0.18.0-1.20.1N.jar
 ```
 
 Forge は `-Ploader=forge` と Forge 用の本体 JAR を指定します。同じ作業ディレクトリで異なるローダーを同時に起動しないでください。
@@ -41,7 +41,7 @@ Forge は `-Ploader=forge` と Forge 用の本体 JAR を指定します。同�
 
 ```sh
 python3 tools/review/prepare_gui.py --build-dir build/neoforge
-./gradlew --no-daemon -I tools/review/gui.gradle runClient -PsinguloJar=/absolute/path/Singulo-0.17.0-1.20.1N.jar
+./gradlew --no-daemon -I tools/review/gui.gradle runClient -PsinguloJar=/absolute/path/Singulo-0.18.0-1.20.1N.jar
 ```
 
 撮影結果は `build/<loader>/gui-review/screenshots/` に出ます。面の重なりの報告は `zfight.txt`、アイコン単体の撮影は `icons-bare.png` です。静止画なので、動いているときのちらつきは実際に操作して確認してください。
@@ -62,3 +62,5 @@ python3 tools/prepare_release.py
 ```
 
 公開処理の回帰テストは25件です。古い JAR の取り違え、バージョン・依存関係の不一致、テスト資材の混入、変更履歴の欠落、誤った公開先を拒否することを検証します。API 確認が GET のみであること、アップロード時の multipart が正しいこと、失敗時に再送や必須依存の除去を行わないこともモックで確認します。実際の API 設定確認と公開手順は [公開・配布手順](../curseforge.md) を参照してください。
+
+0.2.2 adds a Singulo 0.18 SMES interoperability test: partial charging, exact FE debit, full-charge transfer, blocked output and installed-module retention. The full suite requires Singulo 0.18.0; production metadata still permits the previously supported 0.16.x / 0.17.x releases.
