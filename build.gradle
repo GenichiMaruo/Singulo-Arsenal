@@ -15,7 +15,7 @@ tasks.named('jar', Jar) {
     exclude 'data/singulo_arsenal/structure/empty.nbt'
 }
 
-// 本体は未公開のため、開発用 JAR を -PsinguloJar=/absolute/path/to.jar で指定する。
+// 対応する本体 JAR を -PsinguloJar=/absolute/path/to.jar で指定する。
 // 本体クラスへの直接依存は、必要な API が決まるまで追加しない。
 if (providers.gradleProperty('singuloJar').isPresent()) {
     def singuloJar = file(providers.gradleProperty('singuloJar').get())
@@ -28,7 +28,7 @@ if (providers.gradleProperty('singuloJar').isPresent()) {
 def requireSingulo = tasks.register('requireSingulo') {
     doLast {
         if (!providers.gradleProperty('singuloJar').isPresent()) {
-            throw new GradleException('Starting the addon requires -PsinguloJar=/absolute/path/to/Singulo-0.17.0-1.21.1N.jar')
+            throw new GradleException('Starting the addon requires -PsinguloJar=/absolute/path/to/Singulo-0.18.0-1.21.1N.jar')
         }
     }
 }
@@ -69,7 +69,13 @@ def generateModMetadata = tasks.register('generateModMetadata', ProcessResources
 sourceSets.main.resources.srcDir generateModMetadata
 neoForge.ideSyncTask generateModMetadata
 
-tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    // Java compilation cache normalizes source line endings, but javac debug names can
+    // retain character offsets. Do not reuse classes built before the LF checkout rule.
+    inputs.file('.gitattributes').withPropertyName('sourceLineEndingPolicy')
+            .withPathSensitivity(PathSensitivity.RELATIVE).normalizeLineEndings()
+}
 
 tasks.register('offlineTest', Exec) {
     workingDir projectDir
@@ -83,8 +89,8 @@ tasks.named('runGameTestServer') {
     doFirst { delete layout.buildDirectory.file('gametest/logs/latest.log') }
     doLast {
         def log = layout.buildDirectory.file('gametest/logs/latest.log').get().asFile
-        if (!log.isFile() || !log.text.contains('All 55 required tests passed')) {
-            throw new GradleException('Expected all 55 required Arsenal GameTests to pass. Inspect the GameTest server log.')
+        if (!log.isFile() || !log.text.contains('All 56 required tests passed')) {
+            throw new GradleException('Expected all 56 required Arsenal GameTests to pass. Inspect the GameTest server log.')
         }
     }
 }
