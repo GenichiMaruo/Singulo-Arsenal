@@ -1,6 +1,6 @@
 # ドキュメント案内
 
-この版は **0.2.1 / Singulo 0.17.0 互換性対応**。対応範囲と検証結果は [互換性記録](development/singulo-0.17-compatibility.md) を参照してください。
+この版は **0.2.2 / Singulo 0.18.0 互換性対応**。対応範囲と検証結果は [互換性記録](development/singulo-0.18-compatibility.md) を参照してください。
 
 | 目的 | 読むもの |
 | --- | --- |

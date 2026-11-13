@@ -11,3 +11,5 @@ Java sources now use LF checkouts on all platforms. The previous Windows/Linux r
 A new required GameTest exercises the actual Singulo SMES charging block with capacitor-equipped Arsenal armor: partial charging, exact supply debit, capacity limiting, blocked output and full-charge output without losing the module. It uses test-only reflection and does not add a compile-time or production dependency on the new 0.18 API.
 
 The legacy meltdown fixture now waits until its spawned target is visible to the real spatial query before firing once, matching the existing horizon fixture. Initial Forge validation exposed a transient missing-hit failure; diagnostic reruns passed. The immediate-hit, terrain-preservation and owner-protection assertions remain unchanged.
+
+Candidate Linux NeoForge CI also exposed a zero-hit failure in the pre-existing cannon amplifier fixture. It now waits for the actual beam query to see its target, asserts the target is unharmed, fires exactly once and retains the exact amplified-damage assertion. No production combat code was changed.

@@ -900,9 +900,16 @@ public final class ArsenalGameTests {
         ItemStack cannon = hold(p, new ItemStack(ArsenalItems.JET_LANCE.get()));
         Modules.install(cannon, List.of(module(ModuleType.AMPLIFIER)));
         Zombie mob = target(h, 2.5, 4.5);
-        JetLanceItem.pulse(p, h.getLevel());
-        near(h, 100 - mob.getHealth(), Rules.LANCE_DAMAGE * Rules.amplified(1), "cannon amplification");
-        h.succeed();
+        // Wait for the actual beam query to see the fixture, then measure one pulse only.
+        h.startSequence().thenWaitUntil(() -> h.assertTrue(
+                io.github.genichimaruo.singuloarsenal.core.ArsenalDamage.along(p, p.getEyePosition(),
+                        p.getEyePosition().add(p.getLookAngle().normalize().scale(Rules.LANCE_RANGE)),
+                        Rules.LANCE_HIT_WIDTH).contains(mob), "amplifier target not yet visible to beam query"))
+                .thenExecute(() -> {
+                    h.assertTrue(mob.getHealth() == 100, "amplifier target was damaged before firing");
+                    JetLanceItem.pulse(p, h.getLevel());
+                    near(h, 100 - mob.getHealth(), Rules.LANCE_DAMAGE * Rules.amplified(1), "cannon amplification");
+                }).thenSucceed();
     }
 
     // ---- Tools ---------------------------------------------------------------------------------------------------------
