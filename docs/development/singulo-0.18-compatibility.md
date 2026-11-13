@@ -4,7 +4,19 @@ Arsenal 0.2.1 declares `[0.16.0,0.18.0)`, so the loader rejects Singulo 0.18.0 b
 
 No production gameplay, recipes or saved-data format changes are intended. Material IDs, machine recipes, mass-pellet data and the public `GravitationalLensing.add/addDistortion(Vec3,float,float,float)` entry points are checked against Singulo 0.18.0.
 
-Final source pins, release-binary hashes and validation results are pending the official Singulo 0.18.0 release. This branch must not be published before those checks complete.
+Integration CI is pinned to the final Singulo 0.18.0 release commit `49325262cc19c235fccdab9a3f233ceccc52a236`, shared by tags `v0.18.0-1.20.1F` and `v0.18.0-1.20.1N`.
+
+Both actual CurseForge dependency files are approved and generally available. Their CDN downloads match the base release's CI artifacts:
+
+- Forge: [file 9596768](https://www.curseforge.com/minecraft/mc-mods/singulo/files/9596768), `Singulo-0.18.0-1.20.1F.jar`, SHA-256 `616183ffe3a68dd8c4d29b6853289c08930cb30f999fc9ec2c7eeb6198e35d8f`.
+- NeoForge: [file 9596800](https://www.curseforge.com/minecraft/mc-mods/singulo/files/9596800), `Singulo-0.18.0-1.20.1N.jar`, SHA-256 `46eaeae60747d30d3a30e6b7c7c6219ee44c3280ebaf4da7df255655eb8704a8`.
+
+Local integration against each exact released binary passes all 57 required GameTests, 5,331 offline rule assertions, 108 Singulo material references, resource regeneration and both locales. Release validation passes 25 unit tests. Both real-client runs completed all 85 captures, including the final inventory capture, and both actual lens method handles resolved and were invoked successfully. Representative beam and armor captures were visually inspected.
+
+The independently built Linux CI run [43484638080](https://github.com/GenichiMaruo/Singulo-Arsenal/actions/runs/43484638080) passed both loader jobs. Local Windows production artifacts match that CI byte-for-byte:
+
+- Forge SHA-256: `0217a5259a5dfcc7c42959d3e3953984122b123edb076a766f93e5b8ee9348b7`.
+- NeoForge SHA-256: `dc59f4a73bf78b9582dc37640095534e6093423497b1c09572c559c628666507`.
 
 Java sources now use LF checkouts on all platforms. The previous Windows/Linux release comparison found only a compiler-generated local-variable debug name difference caused by CRLF offsets in `FxClient.java`; LF avoids that source of artifact drift without changing the executable code.
 
