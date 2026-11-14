@@ -392,6 +392,11 @@ public final class ArsenalReview {
         }));
         step(2, () -> mc.player.getInventory().selected = 0);
         at += 10;
+        step(2, () -> {
+            mc.setScreen(new net.minecraft.client.gui.screens.inventory.InventoryScreen(mc.player));
+            org.lwjgl.glfw.GLFW.glfwSetCursorPos(mc.getWindow().getWindow(), 0, 0);
+        });
+        at += 5;
         shot("nihonium-inventory");
         step(2, () -> mc.setScreen(null));
         at += 10;
