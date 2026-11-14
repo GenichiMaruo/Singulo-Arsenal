@@ -38,8 +38,10 @@ jobs:
           done
           exit 1
       - run: ./gradlew --no-daemon build
-      - name: Test release validation
-        run: python3 -m unittest discover -s tests -p 'test_release.py' -v
+      - name: Test release and review validation
+        run: |
+          python3 -m unittest discover -s tests -p 'test_release.py' -v
+          python3 -m unittest discover -s tests -p 'test_review.py' -v
       - name: Validate release JAR and changelog
         id: release
         run: python3 tools/prepare_release.py

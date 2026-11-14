@@ -16,8 +16,12 @@ Alternatively, pass `-Darsenal.review.render=true` **to the client JVM**;
 a Gradle JVM system property alone is not automatically forwarded.
 
 Run once with vanilla rendering and separately with the intended shader-mod
-and shader-pack combination. Archive `screenshots` between runs, since these
-runs deliberately use the same screenshot names. Record the mod/pack version,
+and shader-pack combination. Archive the previous review world and `screenshots`,
+then rerun `prepare_gui.py` before **every** rendering run. Reusing a prior world
+can leave a hanging frame which drops its contents when the arena is rebuilt;
+picking those items up then invalidates the empty-hand fixture. The reset is
+for rendering fixtures only, not migration verify/resave runs, which deliberately
+reuse the migrated world. These rendering runs use the same screenshot names. Record the mod/pack version,
 shader enabled/disabled state, and FOV alongside the archived captures.
 
 ## Coverage (68 images)
