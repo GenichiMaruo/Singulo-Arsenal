@@ -70,7 +70,11 @@ verification. Those remain mandatory before merge/publication.
   both trees are `9eb8f4a7ebf43ee9f7ae7a41a7721d4b342c2fe4`.
 - The actual base CI JAR SHA256 is
   `ec45f7d6a6a9dbac654c7a2048df085ca709f055868def39aeee4132d44ed942`.
-  It is not yet described here as a public CurseForge download.
+  CurseForge file [9617080](https://www.curseforge.com/minecraft/mc-mods/singulo/files/9617080)
+  was accepted by workflow `43632052851`; its CDN
+  download matched this hash, including an independent download at 19:32 UTC.
+  It was still Processing at the 19:34 UTC author check,
+  so general-public approval remains a release gate.
 - Arsenal `5ad54849` passed CI `43630011917` and `43630007872` with the final
   source pin. The actual CI base JAR also passed a local production build and
   all 65 GameTests. Python release/review validation passed all 26 tests.
@@ -91,9 +95,11 @@ verification. Those remain mandatory before merge/publication.
 - The six icon captures showed the plain nihonium armor preview, four tool
   icons and held sword correctly. An unrelated native hover tooltip obscured
   part of the inventory captures while unfocused. A QA-only InventoryScreen
-  wrapper now supplies offscreen mouse coordinates; it compiles, and a clean
-  icon recapture remains pending. Production rendering is unchanged by it.
+  wrapper now supplies offscreen mouse coordinates. Its fresh six-image rerun
+  exited normally and showed unobscured icons and English tooltips, plus the
+  nihonium worn preview and held sword. Production rendering is unchanged.
+  QA-only follow-up `39b1bb11` also passed CI `43631710539` and `43631706813`.
 
-Before merge/publication, the public CurseForge base JAR must still match the
-above CI hash, and the clean icon recapture plus final PR checks must complete.
+Before merge/publication, confirm general-public approval of the matched base
+CurseForge file and successful checks for the final PR head.
 No Arsenal 0.3.0 upload is claimed by this report.
