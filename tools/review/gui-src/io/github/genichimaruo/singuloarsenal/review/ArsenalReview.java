@@ -79,6 +79,8 @@ public final class ArsenalReview {
     }
 
     private static void hands(Minecraft mc, HumanoidArm arm, Item main, Item off, float yaw, float pitch) {
+        boolean mainEmpty = main == null || main == net.minecraft.world.item.Items.AIR;
+        boolean offEmpty = off == null || off == net.minecraft.world.item.Items.AIR;
         int serial = ++requested;
         mc.options.mainHand().set(arm); mc.options.broadcastOptions();
         mc.options.setCameraType(CameraType.FIRST_PERSON);
@@ -86,17 +88,18 @@ public final class ArsenalReview {
         local(mc, p -> {
             p.stopUsingItem(); p.getInventory().clearContent(); p.getInventory().selected = 0;
             p.setMainArm(arm);
-            p.setItemSlot(EquipmentSlot.MAINHAND, charged(main));
-            p.setItemSlot(EquipmentSlot.OFFHAND, off == null ? ItemStack.EMPTY : off == net.minecraft.world.item.Items.FILLED_MAP
+            p.setItemSlot(EquipmentSlot.MAINHAND, mainEmpty ? ItemStack.EMPTY : charged(main));
+            p.setItemSlot(EquipmentSlot.OFFHAND, offEmpty ? ItemStack.EMPTY : off == net.minecraft.world.item.Items.FILLED_MAP
                     ? net.minecraft.world.item.MapItem.create(p.serverLevel(), 0, 0, (byte) 0, true, false) : charged(off));
             expectedMain = p.getMainHandItem().copy(); expectedOff = p.getOffhandItem().copy();
             p.connection.teleport(OX, 81, OZ - 4, yaw, pitch);
             p.inventoryMenu.broadcastChanges(); completed = serial;
         });
-        await("hands-" + serial, () -> completed == serial && mc.player.getMainHandItem().is(main)
+        await("hands-" + serial, () -> completed == serial
+                && (mainEmpty ? mc.player.getMainHandItem().isEmpty() : mc.player.getMainHandItem().is(main))
                 && ItemStack.isSameItemSameComponents(mc.player.getMainHandItem(), expectedMain)
                 && ItemStack.isSameItemSameComponents(mc.player.getOffhandItem(), expectedOff)
-                && (off == null ? mc.player.getOffhandItem().isEmpty() : mc.player.getOffhandItem().is(off))
+                && (offEmpty ? mc.player.getOffhandItem().isEmpty() : mc.player.getOffhandItem().is(off))
                 && mc.player.getMainArm() == arm
                 && Math.abs(net.minecraft.util.Mth.wrapDegrees(mc.player.getYRot() - yaw)) < 0.5F
                 && Math.abs(mc.player.getXRot() - pitch) < 0.5F);
@@ -145,6 +148,9 @@ public final class ArsenalReview {
             }
             step(2, () -> hands(mc, arm, torch, gun, 0, 4)); at += 25;
             shot("render-" + side + "-off-gun-main-torch");
+            // The bare main hand is rendered by vanilla: this is the original third-hand reproducer.
+            step(2, () -> hands(mc, arm, net.minecraft.world.item.Items.AIR, gun, 0, 4)); at += 25;
+            shot("render-" + side + "-off-gun-main-empty");
             step(2, () -> hands(mc, arm, gun, gun, 0, 4)); at += 25;
             shot("render-" + side + "-both-guns");
             for (float[] a : new float[][]{{0,0}, {90,0}, {180,0}, {-90,0}, {45,-60}, {-45,60}}) {
@@ -488,6 +494,10 @@ public final class ArsenalReview {
     }
 
     private static void script(Minecraft mc) {
+        if (mc.options.getSoundSourceVolume(net.minecraft.sounds.SoundSource.MUSIC) != 0) {
+            throw new IllegalStateException("Review music must be muted; rerun prepare_gui.py");
+        }
+        System.out.println("ARSENAL_REVIEW_MUSIC_MUTED (other sound categories unchanged)");
         if (Boolean.getBoolean("arsenal.review.render") || Files.exists(mc.gameDirectory.toPath().resolve("render-only"))) {
             renderScript(mc);
             return;

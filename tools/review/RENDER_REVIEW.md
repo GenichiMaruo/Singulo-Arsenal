@@ -10,7 +10,8 @@ is not a visual pass.
 Use the existing `tools/review/prepare_gui.py` and `-I tools/review/gui.gradle`
 client-review workflow. After preparation, create an empty marker file
 `build/gui-review/render-only` before starting the client. This marker takes
-precedence over `icons-only`. Remove it to return to the ordinary review.
+precedence over `icons-only`. Preparation mutes only music in this disposable
+game directory; the harness asserts music volume zero and leaves effects enabled. Remove it to return to the ordinary review.
 Alternatively, pass `-Darsenal.review.render=true` **to the client JVM**;
 a Gradle JVM system property alone is not automatically forwarded.
 
@@ -19,10 +20,10 @@ and shader-pack combination. Archive `screenshots` between runs, since these
 runs deliberately use the same screenshot names. Record the mod/pack version,
 shader enabled/disabled state, and FOV alongside the archived captures.
 
-## Coverage (66 images)
+## Coverage (68 images)
 
 - For each dominant arm: main-hand cannon with empty/torch/shield/real filled-map
-  offhand; offhand cannon with main-hand torch; cannon in both hands.
+  offhand; offhand cannon with main-hand torch or empty bare hand; cannon in both hands.
 - For each arm: yaw 0, 90, 180, -90 at pitch 0, plus yaw/pitch 45/-60 and -45/60.
 - For each arm: real `tryFire` charge, jet, and early/middle/late reload. The last
   magazine round is seeded to avoid three redundant shots, but animation times
