@@ -70,7 +70,10 @@ public final class NihoniumGameTests {
         for (var entry : Nihonium.ARMOR.entrySet()) {
             ArmorItem item = entry.getValue().get();
             ItemStack stack = new ItemStack(item);
-            h.assertTrue(stack.getMaxDamage() == item.getMaterial().getDurabilityForType(entry.getKey()), "armor durability changed");
+            int baseDurability = switch (entry.getKey()) {
+                case HELMET -> 11; case CHESTPLATE -> 16; case LEGGINGS -> 15; case BOOTS -> 13;
+            };
+            h.assertTrue(stack.getMaxDamage() == baseDurability * 60, "armor durability changed");
             h.assertTrue(stack.is(tag("trimmable_armor")), "plain armor lost vanilla trim eligibility");
             h.assertTrue(item.getToughness() == 2.5F, "armor toughness changed");
             defense += item.getDefense();

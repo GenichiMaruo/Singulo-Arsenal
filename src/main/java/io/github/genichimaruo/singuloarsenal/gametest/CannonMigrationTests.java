@@ -68,7 +68,11 @@ public final class CannonMigrationTests {
     }
     @GameTest(template = "empty")
     public static void legacyCannonPlayer(GameTestHelper h) {
-        var p = h.makeMockServerPlayerInLevel(); ItemStack expected = fixture();
+        // This test exercises Inventory NBT without joining a network player. Forge 47's
+        // vanilla mock-join helper has no Netty channel; real player persistence is covered by the world harness.
+        var p = new net.minecraftforge.common.util.FakePlayer(h.getLevel(),
+                new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), "MigrationTest"));
+        ItemStack expected = fixture();
         p.getInventory().selected = 2; p.getInventory().setItem(2, expected.copy()); p.getInventory().setItem(8, expected.copy());
         p.setItemSlot(EquipmentSlot.OFFHAND, expected.copy());
         ListTag saved = p.getInventory().save(new ListTag()); legacyIds(saved); p.getInventory().clearContent(); p.getInventory().load(saved);
