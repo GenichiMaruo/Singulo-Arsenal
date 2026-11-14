@@ -5,6 +5,7 @@ import io.github.genichimaruo.singuloarsenal.armor.SuitItem;
 import io.github.genichimaruo.singuloarsenal.core.Fe;
 import io.github.genichimaruo.singuloarsenal.core.Powered;
 import io.github.genichimaruo.singuloarsenal.module.ModuleContent;
+import io.github.genichimaruo.singuloarsenal.nihonium.Nihonium;
 import io.github.genichimaruo.singuloarsenal.tool.AccretionDrillItem;
 import io.github.genichimaruo.singuloarsenal.tool.DegeneracyBreakerItem;
 import io.github.genichimaruo.singuloarsenal.tool.ShearSawItem;
@@ -86,6 +87,7 @@ public final class ArsenalItems {
             }
             SUITS.put(set, pieces);
         }
+        Nihonium.register(ITEMS, MATERIALS, PIECES);
         TABS.register("arsenal", () -> CreativeModeTab.builder()
                 .title(Component.translatable("itemGroup.singulo_arsenal"))
                 .icon(() -> new ItemStack(ModuleContent.INTEGRATOR_ITEM.get()))
@@ -101,6 +103,11 @@ public final class ArsenalItems {
                     output.accept(charged(DEGENERACY_BREAKER.get()));
                     output.accept(charged(SHEAR_SAW.get()));
                     output.accept(charged(ACCRETION_DRILL.get()));
+                    for (ArmorItem.Type type : PIECES) output.accept(Nihonium.ARMOR.get(type).get());
+                    output.accept(Nihonium.SWORD.get());
+                    output.accept(Nihonium.PICKAXE.get());
+                    output.accept(Nihonium.AXE.get());
+                    output.accept(Nihonium.SHOVEL.get());
                     output.accept(PELLET_CANISTER.get());
                     output.accept(FLUX_WEAVE.get());
                     output.accept(PRESSURE_LATTICE.get());

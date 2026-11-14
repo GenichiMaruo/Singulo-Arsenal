@@ -357,6 +357,25 @@ public final class ArsenalReview {
         step(2, () -> Tips.detail = () -> true);
         at += 3;
         shot("tooltip-detail");
+        step(2, () -> { Tips.detail = () -> false; tip = null; });
+        // Plain nihonium gear: worn on the vanilla armor layer in the inventory preview, then the sword in first person.
+        step(4, () -> local(mc, p -> {
+            p.getInventory().clearContent();
+            p.getInventory().selected = 0;
+            p.getInventory().setItem(0, new ItemStack(io.github.genichimaruo.singuloarsenal.nihonium.Nihonium.SWORD.get()));
+            p.getInventory().setItem(1, new ItemStack(io.github.genichimaruo.singuloarsenal.nihonium.Nihonium.PICKAXE.get()));
+            p.getInventory().setItem(2, new ItemStack(io.github.genichimaruo.singuloarsenal.nihonium.Nihonium.AXE.get()));
+            p.getInventory().setItem(3, new ItemStack(io.github.genichimaruo.singuloarsenal.nihonium.Nihonium.SHOVEL.get()));
+            for (var piece : io.github.genichimaruo.singuloarsenal.nihonium.Nihonium.ARMOR.values()) {
+                p.setItemSlot(piece.get().getEquipmentSlot(), new ItemStack(piece.get()));
+            }
+        }));
+        step(2, () -> mc.player.getInventory().selected = 0);
+        at += 10;
+        shot("nihonium-inventory");
+        step(2, () -> mc.setScreen(null));
+        at += 10;
+        shot("nihonium-hand");
         step(4, () -> done = true);
     }
 

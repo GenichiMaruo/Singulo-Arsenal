@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    "N N",
+    "NNN",
+    "NNN"
+  ],
+  "key": {
+    "N": {
+      "item": "singulo:nihonium_ingot"
+    }
+  },
+  "result": {
+    "id": "singulo_arsenal:nihonium_chestplate",
+    "count": 1
+  }
+}

@@ -22,7 +22,8 @@ MODULES = ['bit_drone_module', 'capacitor_module', 'plating_module', 'thruster_m
 ARMOR = [f'{s}_{p}' for s in SETS for p in PARTS]
 GEAR = ARMOR + WEAPONS + TOOLS + ['module_integrator']
 CONTAINERS = ['pellet_canister']
-ITEMS = GEAR + MATERIALS + MODULES + CONTAINERS
+NIHONIUM = [f'nihonium_{p}' for p in ['sword', 'pickaxe', 'axe', 'shovel'] + PARTS]
+ITEMS = GEAR + MATERIALS + MODULES + CONTAINERS + NIHONIUM
 
 javac = str(Path(os.environ['JAVA_HOME']) / 'bin/javac') if os.environ.get('JAVA_HOME') else shutil.which('javac')
 java = str(Path(os.environ['JAVA_HOME']) / 'bin/java') if os.environ.get('JAVA_HOME') else shutil.which('java')
@@ -58,7 +59,8 @@ for item in ITEMS:
         assert all(context in model['display'] for context in ['gui', 'ground', 'fixed', 'firstperson_righthand', 'firstperson_lefthand',
                                                                 'thirdperson_righthand', 'thirdperson_lefthand']), item
     else:
-        assert model['parent'] == 'minecraft:item/generated', item
+        handheld = item in NIHONIUM[:4]
+        assert model['parent'] == ('minecraft:item/handheld' if handheld else 'minecraft:item/generated'), item
         assert model['textures']['layer0'] == f'singulo_arsenal:item/{item}'
         data = (RES / f'assets/singulo_arsenal/textures/item/{item}.png').read_bytes()
         width, height = struct.unpack('>II', data[16:24])
@@ -90,6 +92,11 @@ for suit in SETS:
 for weapon in WEAPONS + TOOLS:
     for line in (1, 2, 3, 'summary'):
         assert f'tooltip.singulo_arsenal.{weapon}.{line}' in locales[0], weapon
+
+# Nihonium armor is drawn by the vanilla armor layer from the material's texture pair on the 64x32 player net.
+for n in (1, 2):
+    data = (RES / f'assets/singulo_arsenal/textures/models/armor/nihonium_layer_{n}.png').read_bytes()
+    assert data[1:4] == b'PNG' and struct.unpack('>II', data[16:24]) == (64, 32), f'bad nihonium armor layer {n}'
 
 # Materials tile at one texel per model pixel; Canvas.MATERIAL_SIZE assumes 32.
 for suit in SETS:

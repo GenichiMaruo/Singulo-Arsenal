@@ -1202,7 +1202,7 @@ public final class ArsenalGameTests {
                     "recipe result does not match registered item: " + id);
             found++;
         }
-        h.assertTrue(found == 39, "unexpected item count " + found);
+        h.assertTrue(found == 47, "unexpected item count " + found);
         var lamina = recipes.byKey(SinguloArsenal.id("collapsar_lamina")).orElseThrow().value();
         h.assertTrue(BuiltInRegistries.RECIPE_SERIALIZER.getKey(lamina.getSerializer()).toString().equals("singulo:machine"), "lamina must be a Singulo machine recipe");
         h.succeed();
