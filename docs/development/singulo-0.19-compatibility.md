@@ -62,3 +62,38 @@ before upgrades; new canonical IDs are not downgrade-compatible with 0.2.2.
 
 This checkpoint does **not** claim final-dependency or current old-world resave
 verification. Those remain mandatory before merge/publication.
+
+## Tagged-source verification (2026-11-15 JST; distribution gate pending)
+
+- Base `v0.19.0` points to `0f6fcff7645a2a5066a072acce55d4a03884080e`.
+  Successful base CI `43628318212` used synthetic commit `245ae8e17a03b9d820715e1c86fb3ca5a5401f44`;
+  both trees are `9eb8f4a7ebf43ee9f7ae7a41a7721d4b342c2fe4`.
+- The actual base CI JAR SHA256 is
+  `ec45f7d6a6a9dbac654c7a2048df085ca709f055868def39aeee4132d44ed942`.
+  It is not yet described here as a public CurseForge download.
+- Arsenal `5ad54849` passed CI `43630011917` and `43630007872` with the final
+  source pin. The actual CI base JAR also passed a local production build and
+  all 65 GameTests. Python release/review validation passed all 26 tests.
+- Separate fresh-world actual clients completed vanilla 68 and shader 68
+  rendering fixtures, exited normally, and passed all eight FIXED-center
+  assertions. Representative hand/aim/fire/frame images received independent
+  visual review with no new issue. Music alone was muted.
+- Shader setup: official Iris 1.8.12 JAR (runtime reports
+  `1.8.12-snapshot+mc1.21.1-local`), Sodium 0.6.13 and Complementary Reimagined
+  r5.9.3, with the pack confirmed enabled. Pack uniform/block-property warnings
+  remain; this is not a warning-free claim or a promise for every shader pack.
+- The old 0.2.2 + published 0.18.0 world was seeded, backed up, opened with the
+  final CI base JAR + 0.3.0, saved, and opened again. Both verify phases passed
+  all seven persisted locations: main/off hand, inventory, chest, frame, dropped
+  item and armor stand. Canonical `jet_cannon`, FE 123456-123462, magazine 2,
+  terrain mode 1, capacitor module and custom names were retained. Historical
+  recipe/advancement unlocks and old-ID datapack ingredient/result/tag resolved.
+- The six icon captures showed the plain nihonium armor preview, four tool
+  icons and held sword correctly. An unrelated native hover tooltip obscured
+  part of the inventory captures while unfocused. A QA-only InventoryScreen
+  wrapper now supplies offscreen mouse coordinates; it compiles, and a clean
+  icon recapture remains pending. Production rendering is unchanged by it.
+
+Before merge/publication, the public CurseForge base JAR must still match the
+above CI hash, and the clean icon recapture plus final PR checks must complete.
+No Arsenal 0.3.0 upload is claimed by this report.
