@@ -6,7 +6,7 @@
 - Center all four weapons and four powered tools in item frames.
 - Rename the internal item ID to jet_cannon and migrate legacy jet_lance stacks through a Forge registry alias. Preserve recipe unlocks, item NBT and the existing Accretion Jet Cannon display name.
 
-- Requires Singulo 0.19.x ([0.19.0,0.20.0)). Older and untested future minor releases are not supported.
+- Requires Singulo 0.19.0 or newer ([0.19.0,)). Verified with 0.19.0; future versions including 0.20+ are allowed by the loader but untested.
 - Add plain nihonium tools and armor with vanilla durability, repair, enchantments and armor trims. These items do not use FE or modules.
 
 ## 日本語
@@ -17,7 +17,7 @@
 - 4 武器と 4 ツールを額縁の中央へ配置。
 - 内部アイテムIDを jet_cannon に変更し、旧 jet_lance は Forge registry の別名登録で引き継ぎます。レシピ解放・保存NBT・「降着ジェット砲 / Accretion Jet Cannon」の表示名は維持します。
 
-- Singulo 0.19.x 必須（[0.19.0,0.20.0)）。旧版と互換性未検証の将来minor版は対象外です。
+- Singulo 0.19.0 以上必須（[0.19.0,)）。0.19.0 で検証済みです。0.20 以降の将来版も導入可能ですが、互換性は未検証です。
 - 通常の耐久・修理・エンチャント・防具装飾に対応するニホニウムのツールと防具を追加。FEやモジュールを使わない通常装備です。
 
 ## 1.20.1 datapack migration notice

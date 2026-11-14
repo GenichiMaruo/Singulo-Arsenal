@@ -26,7 +26,7 @@ minecraft_version_range=[1.20.1]
 mod_loader_suffix=N
 forge_version=47.4.26
 neoforge_version=47.1.106
-singulo_version_range=[0.16.0,0.17.0)
+singulo_version_range=[0.19.0,)
 '''
 METADATA = '''[[mods]]
 modId="singulo_arsenal"
@@ -45,7 +45,7 @@ versionRange="[47.1.106,)"
 modId="singulo"
 mandatory=true
 side="BOTH"
-versionRange="[0.16.0,0.17.0)"
+versionRange="[0.19.0,)"
 '''
 ENTRY_POINT = 'io/github/genichimaruo/singuloarsenal/SinguloArsenal.class'
 VERSION_TYPES = [{'id': i, 'slug': slug} for i, slug in [(1, 'minecraft-1-20'), (2, 'modloader'), (3, 'java'), (4, 'bukkit'), (5, 'environment')]]
@@ -115,7 +115,7 @@ class ArtifactTests(unittest.TestCase):
 
     def test_rejects_incorrect_dependency_requirements(self):
         for old, new in [('mandatory=true', 'mandatory=false'), ('side="BOTH"', 'side="CLIENT"'),
-                         ('[1.20.1]', '[1.21.1]'), ('[47.1.106,)', '[21.1,)'), ('[0.16.0,0.17.0)', '[0.15.0,)')]:
+                         ('[1.20.1]', '[1.21.1]'), ('[47.1.106,)', '[21.1,)'), ('[0.19.0,)', '[0.15.0,)'), ('[0.19.0,)', '[0.19.0,0.20.0)')]:
             with self.subTest(new=new):
                 self.write_jar(METADATA.replace(old, new))
                 with self.assertRaisesRegex(ValueError, 'dependency metadata'):

@@ -10,13 +10,13 @@ Minecraft 1.20.1（NeoForge / Forge）向け。Singulo の工場で作った素�
 Singulo 本体が必須です。Minecraft・ローダー・Singulo の版が合うファイルを選んでください。
 Singulo is required. Choose the file that matches your Minecraft version, loader and Singulo version.
 
-以下は **0.3.0** の範囲です。Singulo 0.19.x が必須です。0.2.2 は Singulo 0.16.x–0.18.x 対応版です。
-The table describes **0.3.0**, which requires Singulo 0.19.x. Arsenal 0.2.2 supports Singulo 0.16.x–0.18.x.
+以下は **0.3.0** の範囲です。Singulo 0.19.0 以上が必須です。0.2.2 は Singulo 0.16.x–0.18.x 対応版です。
+The table describes **0.3.0**, which requires Singulo 0.19.0 or newer. Arsenal 0.2.2 supports Singulo 0.16.x–0.18.x.
 
 | Minecraft | ローダー / Loader | Java | Singulo | ソース / Source | ダウンロード / Download |
 | --- | --- | --- | --- | --- | --- |
-| **1.21.1** | **NeoForge** 21.1.256+ | **21** | 0.19.x | [1.21.1](https://github.com/GenichiMaruo/Singulo-Arsenal/tree/1.21.1) | [CurseForge](https://www.curseforge.com/minecraft/mc-mods/singulo-arsenal/files) |
-| **1.20.1** | Forge 47.4.26+ / NeoForge 47.1.106+ | 17 | 0.19.x | [1.20.1](https://github.com/GenichiMaruo/Singulo-Arsenal/tree/1.20.1) | [CurseForge](https://www.curseforge.com/minecraft/mc-mods/singulo-arsenal/files) |
+| **1.21.1** | **NeoForge** 21.1.256+ | **21** | 0.19.0+ | [1.21.1](https://github.com/GenichiMaruo/Singulo-Arsenal/tree/1.21.1) | [CurseForge](https://www.curseforge.com/minecraft/mc-mods/singulo-arsenal/files) |
+| **1.20.1** | Forge 47.4.26+ / NeoForge 47.1.106+ | 17 | 0.19.0+ | [1.20.1](https://github.com/GenichiMaruo/Singulo-Arsenal/tree/1.20.1) | [CurseForge](https://www.curseforge.com/minecraft/mc-mods/singulo-arsenal/files) |
 
 ファイル名は `Singulo-Arsenal-<版>-<Minecraft><ローダー>` で、末尾の `N` は NeoForge、`F` は Forge です。マルチプレイではクライアントとサーバーの両方に導入してください。
 初回の 0.1.0 は GitHub Releases で配布しています。以後の版の配布先は [CurseForge](https://www.curseforge.com/minecraft/mc-mods/singulo-arsenal) です。このブランチでは 0.2.0 の機能と修正を Minecraft 1.20.1 向けに移植しています。
@@ -69,6 +69,9 @@ The 0.2.2 compatibility build accepts Singulo 0.16.x, 0.17.x and 0.18.x. See [ve
 
 ## 0.3.0
 
-Singulo 0.19.x is required. Cannon rendering and item-frame placement are corrected, old `jet_lance` stacks migrate to `jet_cannon`, and plain nihonium equipment is added. See [changelog](docs/curseforge/changelog-0.3.0.md).
+Singulo 0.19.0 or newer is required. Cannon rendering and item-frame placement are corrected, old `jet_lance` stacks migrate to `jet_cannon`, and plain nihonium equipment is added. See [changelog](docs/curseforge/changelog-0.3.0.md).
 
-Singulo 0.19.x 必須。ジェット砲の描画・額縁配置を修正し、旧 `jet_lance` を `jet_cannon` へ引き継ぎます。通常のニホニウム装備を追加しました。
+Singulo 0.19.0 以上必須。ジェット砲の描画・額縁配置を修正し、旧 `jet_lance` を `jet_cannon` へ引き継ぎます。通常のニホニウム装備を追加しました。
+
+Compatibility is verified with Singulo 0.19.0. The dependency range has no upper bound; future versions (including 0.20+) are allowed by the loader but have not been tested.
+Singulo 0.19.0 で動作検証済みです。導入条件に上限はありませんが、0.20 以降を含む将来版の互換性は未検証です。
