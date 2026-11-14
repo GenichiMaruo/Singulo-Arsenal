@@ -10,13 +10,13 @@ Minecraft 1.21.1（NeoForge）向け。Singulo の工場で作った素材から
 Singulo 本体が必須です。Minecraft・ローダー・Singulo の版が合うファイルを選んでください。
 Singulo is required. Choose the file that matches your Minecraft version, loader and Singulo version.
 
-以下は **0.2.2 対応版**の範囲です。0.2.1 は Singulo 0.16.x / 0.17.x、0.2.0 は 0.16.x 専用です。
-The table describes the **0.2.2 compatibility update**. Arsenal 0.2.1 supports Singulo 0.16.x / 0.17.x; 0.2.0 requires 0.16.x.
+以下は **0.3.0** の対応範囲です。Singulo 0.19.0 以上・0.20.0 未満が必須です。0.2.2 は 0.16.x–0.18.x 対応です。
+The table describes **0.3.0**. Singulo >=0.19.0 and <0.20.0 is required. Arsenal 0.2.2 supports 0.16.x–0.18.x.
 
 | Minecraft | ローダー / Loader | Java | Singulo | ソース / Source | ダウンロード / Download |
 | --- | --- | --- | --- | --- | --- |
-| **1.21.1** | **NeoForge** 21.1.256+ | **21** | 0.16.x / 0.17.x / 0.18.x | [1.21.1](https://github.com/GenichiMaruo/Singulo-Arsenal/tree/1.21.1) | [CurseForge](https://www.curseforge.com/minecraft/mc-mods/singulo-arsenal/files) |
-| 1.20.1 | Forge / NeoForge | 17 | 0.16.x / 0.17.x / 0.18.x | [1.20.1](https://github.com/GenichiMaruo/Singulo-Arsenal/tree/1.20.1) | [CurseForge](https://www.curseforge.com/minecraft/mc-mods/singulo-arsenal/files) |
+| **1.21.1** | **NeoForge** 21.1.256+ | **21** | 0.19.x | [1.21.1](https://github.com/GenichiMaruo/Singulo-Arsenal/tree/1.21.1) | [CurseForge](https://www.curseforge.com/minecraft/mc-mods/singulo-arsenal/files) |
+| 1.20.1 | Forge / NeoForge | 17 | 0.19.x | [1.20.1](https://github.com/GenichiMaruo/Singulo-Arsenal/tree/1.20.1) | [CurseForge](https://www.curseforge.com/minecraft/mc-mods/singulo-arsenal/files) |
 
 ファイル名は `Singulo-Arsenal-<版>-<Minecraft><ローダー>` で、末尾の `N` は NeoForge です。マルチプレイではクライアントとサーバーの両方に導入してください。
 初回の 0.1.0 は GitHub Releases で配布しています。以後の版の配布先は [CurseForge](https://www.curseforge.com/minecraft/mc-mods/singulo-arsenal) です。0.2.0 は Minecraft 1.21.1 と 1.20.1 に対応しています。
@@ -41,11 +41,11 @@ File names follow `Singulo-Arsenal-<version>-<Minecraft><loader>`, where `N` mea
 
 ## 開発するには
 
-Java 21 の JDK と Python 3 を用意し、Singulo 本体の JAR を指定して起動します。0.2.0 はブランチ `feature/0.2.0` で開発しています。
+Java 21 の JDK と Python 3 を用意し、Singulo 本体の JAR を指定して起動します。0.3.0 の開発・互換性情報は [検証記録](docs/development/singulo-0.19-compatibility.md) を参照してください。
 
 ```sh
 ./gradlew --no-daemon build
-./gradlew runClient -PsinguloJar=/absolute/path/Singulo-0.18.0-1.21.1N.jar
+./gradlew runClient -PsinguloJar=/absolute/path/Singulo-0.19.0-1.21.1N.jar
 ```
 
 生成元と実装時の条件は[開発ガイド](docs/development/README.md)、検査と GameTest は[テスト手順](docs/development/testing.md)、配布は[公開・配布手順](docs/curseforge.md)を参照してください。
@@ -63,3 +63,13 @@ The 0.2.1 compatibility build accepts Singulo 0.16.x and 0.17.x and validates in
 Singulo 0.18.x に対応する更新です。装備の動作・レシピ・保存データの形式は変更しません。
 
 The 0.2.2 compatibility build accepts Singulo 0.16.x, 0.17.x and 0.18.x. See [verification notes](docs/development/singulo-0.18-compatibility.md).
+
+## 0.3.0
+
+- Singulo 0.19.x 必須。将来の 0.20 以降は互換性確認後に対応範囲を広げます。
+- 能力・FE を持たないニホニウムの剣・工具・防具を追加。防具アイコンを刷新。
+- ジェット砲の shader / オフハンド表示と額縁配置を修正。
+- 内部名を `jet_cannon` に整理し、旧 `jet_lance` の保存アイテムを引き継ぎます。
+
+Back up worlds before upgrading. Legacy cannon stacks migrate forward; downgrading
+new saves to 0.2.2 is not supported. See [migration details](docs/development/cannon-migration-0.3.0.md).

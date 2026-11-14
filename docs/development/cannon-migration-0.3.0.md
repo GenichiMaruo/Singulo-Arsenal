@@ -68,9 +68,13 @@ codec success.
 3. Require `ARSENAL_MIGRATION_OK seed`, `seed.ok` and successful normal exit.
    Back up `saves/Review` before continuing. Keep the phase receipts.
 4. Change `phase.txt` to `verify` and run the same init script/client against
-   0.3.0 using the same game directory. Require its successful receipt/exit.
+   0.3.0 using the same game directory, but change `-PsinguloJar` to the
+   final released **Singulo 0.19.x** JAR for 1.21.1 NeoForge. The old 0.18 JAR
+   is only for the 0.2.2 seed and no longer satisfies 0.3.0. Require its
+   successful receipt/exit.
 5. Change the phase to `verify-resaved` and run 0.3.0 once more. Require all
-   seven fixture checks and both saved recipe/advancement checks again.
+   seven fixture checks and both saved recipe/advancement checks again, still
+   using that same verified 0.19.x dependency.
 
 Do not combine `migration.gradle` with the ordinary `gui.gradle` renderer
 harness. Neither opt-in harness is included in production JARs.

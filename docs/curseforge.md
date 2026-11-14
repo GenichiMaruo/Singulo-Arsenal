@@ -30,7 +30,7 @@ GitHub Environment **`curseforge`** に以下を設定します。2026-11-10 時
 1. Actions → **Publish CurseForge** → **Run workflow** を開き、ブランチを `1.21.1` にします。
 2. 最初は `dry_run=true`（既定値）、`release_type=beta`（既定値）で実行します。build、integration、公開用 JAR の検査、設定済みトークンを使った CurseForge バージョン一覧の GET を確認します。このモードはアップロードしません。GET の成功だけでは対象プロジェクトのアップロード権限や審査状態までは確認できません。
 3. 公開するときは同じブランチで `dry_run=false` にして実行します。リリース種別は `alpha` / `beta` / `release` から選べます。アップロードは `1.21.1` ブランチに限定します。
-4. 実行ごとに選択時のコミットをビルドし、通常 CI と同じ build / integration（本体素材 ID 照合・56 GameTest）を通します。同じ実行で生成・検査した JAR だけをアップロードします。確認モードと公開の間にコミットが進んでいれば、公開時のコミットで再検証されます。
+4. 実行ごとに選択時のコミットをビルドし、通常 CI と同じ build / integration（本体素材 ID 照合・65 GameTest）を通します。同じ実行で生成・検査した JAR だけをアップロードします。確認モードと公開の間にコミットが進んでいれば、公開時のコミットで再検証されます。
 5. Actions の Summary でコミット、ファイル名、SHA-256 と公開ファイル URL を確認します。CurseForge の審査・公開状態を確認してから README や GitHub リリースノートから案内します。
 
 公開ファイルには Minecraft `1.21.1`、NeoForge、Java `21`、必須依存 `singulo` を設定します。`gradle.properties` のバージョンと一致する JAR・変更履歴が必要で、JAR 内の依存関係とテスト用クラスの除外も検査します。次回リリースでは `mod_version` と `docs/curseforge/changelog-<version>.md` を更新してください。
