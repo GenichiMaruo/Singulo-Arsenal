@@ -49,5 +49,16 @@ before upgrades; new canonical IDs are not downgrade-compatible with 0.2.2.
   It requested an explicit 0.18 seed / 0.19 verify dependency switch in the
   old-world migration instructions; that clarification is included.
 
-This checkpoint does **not** claim final-dependency, shader or current old-world
-resave verification. Those remain mandatory before merge/publication.
+- The candidate Iris 1.8.12 + Sodium 0.6.13 client, with Complementary Reimagined
+  r5.9.3 actually enabled, also completed all 68 captures and exited normally.
+  English HUD text, firing/beam alignment, offhand suppression and ceiling/wall
+  frames were visually inspected. All eight FIXED-center assertions passed.
+  An initial reused-world attempt was rejected by the empty-hand fixture after
+  picking up dropped frame items. Its evidence was retained; a fresh-world
+  rerun passed. The preparation script now refuses to overwrite an existing
+  review world, with three regression tests, and the instructions require a
+  fresh world for every rendering run. Migration resave tests intentionally
+  retain their own separate world.
+
+This checkpoint does **not** claim final-dependency or current old-world resave
+verification. Those remain mandatory before merge/publication.
