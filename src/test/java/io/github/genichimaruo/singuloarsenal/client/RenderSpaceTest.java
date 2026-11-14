@@ -1,6 +1,6 @@
 package io.github.genichimaruo.singuloarsenal.client;
 import org.joml.Matrix4f;
-import org.joml.Quaternionf;
+import org.joml.Matrix3f;
 import org.joml.Vector3f;
 
 /** No game instance required: the same world point must project identically in
@@ -11,12 +11,19 @@ public final class RenderSpaceTest {
         int checks = 0;
         for (int yaw = -180; yaw <= 180; yaw += 30) {
             for (int pitch = -80; pitch <= 80; pitch += 20) {
-                Quaternionf camera = new Quaternionf().rotationYXZ(
-                        (float)Math.toRadians(yaw), (float)Math.toRadians(pitch), 0);
-                Matrix4f view = new Matrix4f().rotation(new Quaternionf(camera).conjugate());
+                // The actual 1.20.1 GameRenderer view is pitch, then yaw + 180.
+                Matrix4f view = new Matrix4f().rotationX((float)Math.toRadians(pitch))
+                        .rotateY((float)Math.toRadians(yaw + 180));
+                Matrix3f inverseView = new Matrix3f(view).invert();
+                Vector3f forward = new Vector3f(
+                        -(float)(Math.sin(Math.toRadians(yaw)) * Math.cos(Math.toRadians(pitch))),
+                        -(float)Math.sin(Math.toRadians(pitch)),
+                        (float)(Math.cos(Math.toRadians(yaw)) * Math.cos(Math.toRadians(pitch))));
+                if (view.transformDirection(forward).distance(new Vector3f(0,0,-1)) > .0001F)
+                    throw new AssertionError("legacy camera forward must face screen -Z");
                 for (Matrix4f modelView : new Matrix4f[] {view, new Matrix4f(),
                         new Matrix4f().translate(.03F, -.02F, .01F).rotateZ(.08F)}) {
-                    Matrix4f basis = RenderSpace.worldToPose(modelView, camera);
+                    Matrix4f basis = RenderSpace.worldToPose(modelView, inverseView);
                     for (Vector3f world : new Vector3f[] {new Vector3f(0,0,-40),
                             new Vector3f(18,3,-6), new Vector3f(-9,-5,12)}) {
                         Vector3f expected = view.transformPosition(new Vector3f(world));
@@ -31,5 +38,17 @@ public final class RenderSpaceTest {
             }
         }
         System.out.println("Render-space checks passed: " + checks);
+    }
+    @org.junit.jupiter.api.Test
+    void forgeCameraRollIsRetained() {
+        for (float roll : new float[]{-.4F, 0F, .3F}) {
+            Matrix4f view = new Matrix4f().rotationZ(roll).rotateX(-.35F).rotateY(1.2F + (float)Math.PI);
+            Matrix4f modelView = new Matrix4f().translate(.03F, -.02F, 0).rotateZ(.08F);
+            Matrix4f basis = RenderSpace.worldToPose(modelView, new Matrix3f(view).invert());
+            Vector3f world = new Vector3f(12, 4, -8);
+            Vector3f actual = modelView.transformPosition(basis.transformPosition(new Vector3f(world)));
+            if (actual.distance(view.transformPosition(new Vector3f(world))) > .0001F)
+                throw new AssertionError("Forge camera roll lost");
+        }
     }
 }
