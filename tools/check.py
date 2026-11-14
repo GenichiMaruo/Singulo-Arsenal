@@ -36,6 +36,9 @@ recipes = RES / 'data/singulo_arsenal/recipe'
 assert {p.stem for p in recipes.glob('*.json')} == set(ITEMS), 'missing or extra recipes'
 locales = [json.loads((RES / f'assets/singulo_arsenal/lang/{lang}.json').read_text(encoding='utf-8')) for lang in ['ja_jp', 'en_us']]
 assert locales[0].keys() == locales[1].keys(), 'locale key mismatch'
+# Public name describes the cannon; keep the historic registry ID for saved worlds.
+assert locales[1]['item.singulo_arsenal.jet_lance'] == 'Accretion Jet Cannon'
+
 for key in locales[0]:
     for token in ('%s', '%1$s', '%2$s'):
         assert locales[0][key].count(token) == locales[1][key].count(token), f'format placeholders differ: {key}'

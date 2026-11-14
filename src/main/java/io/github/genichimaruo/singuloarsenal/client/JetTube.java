@@ -45,7 +45,7 @@ final class JetTube extends RenderType {
     }
 
     static RenderType type() {
-        return shader == null ? ArsenalRenderTypes.GLOW : BEAM;
+        return shader == null || ShaderCompat.active() ? ArsenalRenderTypes.GLOW : BEAM;
     }
 
     /**
@@ -57,7 +57,9 @@ final class JetTube extends RenderType {
     static void draw(PoseStack pose, MultiBufferSource buffers, Vec3 camera, Vec3 from, Vec3 to, float radius, float focus, float alpha, float flareIn) {
         double length = from.distanceTo(to);
         if (length < 1.0E-3 || radius <= 0 || alpha <= 0) return;
-        if (shader == null) {
+        // Iris intentionally suppresses unknown core shaders. Use the vanilla lightning
+        // path while a pack is active rather than asking users to weaken its settings.
+        if (type() == ArsenalRenderTypes.GLOW) {
             VertexConsumer out = buffers.getBuffer(ArsenalRenderTypes.GLOW);
             Canvas.tube(pose, out, from, to, radius, 0x8CD2FF, alpha * 0.4F);
             Canvas.tube(pose, out, from, to, radius * 0.4, 0xFFF8F0, alpha);

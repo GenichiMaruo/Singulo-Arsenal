@@ -260,7 +260,24 @@ GUI_FIT = {
 }
 
 
+# Measured from emitted idle vertices after each FIXED rotation/scale, in model translation units.
+# Do not reuse GUI_FIT: frames and inventory use different rotations. Recheck via fixed-bounds.txt.
+FIXED_FIT = {
+    'quench_saber': (-0.804334, -0.804334),
+    'casimir_blade': (-0.989949, -0.989949),
+    'tidal_reaver': (-1.484924, -0.928077),
+    'jet_lance': (-3.71875, 0.674877),
+    'squid_pick': (-1.423052, -1.423052),
+    'degeneracy_breaker': (-1.732411, -1.732412),
+    'shear_saw': (-1.175565, -1.175565),
+    'accretion_drill': (-1.020885, -1.020885),
+}
+
+
 def fitted(name, display):
+    if name in FIXED_FIT:
+        x, y = FIXED_FIT[name]
+        display = {**display, 'fixed': {**display['fixed'], 'translation': [x, y, 0]}}
     if name not in GUI_FIT:
         return display
     x, y, scale = GUI_FIT[name]

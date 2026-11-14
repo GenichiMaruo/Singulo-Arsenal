@@ -5,7 +5,8 @@ import io.github.genichimaruo.singuloarsenal.armor.SuitItem;
 import io.github.genichimaruo.singuloarsenal.client.art.Canvas;
 import io.github.genichimaruo.singuloarsenal.client.art.SuitArt;
 import io.github.genichimaruo.singuloarsenal.core.Rules;
-import net.minecraft.client.Camera;
+import com.mojang.blaze3d.systems.RenderSystem;
+import org.joml.Matrix4f;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -53,12 +54,13 @@ final class FirstPersonHands {
     }
 
     private static void arm(AbstractClientPlayer player, PoseStack art, MultiBufferSource buffers, int light, boolean right, float x, float y, float z) {
-        Camera camera = Minecraft.getInstance().gameRenderer.getMainCamera();
-        // The item pose in first person has world axes centred on the camera.
-        Vector3f hand = art.last().pose().transformPosition(x, y, z, new Vector3f());
-        Vector3f screenRight = new Vector3f(camera.getLeftVector()).negate();
-        Vector3f screenUp = new Vector3f(camera.getUpVector());
-        Vector3f look = new Vector3f(camera.getLookVector());
+        // Solve the arm in view space, independent of how the pipeline splits the
+        // camera/bob transforms between ModelView and the item pose.
+        Matrix4f modelView = new Matrix4f(RenderSystem.getModelViewMatrix());
+        Vector3f hand = modelView.transformPosition(art.last().pose().transformPosition(x, y, z, new Vector3f()));
+        Vector3f screenRight = new Vector3f(1, 0, 0);
+        Vector3f screenUp = new Vector3f(0, 1, 0);
+        Vector3f look = new Vector3f(0, 0, -1);
         Vector3f shoulder = new Vector3f(screenRight).mul(right ? 0.72F : -0.5F).add(new Vector3f(screenUp).mul(-1.0F)).add(new Vector3f(look).mul(0.05F));
         Vector3f along = new Vector3f(hand).sub(shoulder).normalize();
         // Entity models are drawn upside down and mirrored, so the model's +X is screen-left for both arms.
@@ -67,6 +69,7 @@ final class FirstPersonHands {
         Vector3f depth = new Vector3f(across).cross(along).normalize();
 
         PoseStack pose = new PoseStack();
+        pose.mulPose(modelView.invert());
         Vector3f pivot = new Vector3f(hand).sub(new Vector3f(along).mul(ARM_LENGTH));
         pose.translate(pivot.x, pivot.y, pivot.z);
         pose.mulPose(new Quaternionf().setFromNormalized(new Matrix3f(across, along, depth)));

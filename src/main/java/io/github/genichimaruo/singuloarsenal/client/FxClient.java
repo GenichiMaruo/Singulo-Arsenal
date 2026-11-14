@@ -337,6 +337,8 @@ final class FxClient {
      * along the barrel's own axis, instead of merely starting at the muzzle. Run before anything else moves the art.
      */
     static void aimLance(Player owner, PoseStack pose, ItemDisplayContext context, float partial) {
+        // A shadow pass uses the light camera, not the main view used by this aim conversion.
+        if (ShaderCompat.shadowPass()) return;
         var mc = Minecraft.getInstance();
         // The inventory's paper doll is drawn in GUI space, where world directions mean nothing.
         if (!context.firstPerson() && mc.screen instanceof net.minecraft.client.gui.screens.inventory.EffectRenderingInventoryScreen) return;
@@ -349,7 +351,8 @@ final class FxClient {
         Vec3 target = eye.add(look.scale(distance)).subtract(camera);
         Matrix4f matrix = pose.last().pose();
         Vector3f origin = matrix.transformPosition(0, 0, 0, new Vector3f());
-        Vector3f direction = new Vector3f((float) target.x, (float) target.y, (float) target.z).sub(origin).normalize();
+        Vector3f direction = RenderSpace.worldToPose().transformPosition(
+                (float) target.x, (float) target.y, (float) target.z, new Vector3f()).sub(origin).normalize();
         new Matrix4f(matrix).invert().transformDirection(direction).normalize();
         pose.mulPose(new Quaternionf().rotationTo(0, 1, 0, direction.x, direction.y, direction.z));
     }
@@ -359,17 +362,25 @@ final class FxClient {
      * world pass. First-person hands are drawn later with their own projection and a cleared depth buffer, so the jet is drawn here.
      */
     static void lanceRendered(Player owner, PoseStack pose, MultiBufferSource buffers, ItemDisplayContext context, float partial, float age) {
+        // Never let a light-space muzzle overwrite the world-pass cache.
+        if (ShaderCompat.shadowPass()) return;
         Vector3f tip = new Matrix4f(pose.last().pose()).transformPosition(0, (float) WeaponArt.LANCE_MUZZLE, 0, new Vector3f());
         var mc = Minecraft.getInstance();
         if (!context.firstPerson()) {
             Vec3 camera = mc.gameRenderer.getMainCamera().getPosition();
+            RenderSpace.worldToPose().invert().transformPosition(tip);
             MUZZLES.put(owner.getId(), new Muzzle(camera.add(tip.x, tip.y, tip.z), frame));
             return;
         }
         if (age < 0) return;
-        double distance = owner.getEyePosition(partial).distanceTo(aim(owner, partial).getLocation());
-        // The hand pose starts from the inverse of the view rotation, so this space has world axes centred on the camera.
-        drawJet(new PoseStack(), buffers, Vec3.ZERO, new Vec3(tip.x, tip.y, tip.z), owner.getViewVector(partial).scale(distance), age, 0.55F);
+        // Draw the entire beam in camera-relative world space, then use the same
+        // conversion as the muzzle/aim. Shader passes need not use vanilla's basis.
+        Matrix4f worldToPose = RenderSpace.worldToPose();
+        new Matrix4f(worldToPose).invert().transformPosition(tip);
+        PoseStack beam = new PoseStack();
+        beam.mulPose(worldToPose);
+        Vec3 target = aim(owner, partial).getLocation().subtract(mc.gameRenderer.getMainCamera().getPosition());
+        drawJet(beam, buffers, Vec3.ZERO, new Vec3(tip.x, tip.y, tip.z), target, age, 0.55F);
     }
 
     /** One jet: at full length from its first tick, flashing wide as it lights and pinching off at the end. */

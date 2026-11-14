@@ -116,7 +116,8 @@ public final class GearRenderer extends BlockEntityWithoutLevelRenderer {
             float charge = owner != null && world ? JetLanceItem.chargeProgress(stack, now, partial) : -1;
             float ignition = jet >= 0 ? 1 : Math.max(0, charge);
             boolean leftHanded = context == ItemDisplayContext.FIRST_PERSON_LEFT_HAND || context == ItemDisplayContext.THIRD_PERSON_LEFT_HAND;
-            if (owner != null && world) {
+            boolean mainHand = mainHand(owner, context);
+            if (mainHand && world) {
                 FxClient.aimLance(owner, pose, context, partial);
                 boolean firstPerson = context.firstPerson();
                 // Recoil runs straight back along the barrel, so the beam stays on its axis.
@@ -133,9 +134,19 @@ public final class GearRenderer extends BlockEntityWithoutLevelRenderer {
                 }
             }
             Canvas.drawFine(pose, buffers, t, light, overlay, world, c -> WeaponArt.lance(c, ignition, reload, t, leftHanded ? 1 : -1));
-            if (owner != null) FxClient.lanceRendered(owner, pose, buffers, context, partial, jet);
-            FirstPersonHands.drawLance(owner, pose, buffers, light, context, reload);
+            if (mainHand) {
+                FxClient.lanceRendered(owner, pose, buffers, context, partial, jet);
+                FirstPersonHands.drawLance(owner, pose, buffers, light, context, reload);
+            }
         }
+    }
+
+    /** Display contexts describe the physical arm, not MAIN_HAND/OFF_HAND. */
+    private static boolean mainHand(Player owner, ItemDisplayContext context) {
+        if (owner == null || !(owner.getMainHandItem().getItem() instanceof JetLanceItem)) return false;
+        boolean right = context == ItemDisplayContext.FIRST_PERSON_RIGHT_HAND
+                || context == ItemDisplayContext.THIRD_PERSON_RIGHT_HAND;
+        return right == (owner.getMainArm() == net.minecraft.world.entity.HumanoidArm.RIGHT);
     }
 
     private static void drawSuit(PoseStack pose, MultiBufferSource buffers, float t, int light, int overlay, SuitItem suit) {

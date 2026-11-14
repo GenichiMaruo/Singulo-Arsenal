@@ -68,6 +68,121 @@ public final class ArsenalReview {
     private static boolean done;
     private static ItemStack tip;
     private static boolean bare;
+    private static java.util.function.BooleanSupplier ready;
+    private static String waiting;
+    private static int waited, requested;
+    private static volatile ItemStack expectedMain = ItemStack.EMPTY, expectedOff = ItemStack.EMPTY;
+    private static volatile int completed, frameId = -1;
+
+    private static void await(String name, java.util.function.BooleanSupplier condition) {
+        waiting = name; ready = condition; waited = 0;
+    }
+
+    private static void hands(Minecraft mc, HumanoidArm arm, Item main, Item off, float yaw, float pitch) {
+        int serial = ++requested;
+        mc.options.mainHand().set(arm); mc.options.broadcastOptions();
+        mc.options.setCameraType(CameraType.FIRST_PERSON);
+        mc.player.getInventory().selected = 0;
+        local(mc, p -> {
+            p.stopUsingItem(); p.getInventory().clearContent(); p.getInventory().selected = 0;
+            p.setMainArm(arm);
+            p.setItemSlot(EquipmentSlot.MAINHAND, charged(main));
+            p.setItemSlot(EquipmentSlot.OFFHAND, off == null ? ItemStack.EMPTY : off == net.minecraft.world.item.Items.FILLED_MAP
+                    ? net.minecraft.world.item.MapItem.create(p.serverLevel(), 0, 0, (byte) 0, true, false) : charged(off));
+            expectedMain = p.getMainHandItem().copy(); expectedOff = p.getOffhandItem().copy();
+            p.connection.teleport(OX, 81, OZ - 4, yaw, pitch);
+            p.inventoryMenu.broadcastChanges(); completed = serial;
+        });
+        await("hands-" + serial, () -> completed == serial && mc.player.getMainHandItem().is(main)
+                && ItemStack.isSameItemSameComponents(mc.player.getMainHandItem(), expectedMain)
+                && ItemStack.isSameItemSameComponents(mc.player.getOffhandItem(), expectedOff)
+                && (off == null ? mc.player.getOffhandItem().isEmpty() : mc.player.getOffhandItem().is(off))
+                && mc.player.getMainArm() == arm
+                && Math.abs(net.minecraft.util.Mth.wrapDegrees(mc.player.getYRot() - yaw)) < 0.5F
+                && Math.abs(mc.player.getXRot() - pitch) < 0.5F);
+    }
+
+    private static void frame(Minecraft mc, Item item, net.minecraft.core.Direction facing, int rotation) {
+        int serial = ++requested;
+        float pitch = facing == net.minecraft.core.Direction.UP ? 90 : facing == net.minecraft.core.Direction.DOWN ? -90 : 0;
+        local(mc, p -> {
+            var level = p.serverLevel();
+            if (frameId >= 0 && level.getEntity(frameId) != null) level.getEntity(frameId).discard();
+            p.getInventory().clearContent();
+            BlockPos pos = new BlockPos(10, pitch == 90 ? 81 : pitch == -90 ? 85 : 83, 10);
+            level.setBlock(pos.relative(facing.getOpposite()), Blocks.SMOOTH_STONE.defaultBlockState(), 3);
+            var f = new net.minecraft.world.entity.decoration.ItemFrame(level, pos, facing);
+            f.setItem(charged(item)); f.setRotation(rotation); f.setInvulnerable(true);
+            if (!f.survives() || !level.addFreshEntity(f)) throw new IllegalStateException("Invalid review frame " + facing);
+            frameId = f.getId();
+            p.getAbilities().flying = true; p.onUpdateAbilities();
+            p.connection.teleport(10.5, pitch == 90 ? 84 : pitch == -90 ? 81 : 81.88, pitch == 0 ? 7 : 10.5, 0, pitch);
+            p.inventoryMenu.broadcastChanges(); completed = serial;
+        });
+        await("frame-" + facing + "-" + rotation, () -> completed == serial
+                && mc.level.getEntity(frameId) instanceof net.minecraft.world.entity.decoration.ItemFrame f
+                && f.getItem().is(item) && f.getRotation() == rotation && f.getDirection() == facing
+                && mc.player.getMainHandItem().isEmpty() && mc.player.getOffhandItem().isEmpty()
+                && Math.abs(mc.player.getX() - 10.5) < 0.1 && Math.abs(mc.player.getXRot() - pitch) < 0.5F);
+    }
+
+    /** Opt-in rendering fixtures; images still require visual review. */
+    private static void renderScript(Minecraft mc) {
+        Item gun = ArsenalItems.JET_LANCE.get(), torch = net.minecraft.world.item.Items.TORCH;
+        step(60, () -> {
+            mc.options.keyAttack.setDown(false); mc.options.keyUse.setDown(false);
+            fixedBounds(mc);
+            server(mc, p -> { p.setGameMode(GameType.SPECTATOR); p.teleportTo(20, 81, 30); });
+        });
+        for (HumanoidArm arm : HumanoidArm.values()) {
+            String side = arm == HumanoidArm.LEFT ? "left" : "right";
+            Item[] offs = {null, torch, net.minecraft.world.item.Items.SHIELD, net.minecraft.world.item.Items.FILLED_MAP};
+            String[] names = {"empty", "torch", "shield", "map"};
+            for (int i = 0; i < offs.length; i++) {
+                Item off = offs[i];
+                step(2, () -> hands(mc, arm, gun, off, 0, 4)); at += 25;
+                shot("render-" + side + "-main-gun-off-" + names[i]);
+            }
+            step(2, () -> hands(mc, arm, torch, gun, 0, 4)); at += 25;
+            shot("render-" + side + "-off-gun-main-torch");
+            step(2, () -> hands(mc, arm, gun, gun, 0, 4)); at += 25;
+            shot("render-" + side + "-both-guns");
+            for (float[] a : new float[][]{{0,0}, {90,0}, {180,0}, {-90,0}, {45,-60}, {-45,60}}) {
+                step(2, () -> hands(mc, arm, gun, torch, a[0], a[1])); at += 25;
+                shot("render-" + side + "-aim-" + (int) a[0] + "-" + (int) a[1]);
+            }
+            step(2, () -> hands(mc, arm, gun, torch, 0, 4)); at += 25;
+            // Seed the last round, then use the real shot/reload path rather than faking animation times.
+            step(2, () -> {
+                local(mc, p -> {
+                    p.getMainHandItem().set(ArsenalData.SHOTS.get(), io.github.genichimaruo.singuloarsenal.core.Rules.LANCE_MAGAZINE - 1);
+                    if (!JetLanceItem.tryFire(p)) throw new IllegalStateException("Review shot rejected");
+                });
+                await("charge-" + side, () -> JetLanceItem.chargeProgress(mc.player.getMainHandItem(), mc.level.getGameTime(), 0) >= 0);
+            });
+            shot("render-" + side + "-charging");
+            step(1, () -> await("jet-" + side, () -> JetLanceItem.jetAge(mc.player.getMainHandItem(), mc.level.getGameTime(), 0) >= 0));
+            shot("render-" + side + "-firing");
+            step(1, () -> await("reload-" + side, () -> io.github.genichimaruo.singuloarsenal.weapon.Weapons.reloadProgress(mc.player.getMainHandItem(), mc.level.getGameTime(), 0) >= 0));
+            at += 30; shot("render-" + side + "-reload-early");
+            at += 55; shot("render-" + side + "-reload-middle");
+            at += 45; shot("render-" + side + "-reload-late"); at += 40;
+        }
+        step(2, () -> { mc.options.mainHand().set(HumanoidArm.RIGHT); mc.options.broadcastOptions(); });
+        List<Item> framed = new ArrayList<>(weapons()); framed.addAll(tools());
+        for (Item item : framed) {
+            step(2, () -> frame(mc, item, net.minecraft.core.Direction.NORTH, 0)); at += 15;
+            shot("render-frame-wall-" + net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(item).getPath());
+        }
+        for (var facing : List.of(net.minecraft.core.Direction.NORTH, net.minecraft.core.Direction.UP, net.minecraft.core.Direction.DOWN)) {
+            for (int i = 0; i < 8; i++) {
+                int rotation = i;
+                step(2, () -> frame(mc, gun, facing, rotation)); at += 15;
+                shot("render-frame-gun-" + facing.getName() + "-rotation-" + rotation);
+            }
+        }
+        step(4, () -> { System.out.println("ARSENAL_RENDER_FIXTURES_COMPLETE (visual review required)"); done = true; });
+    }
 
     private static ItemStack charged(Item item) {
         ItemStack stack = new ItemStack(item);
@@ -239,6 +354,70 @@ public final class ArsenalReview {
         step(4, () -> done = true);
     }
 
+    /** Measures all weapon/tool art with each loaded baked model's actual FIXED transform. */
+    private static void fixedBounds(Minecraft mc) {
+        java.util.Map<Item, java.util.function.Consumer<Canvas>> art = new java.util.LinkedHashMap<>();
+        art.put(ArsenalItems.QUENCH_SABER.get(), c -> WeaponArt.quench(c, 0, 0, -1));
+        art.put(ArsenalItems.CASIMIR_BLADE.get(), c -> WeaponArt.casimir(c, 0, false, 0));
+        art.put(ArsenalItems.TIDAL_REAVER.get(), c -> WeaponArt.reaver(c, 0, -1, 0));
+        art.put(ArsenalItems.JET_LANCE.get(), c -> WeaponArt.lance(c, 0, -1, 0, -1));
+        art.put(ArsenalItems.SQUID_PICK.get(), io.github.genichimaruo.singuloarsenal.client.art.ToolArt::squidPick);
+        art.put(ArsenalItems.DEGENERACY_BREAKER.get(), io.github.genichimaruo.singuloarsenal.client.art.ToolArt::degeneracyBreaker);
+        art.put(ArsenalItems.SHEAR_SAW.get(), c -> io.github.genichimaruo.singuloarsenal.client.art.ToolArt.shearSaw(c, false, 0));
+        art.put(ArsenalItems.ACCRETION_DRILL.get(), c -> io.github.genichimaruo.singuloarsenal.client.art.ToolArt.accretionDrill(c, false, 0));
+        StringBuilder report = new StringBuilder("Idle emitted geometry (all passes), bounds order [minXYZ,maxXYZ]\n");
+        boolean allCentered = true;
+        for (var entry : art.entrySet()) {
+            List<org.joml.Vector3f> points = new ArrayList<>();
+            VertexConsumer sink = new VertexConsumer() {
+                @Override public VertexConsumer addVertex(float x, float y, float z) { points.add(new org.joml.Vector3f(x, y, z)); return this; }
+                @Override public VertexConsumer setColor(int r, int g, int b, int a) { return this; }
+                @Override public VertexConsumer setUv(float u, float v) { return this; }
+                @Override public VertexConsumer setUv1(int u, int v) { return this; }
+                @Override public VertexConsumer setUv2(int u, int v) { return this; }
+                @Override public VertexConsumer setNormal(float x, float y, float z) { return this; }
+            };
+            Canvas.drawFine(new PoseStack(), type -> sink, 0, 0, Canvas.noOverlay(), false, entry.getValue());
+            PoseStack fixed = new PoseStack();
+            var model = mc.getItemRenderer().getModel(new ItemStack(entry.getKey()), mc.level, null, 0);
+            var transform = model.getTransforms().getTransform(net.minecraft.world.item.ItemDisplayContext.FIXED);
+            transform.apply(false, fixed);
+            // ItemRenderer -0.5 and GearRenderer +0.5 cancel before model-pixel scale.
+            fixed.scale(1F / 16, 1F / 16, 1F / 16);
+            float[] raw = bounds(points, new org.joml.Matrix4f());
+            float[] result = bounds(points, fixed.last().pose());
+            float cx = (result[0] + result[3]) / 2, cy = (result[1] + result[4]) / 2;
+            boolean centered = Math.abs(cx) <= 0.001F && Math.abs(cy) <= 0.001F;
+            allCentered &= centered;
+            report.append(net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(entry.getKey()))
+                    .append(" vertices=").append(points.size())
+                    .append("\n  model pixels=").append(java.util.Arrays.toString(raw))
+                    .append("\n  FIXED rotation=").append(transform.rotation).append(" translation=").append(transform.translation).append(" scale=").append(transform.scale)
+                    .append("\n  FIXED item units=").append(java.util.Arrays.toString(result))
+                    .append("\n  FIXED midpoint XY=").append(cx).append(", ").append(cy)
+                    .append(" tolerance=0.001 centered=").append(centered).append('\n');
+        }
+        try {
+            var directory = mc.gameDirectory.toPath().resolve("screenshots");
+            Files.createDirectories(directory);
+            Files.writeString(directory.resolve("fixed-bounds.txt"), report);
+        } catch (java.io.IOException e) { throw new java.io.UncheckedIOException(e); }
+        System.out.println("ARSENAL_FIXED_BOUNDS " + report.toString().replace('\n', ' '));
+        if (!allCentered && (Boolean.getBoolean("arsenal.review.requireFixedCenter")
+                || Files.exists(mc.gameDirectory.toPath().resolve("require-fixed-center")))) {
+            throw new IllegalStateException("FIXED gear is not centered; see fixed-bounds.txt");
+        }
+    }
+    private static float[] bounds(List<org.joml.Vector3f> points, org.joml.Matrix4f matrix) {
+        if (points.isEmpty()) throw new IllegalStateException("No cannon geometry emitted");
+        float[] b = {Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY,
+                Float.NEGATIVE_INFINITY, Float.NEGATIVE_INFINITY, Float.NEGATIVE_INFINITY};
+        for (var p : points) {
+            var v = matrix.transformPosition(p, new org.joml.Vector3f());
+            for (int i = 0; i < 3; i++) { b[i] = Math.min(b[i], v.get(i)); b[i + 3] = Math.max(b[i + 3], v.get(i)); }
+        }
+        return b;
+    }
     /** Reports faces of the weapons that lie in the same plane and overlap, which is what shimmers at a distance. */
     private static void audit() {
         record Quad(int axis, float plane, float a0, float a1, float b0, float b1) {}
@@ -309,6 +488,10 @@ public final class ArsenalReview {
     }
 
     private static void script(Minecraft mc) {
+        if (Boolean.getBoolean("arsenal.review.render") || Files.exists(mc.gameDirectory.toPath().resolve("render-only"))) {
+            renderScript(mc);
+            return;
+        }
         if (Files.exists(mc.gameDirectory.toPath().resolve("icons-only"))) {
             iconScript(mc);
             return;
@@ -619,8 +802,16 @@ public final class ArsenalReview {
         if (!prepared || mc.getOverlay() != null) return;
         if (STEPS.isEmpty()) script(mc);
         if (mc.screen != null && !(mc.screen instanceof net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<?>)) return;
+        if (ready != null) {
+            if (!ready.getAsBoolean()) {
+                if (++waited > 200) throw new IllegalStateException("Review fixture not ready: " + waiting);
+                return;
+            }
+            System.out.println("ARSENAL_RENDER_READY " + waiting);
+            ready = null;
+        }
         ticks++;
-        while (cursor < STEPS.size() && STEPS.get(cursor).tick <= ticks) STEPS.get(cursor++).action.run();
+        while (ready == null && cursor < STEPS.size() && STEPS.get(cursor).tick <= ticks) STEPS.get(cursor++).action.run();
     }
 
     @SubscribeEvent

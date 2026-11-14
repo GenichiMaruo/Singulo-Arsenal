@@ -40,6 +40,7 @@ import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.client.event.InputEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.event.RenderGuiEvent;
+import net.neoforged.neoforge.client.event.RenderHandEvent;
 import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
 import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
 import net.neoforged.neoforge.common.NeoForge;
@@ -67,6 +68,7 @@ public final class ArsenalClient {
         NeoForge.EVENT_BUS.addListener(ArsenalClient::tick);
         NeoForge.EVENT_BUS.addListener(ArsenalClient::hud);
         NeoForge.EVENT_BUS.addListener(ArsenalClient::trigger);
+        NeoForge.EVENT_BUS.addListener(ArsenalClient::hand);
     }
 
     private static void keys(RegisterKeyMappingsEvent event) {
@@ -109,6 +111,14 @@ public final class ArsenalClient {
             if (event.getSkin(skin) instanceof PlayerRenderer renderer) renderer.addLayer(new SuitLayer<>(renderer));
         }
         if (event.getRenderer(EntityType.ARMOR_STAND) instanceof ArmorStandRenderer renderer) renderer.addLayer(new SuitLayer(renderer));
+    }
+
+    /** A main-hand cannon already draws its support arm. Keep the other held item out
+     * of that first-person pass, without changing inventory or gameplay. */
+    private static void hand(RenderHandEvent event) {
+        if (event.getHand() == InteractionHand.OFF_HAND && holdingCannon(Minecraft.getInstance())) {
+            event.setCanceled(true);
+        }
     }
 
     private static boolean holdingCannon(Minecraft mc) {
