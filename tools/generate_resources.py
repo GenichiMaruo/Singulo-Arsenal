@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Deterministic generator for every data file, translation and icon. Python 3 stdlib only; run from any directory."""
+import colorsys
 import json
 import math
 from pathlib import Path
@@ -219,7 +220,9 @@ SWORD_DISPLAY = {
 }
 # Carried at the ready in both hands: +Y to the muzzle, +Z up. The translation seats the pistol grip in the fist.
 CANNON_DISPLAY = {
-    'gui': {'rotation': [-74, 0, -90], 'translation': [-1.9, 0.2, 0], 'scale': [0.36, 0.36, 0.36]},
+    # A true side view, so the gun keeps its proportions, laid on the slot diagonal like vanilla's handheld items: muzzle to the
+    # upper right, top of the gun to the upper left. Rotations apply Z first, then Y, then X, so the in-screen tilt is the Y angle.
+    'gui': {'rotation': [-90, -45, -90], 'translation': [-1.9, 0.2, 0], 'scale': [0.36, 0.36, 0.36]},
     'ground': {'rotation': [-90, 0, -90], 'translation': [0, 3, 0], 'scale': [0.3, 0.3, 0.3]},
     'fixed': {'rotation': [-90, 0, -90], 'scale': [0.5, 0.5, 0.5]},
     'firstperson_righthand': {'rotation': [-90, 0, 0], 'translation': [-1.6, -0.6, -2.1], 'scale': [1, 1, 1]},
@@ -242,7 +245,7 @@ GUI_FIT = {
     'quench_saber': (-0.72, -0.85, 0.913),
     'casimir_blade': (-0.72, -0.91, 0.808),
     'tidal_reaver': (-1.10, -0.90, 0.667),
-    'jet_cannon': (-3.19, 0.45, 0.443),
+    'jet_cannon': (-2.34, -2.16, 0.526),
     'meissner_helmet': (-0.00, -1.01, 0.880),
     'meissner_chestplate': (-0.00, 0.89, 0.754),
     'meissner_leggings': (-0.00, -1.18, 1.225),
@@ -305,9 +308,15 @@ DISPLAYS = {'jet_cannon': CANNON_DISPLAY, 'tidal_reaver': REAVER_DISPLAY,
             'shear_saw': tool_display(0.46, 0.62), 'accretion_drill': tool_display(0.46, 0.62)}
 for name in WEAPONS + TOOLS:
     write(f'assets/{MOD}/models/item/{name}.json', {**BUILTIN, 'display': fitted(name, DISPLAYS.get(name, SWORD_DISPLAY))})
+# Armor items are flat sprites everywhere, inventory and hand alike, like vanilla armor. Worn armor is SuitLayer's
+# geometry and does not use these models. False restores the 3D item models fitted by GUI_FIT.
+FLAT_ARMOR_ICONS = True
 for t in SETS:
     for part in PARTS:
-        write(f'assets/{MOD}/models/item/{t}_{part}.json', {**BUILTIN, 'display': fitted(f'{t}_{part}', ARMOR_DISPLAY)})
+        name = f'{t}_{part}'
+        write(f'assets/{MOD}/models/item/{name}.json',
+              {'parent': 'minecraft:item/generated', 'textures': {'layer0': f'{MOD}:item/{name}'}} if FLAT_ARMOR_ICONS
+              else {**BUILTIN, 'display': fitted(name, ARMOR_DISPLAY)})
 write(f'assets/{MOD}/models/item/module_integrator.json', {**BUILTIN, 'display': {
     'gui': {'rotation': [28, 225, 0], 'scale': [0.56, 0.56, 0.56]},
     'ground': {'translation': [0, 3, 0], 'scale': [0.25, 0.25, 0.25]},
@@ -529,11 +538,31 @@ def shade_pixel(art, x, y, grain):
     return factor
 
 
-def sprite(name, art, palette):
+def edge(art, palette, x, y):
+    """Outline pixel for an empty cell: the colour of the part it borders, darker and more saturated, so every part keeps
+    its own edge instead of one black line. The side facing the light is a step lighter. Gaps one or two pixels wide
+    (between legs, between boots, under a halo) stay open, or the outline would close them."""
+    def filled(px, py):
+        return 0 <= px < 16 and 0 <= py < 16 and art[py][px] != '.'
+    near = [(dx, dy) for dx, dy in ((0, 1), (1, 0), (0, -1), (-1, 0)) if filled(x + dx, y + dy)]
+    if not near or any(filled(x - dx, y - dy) or filled(x - 2 * dx, y - 2 * dy) for dx, dy in near):
+        return (0, 0, 0, 0)
+    def luminance(c):
+        r, g, b, _ = rgb(palette[c])
+        return 0.3 * r + 0.59 * g + 0.11 * b
+    # Where two parts meet the edge, the darker one owns it, so seams between parts stay crisp.
+    dx, dy = min(near, key=lambda d: luminance(art[y + d[1]][x + d[0]]))
+    h, s, v = colorsys.rgb_to_hsv(*(v / 255 for v in rgb(palette[art[y + dy][x + dx]])[:3]))
+    lit = (dx, dy) in ((0, 1), (1, 0))
+    return (*[round(v * 255) for v in colorsys.hsv_to_rgb(h, min(1.0, s * 1.3 + 0.08), v * (0.52 if lit else 0.36))], 255)
+
+
+def sprite(name, art, palette, outlined=False):
     assert len(art) == 16 and all(len(row) == 16 for row in art), name
     # Icons stay inside 14x14 so a one-pixel margin always separates them from the slot border.
     assert set(art[0] + art[15] + ''.join(row[0] + row[15] for row in art)) == {'.'}, f'{name} touches the 16x16 border'
-    rng = random.Random(zlib.crc32(name.encode()))
+    assert not outlined or set(art[1] + art[14] + ''.join(row[1] + row[14] for row in art)) == {'.'}, f'{name} leaves no room for its outline'
+    rng =random.Random(zlib.crc32(name.encode()))
     grain = [[rng.uniform(-0.07, 0.07) for _ in range(16)] for _ in range(16)]
     glow = GLOWS.get(name, '')
     frames = FRAMES if glow else 1
@@ -542,7 +571,7 @@ def sprite(name, art, palette):
         for y, row in enumerate(art):
             for x, c in enumerate(row):
                 if c == '.':
-                    pixels.append((0, 0, 0, 0))
+                    pixels.append(edge(art, palette, x, y) if outlined else (0, 0, 0, 0))
                 elif c in glow:
                     # Light runs diagonally across the lit parts, and they are not shaded like metal.
                     wave = math.sin((frame / FRAMES + (x + y) / 14) * math.tau)
@@ -897,6 +926,241 @@ sprite('meltdown_module', [
     '................',
     '................',
 ], {'I': 0xE7D8B0, 'V': 0x3A3648, 's': 0x7A3A1E, 'O': 0xFF8A3C, 'y': 0xFFD28A, 'W': 0xFFF8E8})
+# ---- Armor icons ---------------------------------------------------------------------------------------------------
+# Shaped like vanilla armor and coloured from the worn suits (client/art/SuitArt.java), each part outlined in its own
+# darker colour (see edge). The art leaves two pixels of margin so the outline keeps one.
+MEISSNER_ICON = {'W': 0xF4F6FA, 'S': 0xC2CDD9, 'd': 0x465365, 'c': 0x7CE8FF}
+DEGENERACY_ICON = {'P': 0x7A7065, 'L': 0x9C8F7E, 'D': 0x4A423B, 'R': 0xC2AE8C, 'h': 0xE08A2E}
+COLLAPSAR_ICON = {'V': 0x3A3648, 'E': 0x565068, 'I': 0xEFE0B6, 'k': 0x0E0D14, 'w': 0xFFF8EA, 'o': 0xFFB061}
+GLOWS.update({'meissner_helmet': 'c', 'meissner_chestplate': 'c', 'meissner_leggings': 'c', 'meissner_boots': 'c', 'degeneracy_helmet': 'h', 'degeneracy_chestplate': 'h', 'degeneracy_leggings': 'h', 'degeneracy_boots': 'h', 'collapsar_helmet': 'wo', 'collapsar_chestplate': 'wo', 'collapsar_leggings': 'wo', 'collapsar_boots': 'wo'})
+# White ceramic with a cold visor and ear coils, under its floating ring of current.
+sprite('meissner_helmet', [
+    '................',
+    '................',
+    '......cccc......',
+    '.....c....c.....',
+    '......cccc......',
+    '................',
+    '.....SSSSSS.....',
+    '....WWWWWWWW....',
+    '...WWWWWWWWWW...',
+    '...WddddddddW...',
+    '..SWdccccccdWS..',
+    '..cWd......dWc..',
+    '...WW......WW...',
+    '...SS......SS...',
+    '................',
+    '................',
+], MEISSNER_ICON, outlined=True)
+# Ceramic plates, the field coil over the sternum, cold rings round the arms.
+sprite('meissner_chestplate', [
+    '................',
+    '................',
+    '..WWW......WWW..',
+    '..WWWWWSSWWWWW..',
+    '..WWWddddddWWW..',
+    '..ddWdccccdWdd..',
+    '..WWSdcddcdSWW..',
+    '..WWSdcddcdSWW..',
+    '..ccSdccccdScc..',
+    '....SddddddS....',
+    '....WWWWWWWW....',
+    '....SddddddS....',
+    '.....SSSSSS.....',
+    '................',
+    '................',
+    '................',
+], MEISSNER_ICON, outlined=True)
+# A seam belt with a cold buckle, and a lit band round each knee.
+sprite('meissner_leggings', [
+    '................',
+    '................',
+    '...dddddddddd...',
+    '...dddSSSSddd...',
+    '...WWWWccWWWW...',
+    '...WWWW..WWWW...',
+    '...WWWW..WWWW...',
+    '...dddd..dddd...',
+    '...cccc..cccc...',
+    '...dddd..dddd...',
+    '...WWWW..WWWW...',
+    '...WWWW..WWWW...',
+    '................',
+    '................',
+    '................',
+    '................',
+], MEISSNER_ICON, outlined=True)
+# Ceramic boots on soles that shine cold.
+sprite('meissner_boots', [
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '....WWW..WWW....',
+    '....WWW..WWW....',
+    '....SSW..WSS....',
+    '....WWW..WWW....',
+    '...WWWW..WWWW...',
+    '..WWWWW..WWWWW..',
+    '..ddddd..ddddd..',
+    '..ccccc..ccccc..',
+    '................',
+    '................',
+    '................',
+], MEISSNER_ICON, outlined=True)
+# Stacked plates, a crest, and a dark visor hot along its slit.
+sprite('degeneracy_helmet', [
+    '................',
+    '................',
+    '................',
+    '.......LL.......',
+    '.......LL.......',
+    '.....PPPPPP.....',
+    '....PPPPPPPP....',
+    '...DDhhhhhhDD...',
+    '...LLLLLLLLLL...',
+    '..PDDDDDDDDDDP..',
+    '..PDhhhhhhhhDP..',
+    '..PD........DP..',
+    '...R........R...',
+    '................',
+    '................',
+    '................',
+], DEGENERACY_ICON, outlined=True)
+# Wide pauldrons and a torso of stacked plates glowing at every seam.
+sprite('degeneracy_chestplate', [
+    '................',
+    '................',
+    '..PPP......PPP..',
+    '..LLLPPPPPPLLL..',
+    '..hDPPPPPPPPDh..',
+    '..PPDhhhhhhDPP..',
+    '..DDLLLDDLLLDD..',
+    '..LLLLLDDLLLLL..',
+    '..LLDhhDDhhDLL..',
+    '....PPPDDPPP....',
+    '....DhhDDhhD....',
+    '....LLLDDLLL....',
+    '....DhhDDhhD....',
+    '....PPPPPPPP....',
+    '................',
+    '................',
+], DEGENERACY_ICON, outlined=True)
+# Riveted belt, plated legs and hot knee seams.
+sprite('degeneracy_leggings', [
+    '................',
+    '................',
+    '...DDDDDDDDDD...',
+    '...DRDDRRDDRD...',
+    '...PPPPPPPPPP...',
+    '...DhhD..DhhD...',
+    '...LLLL..LLLL...',
+    '...DDDD..DDDD...',
+    '...hhhh..hhhh...',
+    '...DDDD..DDDD...',
+    '...PPPP..PPPP...',
+    '...PPPP..PPPP...',
+    '................',
+    '................',
+    '................',
+    '................',
+], DEGENERACY_ICON, outlined=True)
+# Plated boots with a riveted toe, hot underneath.
+sprite('degeneracy_boots', [
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '....PPP..PPP....',
+    '....hhD..Dhh....',
+    '....LLL..LLL....',
+    '....LLL..LLL....',
+    '...PPPP..PPPP...',
+    '..PRPPP..PPPRP..',
+    '..DDDDD..DDDDD..',
+    '...hhh....hhh...',
+    '................',
+    '................',
+    '................',
+], DEGENERACY_ICON, outlined=True)
+# Dark metal and ivory under a floating ivory ring, the visor lit white-hot.
+sprite('collapsar_helmet', [
+    '................',
+    '................',
+    '......IIII......',
+    '.....I....I.....',
+    '......IIII......',
+    '................',
+    '.....EEEEEE.....',
+    '....VIVVVVIV....',
+    '...VVIVVVVIVV...',
+    '...IIIIIIIIII...',
+    '..IIkwwwwwwkII..',
+    '..IVE......EVI..',
+    '...VE......EV...',
+    '...EE......EE...',
+    '................',
+    '................',
+], COLLAPSAR_ICON, outlined=True)
+# The sternum hole framed in ivory above its pasta lining, between dark shoulders.
+sprite('collapsar_chestplate', [
+    '................',
+    '................',
+    '..VVV......VVV..',
+    '..VVVIIEEIIVVV..',
+    '..VVVIIIIIIVVV..',
+    '..VVIIIkkIIIVV..',
+    '..EEIIkookIIEE..',
+    '..VVIIIkkIIIVV..',
+    '..VVIVVVVVVIVV..',
+    '..oVIkokkokIVo..',
+    '....IVVVVVVI....',
+    '....IkokkokI....',
+    '....IIIIIIII....',
+    '.....EEEEEE.....',
+    '................',
+    '................',
+], COLLAPSAR_ICON, outlined=True)
+# Dark plate with ivory knee bands and glowing side vents.
+sprite('collapsar_leggings', [
+    '................',
+    '................',
+    '...EEEEEEEEEE...',
+    '...EEEIIIIEEE...',
+    '...VVVVooVVVV...',
+    '..oVVVV..VVVVo..',
+    '..oVVVV..VVVVo..',
+    '...EEEE..EEEE...',
+    '...IIII..IIII...',
+    '...EEEE..EEEE...',
+    '...VVVV..VVVV...',
+    '...VVVV..VVVV...',
+    '................',
+    '................',
+    '................',
+    '................',
+], COLLAPSAR_ICON, outlined=True)
+# Dark boots with ivory toes, lit underneath.
+sprite('collapsar_boots', [
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '....VVV..VVV....',
+    '....VVo..oVV....',
+    '....VVo..oVV....',
+    '....IIV..VII....',
+    '...VVVV..VVVV...',
+    '..EEEEE..EEEEE..',
+    '..IIIIE..EIIII..',
+    '...ooo....ooo...',
+    '................',
+    '................',
+    '................',
+], COLLAPSAR_ICON, outlined=True)
 png(f'assets/{MOD}/textures/misc/white.png', 1, 1, [(255, 255, 255, 255)])
 
 

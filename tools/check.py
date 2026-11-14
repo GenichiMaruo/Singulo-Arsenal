@@ -19,7 +19,8 @@ WEAPONS = ['quench_saber', 'casimir_blade', 'tidal_reaver', 'jet_cannon']
 TOOLS = ['squid_pick', 'degeneracy_breaker', 'shear_saw', 'accretion_drill']
 MATERIALS = ['flux_weave', 'pressure_lattice', 'collapsar_lamina', 'jet_collimator', 'tidal_edge']
 MODULES = ['bit_drone_module', 'capacitor_module', 'plating_module', 'thruster_module', 'coolant_module', 'amplifier_module', 'metric_drive_module', 'meltdown_module', 'overclock_module', 'smelter_module', 'induction_module', 'collector_module']
-GEAR = [f'{s}_{p}' for s in SETS for p in PARTS] + WEAPONS + TOOLS + ['module_integrator']
+ARMOR = [f'{s}_{p}' for s in SETS for p in PARTS]
+GEAR = ARMOR + WEAPONS + TOOLS + ['module_integrator']
 CONTAINERS = ['pellet_canister']
 ITEMS = GEAR + MATERIALS + MODULES + CONTAINERS
 
@@ -51,11 +52,13 @@ for key in locales[0]:
 for item in ITEMS:
     assert f'item.singulo_arsenal.{item}' in locales[0] or f'block.singulo_arsenal.{item}' in locales[0], f'missing name {item}'
     model = json.loads((RES / f'assets/singulo_arsenal/models/item/{item}.json').read_text(encoding='utf-8'))
-    if item in GEAR:
+    # Armor items are flat icons like vanilla armor; worn armor is drawn by SuitLayer, not by these models.
+    if item in GEAR and item not in ARMOR:
         assert model['parent'] == 'minecraft:builtin/entity', f'{item} must use the gear renderer'
         assert all(context in model['display'] for context in ['gui', 'ground', 'fixed', 'firstperson_righthand', 'firstperson_lefthand',
                                                                 'thirdperson_righthand', 'thirdperson_lefthand']), item
     else:
+        assert model['parent'] == 'minecraft:item/generated', item
         assert model['textures']['layer0'] == f'singulo_arsenal:item/{item}'
         data = (RES / f'assets/singulo_arsenal/textures/item/{item}.png').read_bytes()
         width, height = struct.unpack('>II', data[16:24])
