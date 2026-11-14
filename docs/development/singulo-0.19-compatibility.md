@@ -26,3 +26,28 @@ The migration and rendering checks from earlier 0.3.0 work remain relevant but
 do not replace validation against the final 0.19 binaries. Preserve the old
 cannon recipe/advancement IDs while remapping its item ID. Backups are required
 before upgrades; new canonical IDs are not downgrade-compatible with 0.2.2.
+
+## Preliminary checkpoint (not the final release gate)
+
+- Source `7708a6d`; draft PR #11, CI runs `43626822561` and `43626863818`:
+  build and integration successful against candidate `d12d72c0`.
+- Candidate dependency SHA256:
+  `9152f87437b98e3c5a7d1c244f9a027cf9e9732d19cbe83574b24f9359fd8ae5`.
+- Java 21 build, 5,331 rules assertions, 2,106 matrix cases, 116 real Singulo
+  ingredient references, 23 release-validation tests and 65 GameTests passed.
+- The vanilla actual client completed all 68 synchronized hand/aim/fire/reload/
+  frame captures and exited normally. Music alone was muted. The eight FIXED
+  centers passed, with maximum midpoint error `5.96e-8` item units. Representative
+  left/right hand, bare main hand with offhand cannon, firing and floor-frame
+  captures were visually inspected; image generation alone is not a pass.
+- A separate negative startup with the published Singulo 0.18.0 JAR was rejected
+  before any world started. The loader reported the expected `[0.19.0,0.20.0)`
+  interval and a fatal mod-loading error. The development Gradle server wrapper
+  returned zero despite that refusal, so the fatal log and absent world were
+  explicitly checked instead of relying on the wrapper exit code.
+- Independent read-only review found no P1/P2 modern implementation issue.
+  It requested an explicit 0.18 seed / 0.19 verify dependency switch in the
+  old-world migration instructions; that clarification is included.
+
+This checkpoint does **not** claim final-dependency, shader or current old-world
+resave verification. Those remain mandatory before merge/publication.

@@ -56,6 +56,12 @@ public final class NihoniumGameTests {
         ItemStack pick = new ItemStack(Nihonium.PICKAXE.get());
         h.assertTrue(pick.isCorrectToolForDrops(Blocks.OBSIDIAN.defaultBlockState()), "pick cannot harvest diamond-tier blocks");
         h.assertTrue(pick.getDestroySpeed(Blocks.STONE.defaultBlockState()) == 10F, "pick mining speed changed");
+        h.assertTrue(new ItemStack(net.minecraft.world.item.Items.DIAMOND_PICKAXE).isCorrectToolForDrops(Blocks.OBSIDIAN.defaultBlockState()),
+                "plain gear registration broke diamond obsidian harvesting");
+        h.assertTrue(new ItemStack(net.minecraft.world.item.Items.NETHERITE_PICKAXE).isCorrectToolForDrops(Blocks.OBSIDIAN.defaultBlockState()),
+                "plain gear registration broke netherite obsidian harvesting");
+        h.assertTrue(!new ItemStack(net.minecraft.world.item.Items.IRON_PICKAXE).isCorrectToolForDrops(Blocks.OBSIDIAN.defaultBlockState()),
+                "iron incorrectly harvests obsidian");
         h.assertTrue(!new ItemStack(Nihonium.SHOVEL.get()).isCorrectToolForDrops(Blocks.OBSIDIAN.defaultBlockState()),
                 "shovel incorrectly mines obsidian");
         h.succeed();
