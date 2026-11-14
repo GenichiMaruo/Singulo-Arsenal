@@ -1,7 +1,7 @@
 package io.github.genichimaruo.singuloarsenal.client;
 
 import io.github.genichimaruo.singuloarsenal.core.Rules;
-import io.github.genichimaruo.singuloarsenal.weapon.JetLanceItem;
+import io.github.genichimaruo.singuloarsenal.weapon.JetCannonItem;
 import io.github.genichimaruo.singuloarsenal.weapon.TidalReaverItem;
 import java.util.HashMap;
 import java.util.Map;
@@ -68,8 +68,8 @@ final class ActiveSounds {
         }
         for (Player player : mc.level.players()) {
             int id = player.getId();
-            ensure(mc, new Key(id, CHARGE), "horizon_warden.beam_charge", false, 2.5F, Rules.LANCE_CHARGE_PITCH, () -> charging(player), player::getEyePosition);
-            ensure(mc, new Key(id, CHARGE_BODY), "jet_forge.spool", false, 3F, Rules.LANCE_CHARGE_BODY_PITCH, () -> charging(player), player::getEyePosition);
+            ensure(mc, new Key(id, CHARGE), "horizon_warden.beam_charge", false, 2.5F, Rules.CANNON_CHARGE_PITCH, () -> charging(player), player::getEyePosition);
+            ensure(mc, new Key(id, CHARGE_BODY), "jet_forge.spool", false, 3F, Rules.CANNON_CHARGE_BODY_PITCH, () -> charging(player), player::getEyePosition);
             ensure(mc, new Key(id, JET), "jet_forge.jet", true, 3F, 1, () -> burning(player), () -> nearestOnJet(mc, player));
             ensure(mc, new Key(id, FOCUS), "tidal_spindle_running", true, 1.2F, 0.8F, () -> focusing(player), () -> TidalReaverItem.focus(player, 1));
         }
@@ -85,11 +85,11 @@ final class ActiveSounds {
     }
 
     private static boolean charging(Player player) {
-        return player.isAlive() && JetLanceItem.chargeProgress(player.getMainHandItem(), player.level().getGameTime(), 0) >= 0;
+        return player.isAlive() && JetCannonItem.chargeProgress(player.getMainHandItem(), player.level().getGameTime(), 0) >= 0;
     }
 
     private static boolean burning(Player player) {
-        return player.isAlive() && JetLanceItem.jetAge(player.getMainHandItem(), player.level().getGameTime(), 0) >= 0;
+        return player.isAlive() && JetCannonItem.jetAge(player.getMainHandItem(), player.level().getGameTime(), 0) >= 0;
     }
 
     private static boolean focusing(Player player) {

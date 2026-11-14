@@ -18,7 +18,7 @@ import io.github.genichimaruo.singuloarsenal.tool.PoweredTool;
 import io.github.genichimaruo.singuloarsenal.tool.ShearSawItem;
 import io.github.genichimaruo.singuloarsenal.tool.SquidPickItem;
 import io.github.genichimaruo.singuloarsenal.weapon.CasimirBladeItem;
-import io.github.genichimaruo.singuloarsenal.weapon.JetLanceItem;
+import io.github.genichimaruo.singuloarsenal.weapon.JetCannonItem;
 import io.github.genichimaruo.singuloarsenal.weapon.QuenchSaberItem;
 import io.github.genichimaruo.singuloarsenal.weapon.TidalReaverItem;
 import io.github.genichimaruo.singuloarsenal.weapon.Weapons;
@@ -78,7 +78,7 @@ public final class GearRenderer extends BlockEntityWithoutLevelRenderer {
         boolean using = owner != null && owner.isUsingItem() && owner.getUseItem().getItem() == stack.getItem();
         int ticks = using ? owner.getTicksUsingItem() : 0;
         boolean world = context != ItemDisplayContext.GUI;
-        if (owner != null && !(stack.getItem() instanceof JetLanceItem)) seatInHand(pose, stack);
+        if (owner != null && !(stack.getItem() instanceof JetCannonItem)) seatInHand(pose, stack);
         long now = Minecraft.getInstance().level == null ? 0 : Minecraft.getInstance().level.getGameTime();
         float reload = world ? Weapons.reloadProgress(stack, now, partial) : -1;
         if (stack.getItem() instanceof QuenchSaberItem) {
@@ -111,17 +111,17 @@ public final class GearRenderer extends BlockEntityWithoutLevelRenderer {
                 else if (stack.getItem() instanceof ShearSawItem) ToolArt.shearSaw(c, running, t);
                 else ToolArt.accretionDrill(c, running, t);
             });
-        } else if (stack.getItem() instanceof JetLanceItem) {
-            float jet = owner != null && world ? JetLanceItem.jetAge(stack, now, partial) : -1;
-            float charge = owner != null && world ? JetLanceItem.chargeProgress(stack, now, partial) : -1;
+        } else if (stack.getItem() instanceof JetCannonItem) {
+            float jet = owner != null && world ? JetCannonItem.jetAge(stack, now, partial) : -1;
+            float charge = owner != null && world ? JetCannonItem.chargeProgress(stack, now, partial) : -1;
             float ignition = jet >= 0 ? 1 : Math.max(0, charge);
             boolean leftHanded = context == ItemDisplayContext.FIRST_PERSON_LEFT_HAND || context == ItemDisplayContext.THIRD_PERSON_LEFT_HAND;
             boolean mainHand = mainHand(owner, context);
             if (mainHand && world) {
-                FxClient.aimLance(owner, pose, context, partial);
+                FxClient.aimCannon(owner, pose, context, partial);
                 boolean firstPerson = context.firstPerson();
                 // Recoil runs straight back along the barrel, so the beam stays on its axis.
-                pose.translate(0, -(firstPerson ? 1.6F : 0.8F) * Rules.lanceKick(jet), 0);
+                pose.translate(0, -(firstPerson ? 1.6F : 0.8F) * Rules.cannonKick(jet), 0);
                 if (reload >= 0 && !firstPerson) {
                     // Drawn in toward the chest while the support hand works on it: at arm's length the magazine is out of reach.
                     pose.translate(0, -9 * Rules.reloadReach(reload), 0);
@@ -133,17 +133,17 @@ public final class GearRenderer extends BlockEntityWithoutLevelRenderer {
                     pose.mulPose(Axis.YP.rotationDegrees((owner.getMainArm() == net.minecraft.world.entity.HumanoidArm.RIGHT ? 30 : -30) * tilt));
                 }
             }
-            Canvas.drawFine(pose, buffers, t, light, overlay, world, c -> WeaponArt.lance(c, ignition, reload, t, leftHanded ? 1 : -1));
+            Canvas.drawFine(pose, buffers, t, light, overlay, world, c -> WeaponArt.cannon(c, ignition, reload, t, leftHanded ? 1 : -1));
             if (mainHand) {
-                FxClient.lanceRendered(owner, pose, buffers, context, partial, jet);
-                FirstPersonHands.drawLance(owner, pose, buffers, light, context, reload);
+                FxClient.cannonRendered(owner, pose, buffers, context, partial, jet);
+                FirstPersonHands.drawCannon(owner, pose, buffers, light, context, reload);
             }
         }
     }
 
     /** Display contexts describe the physical arm, not MAIN_HAND/OFF_HAND. */
     private static boolean mainHand(Player owner, ItemDisplayContext context) {
-        if (owner == null || !(owner.getMainHandItem().getItem() instanceof JetLanceItem)) return false;
+        if (owner == null || !(owner.getMainHandItem().getItem() instanceof JetCannonItem)) return false;
         boolean right = context == ItemDisplayContext.FIRST_PERSON_RIGHT_HAND
                 || context == ItemDisplayContext.THIRD_PERSON_RIGHT_HAND;
         return right == (owner.getMainArm() == net.minecraft.world.entity.HumanoidArm.RIGHT);

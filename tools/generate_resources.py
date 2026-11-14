@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1] / 'src/main/resources'
 MOD = 'singulo_arsenal'
 SETS = ['meissner', 'degeneracy', 'collapsar']
 PARTS = ['helmet', 'chestplate', 'leggings', 'boots']
-WEAPONS = ['quench_saber', 'casimir_blade', 'tidal_reaver', 'jet_lance']
+WEAPONS = ['quench_saber', 'casimir_blade', 'tidal_reaver', 'jet_cannon']
 TOOLS = ['squid_pick', 'degeneracy_breaker', 'shear_saw', 'accretion_drill']
 MATERIALS = ['flux_weave', 'pressure_lattice', 'collapsar_lamina', 'jet_collimator', 'tidal_edge']
 MODULES = ['bit_drone_module', 'capacitor_module', 'plating_module', 'thruster_module', 'coolant_module', 'amplifier_module', 'metric_drive_module', 'meltdown_module', 'overclock_module', 'smelter_module', 'induction_module', 'collector_module']
@@ -51,14 +51,15 @@ def unlock_advancement(name, unlock):
     })
 
 
-def shaped(name, pattern, key, unlock):
+def shaped(name, pattern, key, unlock, *, recipe_name=None):
     """A crafting-table recipe. Every pattern below is a drawing of the thing being built; see docs/arsenal.md."""
-    write(f'data/{MOD}/recipe/{name}.json', {
+    recipe_name = recipe_name or name
+    write(f'data/{MOD}/recipe/{recipe_name}.json', {
         'type': 'minecraft:crafting_shaped', 'category': 'equipment', 'pattern': pattern,
         'key': {symbol: ingredient(ref) for symbol, ref in key.items()},
         'result': {'id': own(name), 'count': 1},
     })
-    unlock_advancement(name, unlock)
+    unlock_advancement(recipe_name, unlock)
 
 
 def machine(name, station, stage, time, energy, ingredients, unlock, fluids=(), count=1):
@@ -133,8 +134,9 @@ shaped('casimir_blade', ['M M', 'MEM', ' F '],
 shaped('tidal_reaver', [' T ', 'LGL', ' F '],
        {'T': own('tidal_edge'), 'L': own('collapsar_lamina'), 'G': s('gravity_field_stabilizer'), 'F': s('tidal_filament')}, own('tidal_edge'))
 # The hole in the middle, a collimator on the firing pole, and a confinement ring sealing the other.
-shaped('jet_lance', [' J ', 'LBL', ' R '],
-       {'J': own('jet_collimator'), 'L': own('collapsar_lamina'), 'B': s('micro_black_hole'), 'R': s('confinement_ring')}, own('jet_collimator'))
+# Keep the historical recipe/advancement identities: existing unlocks and pack overrides survive.
+shaped('jet_cannon', [' J ', 'LBL', ' R '],
+       {'J': own('jet_collimator'), 'L': own('collapsar_lamina'), 'B': s('micro_black_hole'), 'R': s('confinement_ring')}, own('jet_collimator'), recipe_name='jet_lance')
 
 # ---- Tools: each drawn the way it is held, working end in the top row ----------------------------------------------------
 
@@ -200,7 +202,7 @@ write(f'data/{MOD}/tags/block/mineable/drill.json', {'replace': False, 'values':
 write('data/minecraft/tags/item/pickaxes.json', {'replace': False, 'values': [own('squid_pick'), own('degeneracy_breaker'), own('accretion_drill')]})
 write('data/minecraft/tags/item/shovels.json', {'replace': False, 'values': [own('degeneracy_breaker'), own('accretion_drill')]})
 write('data/minecraft/tags/item/axes.json', {'replace': False, 'values': [own('shear_saw'), own('accretion_drill')]})
-write('data/minecraft/tags/item/enchantable/durability.json', {'replace': False, 'values': [own('jet_lance')]})
+write('data/minecraft/tags/item/enchantable/durability.json', {'replace': False, 'values': [own('jet_cannon')]})
 
 # ---- Item models ---------------------------------------------------------------------------------------------------
 
@@ -216,7 +218,7 @@ SWORD_DISPLAY = {
     'thirdperson_lefthand': {'rotation': [0, 90, -10], 'translation': [0, 4, 0.5], 'scale': [0.85, 0.85, 0.85]},
 }
 # Carried at the ready in both hands: +Y to the muzzle, +Z up. The translation seats the pistol grip in the fist.
-LANCE_DISPLAY = {
+CANNON_DISPLAY = {
     'gui': {'rotation': [-74, 0, -90], 'translation': [-1.9, 0.2, 0], 'scale': [0.36, 0.36, 0.36]},
     'ground': {'rotation': [-90, 0, -90], 'translation': [0, 3, 0], 'scale': [0.3, 0.3, 0.3]},
     'fixed': {'rotation': [-90, 0, -90], 'scale': [0.5, 0.5, 0.5]},
@@ -240,7 +242,7 @@ GUI_FIT = {
     'quench_saber': (-0.72, -0.85, 0.913),
     'casimir_blade': (-0.72, -0.91, 0.808),
     'tidal_reaver': (-1.10, -0.90, 0.667),
-    'jet_lance': (-3.19, 0.45, 0.443),
+    'jet_cannon': (-3.19, 0.45, 0.443),
     'meissner_helmet': (-0.00, -1.01, 0.880),
     'meissner_chestplate': (-0.00, 0.89, 0.754),
     'meissner_leggings': (-0.00, -1.18, 1.225),
@@ -266,7 +268,7 @@ FIXED_FIT = {
     'quench_saber': (-0.804334, -0.804334),
     'casimir_blade': (-0.989949, -0.989949),
     'tidal_reaver': (-1.484924, -0.928077),
-    'jet_lance': (-3.71875, 0.674877),
+    'jet_cannon': (-3.71875, 0.674877),
     'squid_pick': (-1.423052, -1.423052),
     'degeneracy_breaker': (-1.732411, -1.732412),
     'shear_saw': (-1.175565, -1.175565),
@@ -298,7 +300,7 @@ def tool_display(first, third):
             'thirdperson_lefthand': {**SWORD_DISPLAY['thirdperson_lefthand'], 'scale': [third] * 3}}
 
 
-DISPLAYS = {'jet_lance': LANCE_DISPLAY, 'tidal_reaver': REAVER_DISPLAY,
+DISPLAYS = {'jet_cannon': CANNON_DISPLAY, 'tidal_reaver': REAVER_DISPLAY,
             'squid_pick': tool_display(0.48, 0.62), 'degeneracy_breaker': tool_display(0.4, 0.55),
             'shear_saw': tool_display(0.46, 0.62), 'accretion_drill': tool_display(0.46, 0.62)}
 for name in WEAPONS + TOOLS:
@@ -369,7 +371,7 @@ weapon_text = {
     'tidal_reaver': ('潮汐断裁刃', 'Tidal Reaver', '溜めて引き寄せ、離して断裁', 'Hold to drag in, release to shear',
                      ['攻撃22／攻撃速度1.0。命中で潮汐応力（最大5、被ダメージ+8%／層）。', '右クリック長押しで周囲の敵を引き寄せる（300k FE/秒）。', '離すと応力に応じて16〜66ダメージ。'],
                      ['22 damage, 1.0 speed. Hits add tidal stress (up to 5, +8% damage taken each).', 'Hold use to drag enemies in (300k FE/s).', 'Release for 16-66 damage by stress.']),
-    'jet_lance': ('降着ジェット砲', 'Accretion Jet Cannon', '左クリックでジェットを発射', 'Left click fires the jet',
+    'jet_cannon': ('降着ジェット砲', 'Accretion Jet Cannon', '左クリックでジェットを発射', 'Left click fires the jet',
                   ['チャージ1.4秒の後に発射し2秒照射。前方80ブロックを貫通、56 DPS（防具の6割を無視）。', '4発ごとにリロード（8秒）。1発 1M FE。', '右クリック：地形保護／地形破壊。破壊モードは発射の瞬間に20ブロック貫く。'],
                   ['Charges 1.4s, then burns 2s, piercing 80 blocks. 56 DPS, ignoring 60% of armor.', 'Reloads every 4 shots (8s). 1M FE per shot.', 'Right click: terrain protection or destruction. Destruction drills 20 blocks at the moment of firing.']),
 }
@@ -474,6 +476,11 @@ common = {
 }
 for key, (j, e) in common.items():
     ja[key], en[key] = j, e
+# Saved text components may explicitly contain the historical translation key.
+for data in (ja, en):
+    for key, value in list(data.items()):
+        if '.jet_cannon' in key:
+            data[key.replace('.jet_cannon', '.jet_lance')] = value
 for locale, data in [('ja_jp', ja), ('en_us', en)]:
     write(f'assets/{MOD}/lang/{locale}.json', dict(sorted(data.items())))
 write('pack.mcmeta', {'pack': {'pack_format': 34, 'description': 'Singulo Arsenal equipment resources'}})

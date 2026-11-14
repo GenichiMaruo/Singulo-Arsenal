@@ -97,8 +97,8 @@ tasks.named('runGameTestServer') {
     doFirst { delete layout.buildDirectory.file('gametest/logs/latest.log') }
     doLast {
         def log = layout.buildDirectory.file('gametest/logs/latest.log').get().asFile
-        if (!log.isFile() || !log.text.contains('All 56 required tests passed')) {
-            throw new GradleException('Expected all 56 required Arsenal GameTests to pass. Inspect the GameTest server log.')
+        if (!log.isFile() || !log.text.contains('All 62 required tests passed')) {
+            throw new GradleException('Expected all 62 required Arsenal GameTests to pass. Inspect the GameTest server log.')
         }
     }
 }

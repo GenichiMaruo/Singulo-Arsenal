@@ -1,0 +1,18 @@
+// Opt-in only: do NOT combine with gui.gradle. Copy this harness unchanged to old/new 1.21.1 checkouts.
+// Copy a disposable world into build/gui-migration/saves/Review and set phase.txt to seed / verify / verify-resaved.
+// Move the entire gui-migration directory (including phase receipts) between checkouts, or use -PmigrationGameDir=<absolute .../build/gui-migration>.
+allprojects {
+    afterEvaluate {
+        sourceSets.main.java.srcDir(file(providers.gradleProperty('migrationSourceDir').getOrElse('tools/review/migration-src')))
+        tasks.named('jar', Jar) { exclude 'io/github/genichimaruo/singuloarsenal/review/**' }
+        neoForge.runs.client {
+            gameDirectory = file(providers.gradleProperty('migrationGameDir').getOrElse('build/gui-migration'))
+            programArgument '--quickPlaySingleplayer'
+            programArgument 'Review'
+            programArgument '--width'
+            programArgument '1280'
+            programArgument '--height'
+            programArgument '800'
+        }
+    }
+}

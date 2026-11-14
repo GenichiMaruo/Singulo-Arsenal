@@ -1,7 +1,7 @@
 package io.github.genichimaruo.singuloarsenal.net;
 
 import io.github.genichimaruo.singuloarsenal.SinguloArsenal;
-import io.github.genichimaruo.singuloarsenal.weapon.JetLanceItem;
+import io.github.genichimaruo.singuloarsenal.weapon.JetCannonItem;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -18,7 +18,7 @@ public record FirePayload() implements CustomPacketPayload {
 
     public static void handle(FirePayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
-            if (context.player() instanceof ServerPlayer player) JetLanceItem.tryFire(player);
+            if (context.player() instanceof ServerPlayer player) JetCannonItem.tryFire(player);
         });
     }
 }

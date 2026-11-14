@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 RES = ROOT / 'src/main/resources'
 SETS = ['meissner', 'degeneracy', 'collapsar']
 PARTS = ['helmet', 'chestplate', 'leggings', 'boots']
-WEAPONS = ['quench_saber', 'casimir_blade', 'tidal_reaver', 'jet_lance']
+WEAPONS = ['quench_saber', 'casimir_blade', 'tidal_reaver', 'jet_cannon']
 TOOLS = ['squid_pick', 'degeneracy_breaker', 'shear_saw', 'accretion_drill']
 MATERIALS = ['flux_weave', 'pressure_lattice', 'collapsar_lamina', 'jet_collimator', 'tidal_edge']
 MODULES = ['bit_drone_module', 'capacitor_module', 'plating_module', 'thruster_module', 'coolant_module', 'amplifier_module', 'metric_drive_module', 'meltdown_module', 'overclock_module', 'smelter_module', 'induction_module', 'collector_module']
@@ -33,11 +33,16 @@ with tempfile.TemporaryDirectory(prefix='arsenal-tests-') as directory:
     subprocess.run([java, '-cp', directory, 'RulesTest'], check=True)
 
 recipes = RES / 'data/singulo_arsenal/recipe'
-assert {p.stem for p in recipes.glob('*.json')} == set(ITEMS), 'missing or extra recipes'
+recipe_name = lambda item: 'jet_lance' if item == 'jet_cannon' else item
+assert {p.stem for p in recipes.glob('*.json')} == {recipe_name(item) for item in ITEMS}, 'missing or extra recipes'
 locales = [json.loads((RES / f'assets/singulo_arsenal/lang/{lang}.json').read_text(encoding='utf-8')) for lang in ['ja_jp', 'en_us']]
 assert locales[0].keys() == locales[1].keys(), 'locale key mismatch'
-# Public name describes the cannon; keep the historic registry ID for saved worlds.
-assert locales[1]['item.singulo_arsenal.jet_lance'] == 'Accretion Jet Cannon'
+# Public display is unchanged; the old registry ID migrates through the NeoForge alias.
+assert locales[1]['item.singulo_arsenal.jet_cannon'] == 'Accretion Jet Cannon'
+for locale in locales:
+    for key, value in locale.items():
+        if '.jet_cannon' in key:
+            assert locale[key.replace('.jet_cannon', '.jet_lance')] == value, 'legacy text key lost'
 
 for key in locales[0]:
     for token in ('%s', '%1$s', '%2$s'):
@@ -55,10 +60,10 @@ for item in ITEMS:
         data = (RES / f'assets/singulo_arsenal/textures/item/{item}.png').read_bytes()
         width, height = struct.unpack('>II', data[16:24])
         assert data[1:4] == b'PNG' and width == 16 and height % 16 == 0, f'bad icon {item}'
-    recipe = json.loads((recipes / f'{item}.json').read_text(encoding='utf-8'))
+    recipe = json.loads((recipes / f'{recipe_name(item)}.json').read_text(encoding='utf-8'))
     assert recipe['result']['id'] == f'singulo_arsenal:{item}', item
-    advancement = json.loads((RES / f'data/singulo_arsenal/advancement/recipes/{item}.json').read_text(encoding='utf-8'))
-    assert advancement['rewards']['recipes'] == [f'singulo_arsenal:{item}'], item
+    advancement = json.loads((RES / f'data/singulo_arsenal/advancement/recipes/{recipe_name(item)}.json').read_text(encoding='utf-8'))
+    assert advancement['rewards']['recipes'] == [f'singulo_arsenal:{recipe_name(item)}'], item
     if recipe['type'] == 'minecraft:crafting_shaped':
         symbols = set(''.join(recipe['pattern'])) - {' '}
         assert symbols == recipe['key'].keys(), f'bad crafting key: {item}'

@@ -10,7 +10,7 @@ import io.github.genichimaruo.singuloarsenal.client.art.WeaponArt;
 import io.github.genichimaruo.singuloarsenal.core.Fe;
 import io.github.genichimaruo.singuloarsenal.core.Tips;
 import io.github.genichimaruo.singuloarsenal.net.FxPayload;
-import io.github.genichimaruo.singuloarsenal.weapon.JetLanceItem;
+import io.github.genichimaruo.singuloarsenal.weapon.JetCannonItem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import io.github.genichimaruo.singuloarsenal.module.IntegratorBlockEntity;
@@ -131,7 +131,7 @@ public final class ArsenalReview {
 
     /** Opt-in rendering fixtures; images still require visual review. */
     private static void renderScript(Minecraft mc) {
-        Item gun = ArsenalItems.JET_LANCE.get(), torch = net.minecraft.world.item.Items.TORCH;
+        Item gun = ArsenalItems.JET_CANNON.get(), torch = net.minecraft.world.item.Items.TORCH;
         step(60, () -> {
             mc.options.keyAttack.setDown(false); mc.options.keyUse.setDown(false);
             fixedBounds(mc);
@@ -161,13 +161,13 @@ public final class ArsenalReview {
             // Seed the last round, then use the real shot/reload path rather than faking animation times.
             step(2, () -> {
                 local(mc, p -> {
-                    p.getMainHandItem().set(ArsenalData.SHOTS.get(), io.github.genichimaruo.singuloarsenal.core.Rules.LANCE_MAGAZINE - 1);
-                    if (!JetLanceItem.tryFire(p)) throw new IllegalStateException("Review shot rejected");
+                    p.getMainHandItem().set(ArsenalData.SHOTS.get(), io.github.genichimaruo.singuloarsenal.core.Rules.CANNON_MAGAZINE - 1);
+                    if (!JetCannonItem.tryFire(p)) throw new IllegalStateException("Review shot rejected");
                 });
-                await("charge-" + side, () -> JetLanceItem.chargeProgress(mc.player.getMainHandItem(), mc.level.getGameTime(), 0) >= 0);
+                await("charge-" + side, () -> JetCannonItem.chargeProgress(mc.player.getMainHandItem(), mc.level.getGameTime(), 0) >= 0);
             });
             shot("render-" + side + "-charging");
-            step(1, () -> await("jet-" + side, () -> JetLanceItem.jetAge(mc.player.getMainHandItem(), mc.level.getGameTime(), 0) >= 0));
+            step(1, () -> await("jet-" + side, () -> JetCannonItem.jetAge(mc.player.getMainHandItem(), mc.level.getGameTime(), 0) >= 0));
             shot("render-" + side + "-firing");
             step(1, () -> await("reload-" + side, () -> io.github.genichimaruo.singuloarsenal.weapon.Weapons.reloadProgress(mc.player.getMainHandItem(), mc.level.getGameTime(), 0) >= 0));
             at += 30; shot("render-" + side + "-reload-early");
@@ -197,7 +197,7 @@ public final class ArsenalReview {
     }
 
     private static List<Item> weapons() {
-        return List.of(ArsenalItems.QUENCH_SABER.get(), ArsenalItems.CASIMIR_BLADE.get(), ArsenalItems.TIDAL_REAVER.get(), ArsenalItems.JET_LANCE.get());
+        return List.of(ArsenalItems.QUENCH_SABER.get(), ArsenalItems.CASIMIR_BLADE.get(), ArsenalItems.TIDAL_REAVER.get(), ArsenalItems.JET_CANNON.get());
     }
 
     private static List<Item> tools() {
@@ -351,7 +351,7 @@ public final class ArsenalReview {
         at += 3;
         shot("icons-bare");
         step(2, () -> bare = false);
-        step(2, () -> { audit(); tip = new ItemStack(ArsenalItems.JET_LANCE.get()); Fe.set(tip, Fe.capacity(tip)); });
+        step(2, () -> { audit(); tip = new ItemStack(ArsenalItems.JET_CANNON.get()); Fe.set(tip, Fe.capacity(tip)); });
         at += 3;
         shot("tooltip-brief");
         step(2, () -> Tips.detail = () -> true);
@@ -366,7 +366,7 @@ public final class ArsenalReview {
         art.put(ArsenalItems.QUENCH_SABER.get(), c -> WeaponArt.quench(c, 0, 0, -1));
         art.put(ArsenalItems.CASIMIR_BLADE.get(), c -> WeaponArt.casimir(c, 0, false, 0));
         art.put(ArsenalItems.TIDAL_REAVER.get(), c -> WeaponArt.reaver(c, 0, -1, 0));
-        art.put(ArsenalItems.JET_LANCE.get(), c -> WeaponArt.lance(c, 0, -1, 0, -1));
+        art.put(ArsenalItems.JET_CANNON.get(), c -> WeaponArt.cannon(c, 0, -1, 0, -1));
         art.put(ArsenalItems.SQUID_PICK.get(), io.github.genichimaruo.singuloarsenal.client.art.ToolArt::squidPick);
         art.put(ArsenalItems.DEGENERACY_BREAKER.get(), io.github.genichimaruo.singuloarsenal.client.art.ToolArt::degeneracyBreaker);
         art.put(ArsenalItems.SHEAR_SAW.get(), c -> io.github.genichimaruo.singuloarsenal.client.art.ToolArt.shearSaw(c, false, 0));
@@ -431,7 +431,7 @@ public final class ArsenalReview {
         art.put("quench", c -> WeaponArt.quench(c, 0, 0.5F, -1));
         art.put("casimir", c -> WeaponArt.casimir(c, 0.5F, false, 3));
         art.put("reaver", c -> WeaponArt.reaver(c, 0, -1, 0));
-        art.put("lance", c -> WeaponArt.lance(c, 0, -1, 0, -1));
+        art.put("cannon", c -> WeaponArt.cannon(c, 0, -1, 0, -1));
         art.put("pick", io.github.genichimaruo.singuloarsenal.client.art.ToolArt::squidPick);
         art.put("breaker", io.github.genichimaruo.singuloarsenal.client.art.ToolArt::degeneracyBreaker);
         art.put("saw", c -> io.github.genichimaruo.singuloarsenal.client.art.ToolArt.shearSaw(c, false, 0));
@@ -506,7 +506,7 @@ public final class ArsenalReview {
             iconScript(mc);
             return;
         }
-        String[] names = {"quench", "casimir", "reaver", "lance"};
+        String[] names = {"quench", "casimir", "reaver", "cannon"};
         step(90, () -> mc.options.setCameraType(CameraType.FIRST_PERSON));
 
         // Another player, idle, from three sides.
@@ -566,30 +566,30 @@ public final class ArsenalReview {
         step(40, () -> server(mc, o -> hold(o, weapons().get(3))));
         // Four shots, each seen from another side; the fourth empties the magazine and starts the reload.
         step(2, () -> watch(mc, -100, 6));
-        step(10, () -> server(mc, JetLanceItem::tryFire));
+        step(10, () -> server(mc, JetCannonItem::tryFire));
         at += 14;
-        shot("other-lance-charging");
+        shot("other-cannon-charging");
         at += 13;
-        shot("other-lance-firing-lit");
+        shot("other-cannon-firing-lit");
         at += 12;
-        shot("other-lance-firing-side");
+        shot("other-cannon-firing-side");
         step(40, () -> watch(mc, -40, 6));
-        step(4, () -> server(mc, JetLanceItem::tryFire));
+        step(4, () -> server(mc, JetCannonItem::tryFire));
         at += 42;
-        shot("other-lance-firing-right");
+        shot("other-cannon-firing-right");
         step(40, () -> watch(mc, 165, 6));
-        step(4, () -> server(mc, JetLanceItem::tryFire));
+        step(4, () -> server(mc, JetCannonItem::tryFire));
         at += 42;
-        shot("other-lance-firing-behind");
+        shot("other-cannon-firing-behind");
         step(40, () -> watch(mc, 30, 5));
-        step(4, () -> server(mc, JetLanceItem::tryFire));
+        step(4, () -> server(mc, JetCannonItem::tryFire));
         at += 42;
-        shot("other-lance-firing-front");
+        shot("other-cannon-firing-front");
         at += 26;
         step(2, () -> watch(mc, -70, 3.2));
         for (int[] cue : new int[][]{{20, 1}, {22, 2}, {26, 3}, {30, 4}, {22, 5}}) {
             at += cue[0];
-            shot("other-lance-reload-" + cue[1]);
+            shot("other-cannon-reload-" + cue[1]);
         }
         at += 45;
 
@@ -634,22 +634,22 @@ public final class ArsenalReview {
         step(2, () -> mc.options.keyAttack.setDown(true));
         step(2, () -> mc.options.keyAttack.setDown(false));
         at += 12;
-        shot("self-lance-charging");
+        shot("self-cannon-charging");
         at += 15;
-        shot("self-lance-firing-lit");
+        shot("self-cannon-firing-lit");
         at += 12;
-        shot("self-lance-firing");
-        step(40, () -> { local(mc, JetLanceItem::tryFire); mc.options.setCameraType(CameraType.THIRD_PERSON_BACK); });
+        shot("self-cannon-firing");
+        step(40, () -> { local(mc, JetCannonItem::tryFire); mc.options.setCameraType(CameraType.THIRD_PERSON_BACK); });
         at += 42;
-        shot("self-lance-firing-third-back");
-        step(40, () -> { local(mc, JetLanceItem::tryFire); mc.options.setCameraType(CameraType.THIRD_PERSON_FRONT); });
+        shot("self-cannon-firing-third-back");
+        step(40, () -> { local(mc, JetCannonItem::tryFire); mc.options.setCameraType(CameraType.THIRD_PERSON_FRONT); });
         at += 42;
-        shot("self-lance-firing-third-front");
-        step(40, () -> { local(mc, JetLanceItem::tryFire); mc.options.setCameraType(CameraType.FIRST_PERSON); });
+        shot("self-cannon-firing-third-front");
+        step(40, () -> { local(mc, JetCannonItem::tryFire); mc.options.setCameraType(CameraType.FIRST_PERSON); });
         at += 70;
         for (int[] cue : new int[][]{{20, 1}, {22, 2}, {26, 3}, {30, 4}, {22, 5}}) {
             at += cue[0];
-            shot("self-lance-reload-" + cue[1]);
+            shot("self-cannon-reload-" + cue[1]);
         }
         at += 45;
 
@@ -660,7 +660,7 @@ public final class ArsenalReview {
         shot("self-left-handed-quench");
         step(2, () -> selectSlot(mc, 3));
         at += 26;
-        shot("self-left-handed-lance");
+        shot("self-left-handed-cannon");
         step(2, () -> { mc.options.mainHand().set(HumanoidArm.RIGHT); mc.options.broadcastOptions(); });
 
         // Bit drones and the Module Integrator, seen as another player.
@@ -683,7 +683,7 @@ public final class ArsenalReview {
             level.setBlock(at, ModuleContent.INTEGRATOR.get().defaultBlockState(), 3);
             var entity = (IntegratorBlockEntity) level.getBlockEntity(at);
             entity.energy().receiveEnergy(400_000, false);
-            entity.items().setStackInSlot(0, charged(ArsenalItems.JET_LANCE.get()));
+            entity.items().setStackInSlot(0, charged(ArsenalItems.JET_CANNON.get()));
             entity.items().setStackInSlot(1, new ItemStack(ModuleContent.MODULES.get(ModuleType.MELTDOWN).get()));
             entity.items().setStackInSlot(2, new ItemStack(ModuleContent.MODULES.get(ModuleType.AMPLIFIER).get()));
             p.connection.teleport(3.5, 81, 0.6, 0, 18);
@@ -715,7 +715,7 @@ public final class ArsenalReview {
             cannon.set(ArsenalData.TERRAIN_MODE.get(), 1);
         }));
         step(2, () -> teleport(mc, OX + 18, 36, 90, 2));
-        step(20, () -> server(mc, JetLanceItem::tryFire));
+        step(20, () -> server(mc, JetCannonItem::tryFire));
         at += 30;
         shot("meltdown-1");
         at += 3;

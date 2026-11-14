@@ -50,13 +50,13 @@ final class Terrain {
     static Vec3 drill(ServerPlayer player, ServerLevel level, Vec3 from, Vec3 direction, double range) {
         BlockHitResult first = level.clip(new ClipContext(from, from.add(direction.scale(range)), ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, player));
         if (first.getType() != HitResult.Type.BLOCK) return null;
-        int reach = Mth.ceil(Rules.LANCE_BORE_RADIUS);
-        double limit = Rules.LANCE_BORE_RADIUS * Rules.LANCE_BORE_RADIUS;
+        int reach = Mth.ceil(Rules.CANNON_BORE_RADIUS);
+        double limit = Rules.CANNON_BORE_RADIUS * Rules.CANNON_BORE_RADIUS;
         Set<BlockPos> tried = new HashSet<>();
         Vec3 deepest = null;
         BlockPos previous = null;
         double surface = from.distanceTo(first.getLocation());
-        double end = Math.min(range, surface + Rules.LANCE_BORE_DEPTH);
+        double end = Math.min(range, surface + Rules.CANNON_BORE_DEPTH);
         for (double distance = surface + 0.05; distance <= end; distance += 0.5) {
             Vec3 point = from.add(direction.scale(distance));
             BlockPos center = BlockPos.containing(point);

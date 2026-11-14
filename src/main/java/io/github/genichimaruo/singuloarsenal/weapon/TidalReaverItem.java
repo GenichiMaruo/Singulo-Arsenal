@@ -69,7 +69,7 @@ public final class TidalReaverItem extends PoweredSword {
         int held = Rules.REAVER_MAX_HOLD - remaining;
         if (held > 0 && held % 10 == 0 && !Fe.spend(stack, Rules.REAVER_FE_PER_10_TICKS)) {
             player.stopUsingItem();
-            player.getCooldowns().addCooldown(this, Rules.LANCE_SHORT_COOLDOWN);
+            player.getCooldowns().addCooldown(this, Rules.CANNON_SHORT_COOLDOWN);
             return;
         }
         if (held % 2 == 0) pull(player);
@@ -92,7 +92,7 @@ public final class TidalReaverItem extends PoweredSword {
         stack.remove(ArsenalData.FOCUS_START.get());
         if (level instanceof ServerLevel server && entity instanceof Player player) {
             if (Rules.REAVER_MAX_HOLD - remaining >= Rules.REAVER_MIN_HOLD) shear(player, server);
-            else player.getCooldowns().addCooldown(this, Rules.LANCE_SHORT_COOLDOWN);
+            else player.getCooldowns().addCooldown(this, Rules.CANNON_SHORT_COOLDOWN);
         }
     }
 

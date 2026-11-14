@@ -15,7 +15,7 @@ public final class Rules {
     public static final int QUENCH_CAPACITY = 240_000;
     public static final int CASIMIR_CAPACITY = 1_000_000;
     public static final int REAVER_CAPACITY = 8_000_000;
-    public static final int LANCE_CAPACITY = 16_000_000;
+    public static final int CANNON_CAPACITY = 16_000_000;
 
     /** A sneak-use on a power source requests one eighth of the tank, so large tanks do not take hundreds of clicks. */
     public static int chargeRequest(int capacity) {
@@ -206,37 +206,37 @@ public final class Rules {
         return 1 - ramp(age, 0, ticks);
     }
 
-    // ---- Bipolar jet lance -------------------------------------------------------------------------------------
+    // ---- Accretion jet cannon -------------------------------------------------------------------------------------
 
     /** How long one shot burns. The jet is at full length from its first tick. */
-    public static final int LANCE_SHOT_TICKS = 40;
-    public static final int LANCE_SHOT_GAP = 6;
-    public static final int LANCE_MAGAZINE = 4;
-    public static final int LANCE_PULSE = 5;
-    public static final float LANCE_DAMAGE = 14;
-    public static final float LANCE_ARMOR_KEPT = 0.4F;
-    public static final double LANCE_RANGE = 80;
+    public static final int CANNON_SHOT_TICKS = 40;
+    public static final int CANNON_SHOT_GAP = 6;
+    public static final int CANNON_MAGAZINE = 4;
+    public static final int CANNON_PULSE = 5;
+    public static final float CANNON_DAMAGE = 14;
+    public static final float CANNON_ARMOR_KEPT = 0.4F;
+    public static final double CANNON_RANGE = 80;
     /** Added to target hitboxes along the beam, so what looks hit is hit. */
-    public static final double LANCE_HIT_WIDTH = 0.45;
-    public static final int LANCE_SHOT_FE = 1_000_000;
-    public static final int LANCE_COOLDOWN = 160;
-    public static final int LANCE_SHORT_COOLDOWN = 20;
+    public static final double CANNON_HIT_WIDTH = 0.45;
+    public static final int CANNON_SHOT_FE = 1_000_000;
+    public static final int CANNON_COOLDOWN = 160;
+    public static final int CANNON_SHORT_COOLDOWN = 20;
     /** How far past the first surface the shot can drill in breaking mode; the meltdown goes off where it gives out. */
-    public static final double LANCE_BORE_DEPTH = 20;
+    public static final double CANNON_BORE_DEPTH = 20;
     /** Half-width of the tunnel the shot drills in breaking mode. */
-    public static final double LANCE_BORE_RADIUS = 1.75;
+    public static final double CANNON_BORE_RADIUS = 1.75;
     /** The rings spool up for this long before the shot goes off. */
-    public static final int LANCE_CHARGE_TICKS = 28;
+    public static final int CANNON_CHARGE_TICKS = 28;
     /** Singulo's beam charge at its own low pitch. It runs longer than the spool-up and is cut off the instant the shot goes off. */
-    public static final float LANCE_CHARGE_PITCH = 1F;
+    public static final float CANNON_CHARGE_PITCH = 1F;
     /** The Jet Forge's coil-and-drone spool under it, for weight. Slowed so its burst falls after the shot has already cut it off. */
-    public static final float LANCE_CHARGE_BODY_PITCH = 0.8F;
-    public static final float LANCE_BLAST_DAMAGE = 60;
-    public static final double LANCE_BLAST_RADIUS = 7;
-    public static final double LANCE_BLAST_RADIUS_PER_EXTRA = 1.5;
+    public static final float CANNON_CHARGE_BODY_PITCH = 0.8F;
+    public static final float CANNON_BLAST_DAMAGE = 60;
+    public static final double CANNON_BLAST_RADIUS = 7;
+    public static final double CANNON_BLAST_RADIUS_PER_EXTRA = 1.5;
 
     public static double blastRadius(int modules) {
-        return LANCE_BLAST_RADIUS + LANCE_BLAST_RADIUS_PER_EXTRA * Math.max(0, modules - 1);
+        return CANNON_BLAST_RADIUS + CANNON_BLAST_RADIUS_PER_EXTRA * Math.max(0, modules - 1);
     }
 
     /** Full damage at the centre, 40% at the edge. */
@@ -320,22 +320,22 @@ public final class Rules {
     }
 
     /** The one kick of a shot going off: 1 as it fires, gone within half a second. */
-    public static float lanceKick(float age) {
+    public static float cannonKick(float age) {
         if (age < 0 || age >= 10) return 0;
         float left = 1 - age / 10;
         return left * left;
     }
 
     /** The jet flashes wide as it lights, settles within a few ticks, and pinches off over the last few. */
-    public static float lanceRadius(float age) {
+    public static float cannonRadius(float age) {
         if (age < 0) return 0;
         float settle = Math.min(1, age / 4);
-        float tail = Math.max(0, Math.min(1, (LANCE_SHOT_TICKS - age) / 8));
+        float tail = Math.max(0, Math.min(1, (CANNON_SHOT_TICKS - age) / 8));
         return (0.8F + (0.44F - 0.8F) * settle) * tail;
     }
 
     /** 0 for a broad turbulent jet, 1 for a tight white beam. */
-    public static float lanceFocus(float age) {
+    public static float cannonFocus(float age) {
         return Math.max(0, Math.min(1, age / 3));
     }
 

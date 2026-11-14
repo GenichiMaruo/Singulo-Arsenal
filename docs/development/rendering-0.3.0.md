@@ -5,12 +5,11 @@
 The development branch targets Minecraft 1.21.1 / NeoForge 21.1.256 / Java 21
 with the released Singulo 0.18.0. It is not a merged or published release.
 
-- The display name is **Accretion Jet Cannon**. It already had this name in
-  0.2.2; a regression assertion now protects it. The historical `jet_lance`
-  registry ID is intentionally unchanged so existing worlds retain items.
-  The released 0.2.2 JAR and an English 0.3.0 client both show this text.
-  The user's request for a more suitable name is not resolved by that check;
-  no replacement display name has been chosen in this branch.
+- The display name remains **Accretion Jet Cannon** / **降着ジェット砲**.
+  The internal item ID is now `singulo_arsenal:jet_cannon`, implemented by
+  `JetCannonItem` / `ArsenalItems.JET_CANNON`. The old `jet_lance` ID resolves
+  to the same item through NeoForge's registry alias. No balance or component
+  schema was changed. See [migration details](cannon-migration-0.3.0.md).
 - Only a main-hand cannon gets the two-handed first-person pose. A main-hand
   cannon suppresses the OFF_HAND render pass, for both dominant-arm settings.
   This does not remove the item, change its functionality, or hide third-person

@@ -37,12 +37,12 @@ import net.minecraft.world.phys.Vec3;
  * A shouldered gun built around a contained black hole. A magnetic mirror seals the rear pole, so the whole jet leaves through the
  * barrel. One click spools the rings, then the jet goes off once at full length and burns for two seconds. A magazine holds four shots.
  */
-public final class JetLanceItem extends Item implements ArsenalWeapon {
-    public JetLanceItem() {
+public final class JetCannonItem extends Item implements ArsenalWeapon {
+    public JetCannonItem() {
         super(new Properties().stacksTo(1).rarity(Rarity.EPIC).fireResistant());
     }
 
-    @Override public int capacity() { return Rules.LANCE_CAPACITY; }
+    @Override public int capacity() { return Rules.CANNON_CAPACITY; }
     @Override public boolean accretes() { return true; }
     @Override public int stage() { return 5; }
     @Override public InteractionResult useOn(UseOnContext context) { return Fe.chargeFromBlock(context); }
@@ -56,7 +56,7 @@ public final class JetLanceItem extends Item implements ArsenalWeapon {
     }
 
     public static int shotsLeft(ItemStack stack) {
-        return Math.max(0, Rules.LANCE_MAGAZINE - ArsenalData.get(stack, ArsenalData.SHOTS));
+        return Math.max(0, Rules.CANNON_MAGAZINE - ArsenalData.get(stack, ArsenalData.SHOTS));
     }
 
     /** Right click switches between sparing and melting the terrain. */
@@ -76,32 +76,32 @@ public final class JetLanceItem extends Item implements ArsenalWeapon {
     /** Spool-up from 0 to 1, or -1 when the gun is not charging. */
     public static float chargeProgress(ItemStack stack, long now, float partial) {
         long remaining = ArsenalData.time(stack, ArsenalData.CHARGE_UNTIL) - now;
-        return remaining <= 0 || remaining > Rules.LANCE_CHARGE_TICKS ? -1 : 1 - (remaining - partial) / Rules.LANCE_CHARGE_TICKS;
+        return remaining <= 0 || remaining > Rules.CANNON_CHARGE_TICKS ? -1 : 1 - (remaining - partial) / Rules.CANNON_CHARGE_TICKS;
     }
 
     /** Ticks since this shot was lit, including the frame fraction, or -1 when the jet is off. */
     public static float jetAge(ItemStack stack, long now, float partial) {
         long remaining = ArsenalData.time(stack, ArsenalData.JET_UNTIL) - now;
-        return remaining <= 0 || remaining > Rules.LANCE_SHOT_TICKS ? -1 : Rules.LANCE_SHOT_TICKS - remaining + partial;
+        return remaining <= 0 || remaining > Rules.CANNON_SHOT_TICKS ? -1 : Rules.CANNON_SHOT_TICKS - remaining + partial;
     }
 
     /** Whether the gun could start a shot right now. Run on the client as well, to avoid sending clicks the server would refuse. */
     public static boolean ready(ItemStack stack, long now) {
-        return shotsLeft(stack) > 0 && now >= ArsenalData.time(stack, ArsenalData.JET_UNTIL) + Rules.LANCE_SHOT_GAP
+        return shotsLeft(stack) > 0 && now >= ArsenalData.time(stack, ArsenalData.JET_UNTIL) + Rules.CANNON_SHOT_GAP
                 && ArsenalData.time(stack, ArsenalData.CHARGE_UNTIL) <= now && Weapons.reloadProgress(stack, now, 0) < 0;
     }
 
     /** The left-click packet lands here and starts the spool-up. It carries no values; everything is decided from server state. */
     public static boolean tryFire(ServerPlayer player) {
         ItemStack stack = player.getMainHandItem();
-        if (!(stack.getItem() instanceof JetLanceItem item) || !player.isAlive() || player.isSpectator()) return false;
+        if (!(stack.getItem() instanceof JetCannonItem item) || !player.isAlive() || player.isSpectator()) return false;
         long now = player.serverLevel().getGameTime();
         if (!ready(stack, now) || player.getCooldowns().isOnCooldown(item)) return false;
-        if (Fe.stored(stack) < Rules.LANCE_SHOT_FE) {
+        if (Fe.stored(stack) < Rules.CANNON_SHOT_FE) {
             player.displayClientMessage(Component.translatable("message.singulo_arsenal.no_energy"), true);
             return false;
         }
-        stack.set(ArsenalData.CHARGE_UNTIL.get(), now + Rules.LANCE_CHARGE_TICKS);
+        stack.set(ArsenalData.CHARGE_UNTIL.get(), now + Rules.CANNON_CHARGE_TICKS);
         return true;
     }
 
@@ -135,8 +135,8 @@ public final class JetLanceItem extends Item implements ArsenalWeapon {
             finish(stack, player, level);
             return;
         }
-        if (age > 0 && (int) age % Rules.LANCE_PULSE == 0) pulse(player, level);
-        if ((int) age == Rules.LANCE_SHOT_TICKS - 1) finish(stack, player, level);
+        if (age > 0 && (int) age % Rules.CANNON_PULSE == 0) pulse(player, level);
+        if ((int) age == Rules.CANNON_SHOT_TICKS - 1) finish(stack, player, level);
     }
 
     /**
@@ -144,13 +144,13 @@ public final class JetLanceItem extends Item implements ArsenalWeapon {
      * far end of what is in front of it; a meltdown goes up at the deepest point it reached. The two seconds of burn that follow only burn.
      */
     private static void ignite(ItemStack stack, ServerPlayer player, ServerLevel level) {
-        if (!Fe.spend(stack, Rules.LANCE_SHOT_FE)) {
+        if (!Fe.spend(stack, Rules.CANNON_SHOT_FE)) {
             player.displayClientMessage(Component.translatable("message.singulo_arsenal.no_energy"), true);
             return;
         }
-        stack.set(ArsenalData.JET_UNTIL.get(), level.getGameTime() + Rules.LANCE_SHOT_TICKS);
+        stack.set(ArsenalData.JET_UNTIL.get(), level.getGameTime() + Rules.CANNON_SHOT_TICKS);
         stack.set(ArsenalData.SHOTS.get(), ArsenalData.get(stack, ArsenalData.SHOTS) + 1);
-        Vec3 deepest = breaksTerrain(stack) ? Terrain.drill(player, level, player.getEyePosition(), player.getLookAngle().normalize(), Rules.LANCE_RANGE) : null;
+        Vec3 deepest = breaksTerrain(stack) ? Terrain.drill(player, level, player.getEyePosition(), player.getLookAngle().normalize(), Rules.CANNON_RANGE) : null;
         Vec3 contact = pulse(player, level);
         boom(level, player.position());
         Vec3 impact = deepest != null ? deepest : contact;
@@ -166,8 +166,8 @@ public final class JetLanceItem extends Item implements ArsenalWeapon {
     }
 
     private static void finish(ItemStack stack, ServerPlayer player, ServerLevel level) {
-        if (ArsenalData.get(stack, ArsenalData.SHOTS) < Rules.LANCE_MAGAZINE) return;
-        int ticks = Weapons.cooled(stack, Rules.LANCE_COOLDOWN);
+        if (ArsenalData.get(stack, ArsenalData.SHOTS) < Rules.CANNON_MAGAZINE) return;
+        int ticks = Weapons.cooled(stack, Rules.CANNON_COOLDOWN);
         stack.remove(ArsenalData.SHOTS.get());
         player.getCooldowns().addCooldown(stack.getItem(), ticks);
         Weapons.beginReload(stack, level.getGameTime(), ticks);
@@ -179,8 +179,8 @@ public final class JetLanceItem extends Item implements ArsenalWeapon {
         float progress = Weapons.reloadProgress(stack, level.getGameTime(), 0);
         if (progress < 0) return;
         // Cues are placed on the base 160-tick timeline. A coolant module shortens the run, so ticks can skip over a cue.
-        int tick = Math.round(progress * Rules.LANCE_COOLDOWN);
-        int previous = Math.round(Math.max(0, Weapons.reloadProgress(stack, level.getGameTime() - 1, 0)) * Rules.LANCE_COOLDOWN);
+        int tick = Math.round(progress * Rules.CANNON_COOLDOWN);
+        int previous = Math.round(Math.max(0, Weapons.reloadProgress(stack, level.getGameTime() - 1, 0)) * Rules.CANNON_COOLDOWN);
         if (crossed(previous, tick, 8)) Weapons.sound(player, "sealed_container.vent", 0.9F, 1.1F);
         else if (crossed(previous, tick, 34)) Weapons.sound(player, "drone_port.hatch_open", 0.9F, 1.5F);
         else if (crossed(previous, tick, 92)) Weapons.sound(player, "sealed_container.insert", 1, 0.9F);
@@ -198,12 +198,12 @@ public final class JetLanceItem extends Item implements ArsenalWeapon {
         ItemStack stack = player.getMainHandItem();
         Vec3 eye = player.getEyePosition();
         Vec3 look = player.getLookAngle().normalize();
-        BlockHitResult block = level.clip(new ClipContext(eye, eye.add(look.scale(Rules.LANCE_RANGE)), ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, player));
+        BlockHitResult block = level.clip(new ClipContext(eye, eye.add(look.scale(Rules.CANNON_RANGE)), ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, player));
         Vec3 end = block.getLocation();
         var source = ArsenalDamage.source(level, ArsenalDamage.JET, player);
-        float damage = Weapons.amplified(stack, Rules.LANCE_DAMAGE);
+        float damage = Weapons.amplified(stack, Rules.CANNON_DAMAGE);
         Vec3 contact = block.getType() == HitResult.Type.MISS ? null : end;
-        for (LivingEntity target : ArsenalDamage.along(player, eye, end, Rules.LANCE_HIT_WIDTH)) {
+        for (LivingEntity target : ArsenalDamage.along(player, eye, end, Rules.CANNON_HIT_WIDTH)) {
             Vec3 touched = touchPoint(target, eye, end);
             if (contact == null || eye.distanceToSqr(touched) < eye.distanceToSqr(contact)) contact = touched;
             burn(target, source, damage);
@@ -212,7 +212,7 @@ public final class JetLanceItem extends Item implements ArsenalWeapon {
     }
 
     private static Vec3 touchPoint(LivingEntity target, Vec3 from, Vec3 to) {
-        AABB bounds = target.getBoundingBox().inflate(Rules.LANCE_HIT_WIDTH);
+        AABB bounds = target.getBoundingBox().inflate(Rules.CANNON_HIT_WIDTH);
         return bounds.contains(from) ? from : bounds.clip(from, to).orElse(target.getBoundingBox().getCenter());
     }
 
@@ -220,7 +220,7 @@ public final class JetLanceItem extends Item implements ArsenalWeapon {
     private static void detonate(ItemStack stack, ServerPlayer player, ServerLevel level, Vec3 at, int modules) {
         double radius = Rules.blastRadius(modules);
         var source = ArsenalDamage.source(level, ArsenalDamage.JET, player);
-        float damage = Weapons.amplified(stack, Rules.LANCE_BLAST_DAMAGE);
+        float damage = Weapons.amplified(stack, Rules.CANNON_BLAST_DAMAGE);
         for (LivingEntity target : ArsenalDamage.around(player, at, radius)) {
             double distance = Math.sqrt(target.getBoundingBox().distanceToSqr(at));
             if (target.hurt(source, damage * Rules.blastFalloff(distance, radius))) target.setRemainingFireTicks(Math.max(target.getRemainingFireTicks(), 100));

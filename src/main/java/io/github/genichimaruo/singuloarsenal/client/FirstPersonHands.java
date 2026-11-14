@@ -30,7 +30,7 @@ final class FirstPersonHands {
     private FirstPersonHands() {}
 
     /** Both hands: the firing hand on the pistol grip, the support hand on the fore grip or wherever the reload has taken it. */
-    static void drawLance(Player owner, PoseStack art, MultiBufferSource buffers, int light, ItemDisplayContext context, float reload) {
+    static void drawCannon(Player owner, PoseStack art, MultiBufferSource buffers, int light, ItemDisplayContext context, float reload) {
         if (!visible(owner, context)) return;
         boolean right = context == ItemDisplayContext.FIRST_PERSON_RIGHT_HAND;
         AbstractClientPlayer player = (AbstractClientPlayer) owner;

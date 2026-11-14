@@ -11,7 +11,7 @@ import io.github.genichimaruo.singuloarsenal.module.IntegratorBlockEntity;
 import io.github.genichimaruo.singuloarsenal.module.ModuleContent;
 import io.github.genichimaruo.singuloarsenal.module.ModuleType;
 import io.github.genichimaruo.singuloarsenal.module.Modules;
-import io.github.genichimaruo.singuloarsenal.weapon.JetLanceItem;
+import io.github.genichimaruo.singuloarsenal.weapon.JetCannonItem;
 import io.github.genichimaruo.singuloarsenal.weapon.TidalReaverItem;
 import io.github.genichimaruo.singuloarsenal.weapon.Weapons;
 import java.util.List;
@@ -477,22 +477,22 @@ public final class ArsenalGameTests {
     }
 
     @GameTest(template = ARENA)
-    public static void lanceFiresForwardOnlyAndStopsAtWalls(GameTestHelper h) {
+    public static void cannonFiresForwardOnlyAndStopsAtWalls(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 2.5);
-        hold(p, new ItemStack(ArsenalItems.JET_LANCE.get()));
+        hold(p, new ItemStack(ArsenalItems.JET_CANNON.get()));
         p.setYRot(0);
         p.setXRot(0);
         Zombie front = target(h, 2.5, 4.2);
         Zombie rear = target(h, 2.5, 1);
-        JetLanceItem.pulse(p, h.getLevel());
-        near(h, 100 - front.getHealth(), Rules.LANCE_DAMAGE, "jet");
+        JetCannonItem.pulse(p, h.getLevel());
+        near(h, 100 - front.getHealth(), Rules.CANNON_DAMAGE, "jet");
         h.assertTrue(rear.getHealth() == 100, "the rear pole is sealed: nothing behind the wielder may be hurt");
-        JetLanceItem.pulse(p, h.getLevel());
-        near(h, 100 - front.getHealth(), Rules.LANCE_DAMAGE * 2, "pulses must not be blocked by hurt cooldown");
+        JetCannonItem.pulse(p, h.getLevel());
+        near(h, 100 - front.getHealth(), Rules.CANNON_DAMAGE * 2, "pulses must not be blocked by hurt cooldown");
         h.setBlock(2, 3, 3, Blocks.IRON_BLOCK);
         h.setBlock(2, 2, 3, Blocks.IRON_BLOCK);
         float before = front.getHealth();
-        JetLanceItem.pulse(p, h.getLevel());
+        JetCannonItem.pulse(p, h.getLevel());
         h.assertTrue(front.getHealth() == before, "jet passed through a wall");
         h.succeed();
     }
@@ -500,73 +500,73 @@ public final class ArsenalGameTests {
     @GameTest(template = ARENA)
     public static void cannonHitsTargetsContainingTheRayOrigin(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 2.5);
-        hold(p, new ItemStack(ArsenalItems.JET_LANCE.get()));
+        hold(p, new ItemStack(ArsenalItems.JET_CANNON.get()));
         Zombie mob = target(h, 2.5, 3.0);
-        h.assertTrue(mob.getBoundingBox().inflate(Rules.LANCE_HIT_WIDTH).contains(p.getEyePosition()), "target must contain the ray origin");
-        JetLanceItem.pulse(p, h.getLevel());
-        near(h, 100 - mob.getHealth(), Rules.LANCE_DAMAGE, "point-blank cannon shot missed");
+        h.assertTrue(mob.getBoundingBox().inflate(Rules.CANNON_HIT_WIDTH).contains(p.getEyePosition()), "target must contain the ray origin");
+        JetCannonItem.pulse(p, h.getLevel());
+        near(h, 100 - mob.getHealth(), Rules.CANNON_DAMAGE, "point-blank cannon shot missed");
         h.succeed();
     }
 
     @GameTest(template = ARENA)
-    public static void lanceNeverHurtsTheWielder(GameTestHelper h) {
+    public static void cannonNeverHurtsTheWielder(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 4.5);
-        hold(p, new ItemStack(ArsenalItems.JET_LANCE.get()));
-        JetLanceItem.pulse(p, h.getLevel());
+        hold(p, new ItemStack(ArsenalItems.JET_CANNON.get()));
+        JetCannonItem.pulse(p, h.getLevel());
         h.assertTrue(p.getHealth() == p.getMaxHealth(), "self-damage");
         h.succeed();
     }
 
     /** Skips the spool-up: the shot goes off on this call. */
     private static void ignite(GameTestHelper h, ServerPlayer p, ItemStack cannon) {
-        h.assertTrue(JetLanceItem.tryFire(p), "the shot was refused");
+        h.assertTrue(JetCannonItem.tryFire(p), "the shot was refused");
         cannon.set(ArsenalData.CHARGE_UNTIL.get(), h.getLevel().getGameTime());
-        JetLanceItem.tickShot(cannon, p, h.getLevel());
+        JetCannonItem.tickShot(cannon, p, h.getLevel());
     }
 
     /** Runs one whole shot on a level whose clock the test does not control. */
     private static void completeShot(GameTestHelper h, ServerPlayer p, ItemStack cannon) {
-        cannon.set(ArsenalData.JET_UNTIL.get(), h.getLevel().getGameTime() - Rules.LANCE_SHOT_GAP);
+        cannon.set(ArsenalData.JET_UNTIL.get(), h.getLevel().getGameTime() - Rules.CANNON_SHOT_GAP);
         ignite(h, p, cannon);
         cannon.set(ArsenalData.JET_UNTIL.get(), h.getLevel().getGameTime() + 1);
-        JetLanceItem.tickShot(cannon, p, h.getLevel());
+        JetCannonItem.tickShot(cannon, p, h.getLevel());
     }
 
     @GameTest(template = ARENA)
     public static void cannonFiresAMagazineThenReloads(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 2.5);
-        ItemStack cannon = hold(p, new ItemStack(ArsenalItems.JET_LANCE.get()));
-        h.assertTrue(JetLanceItem.tryFire(p), "first shot");
-        h.assertTrue(JetLanceItem.jetAge(cannon, h.getLevel().getGameTime(), 0) < 0, "the jet must wait for the spool-up");
-        h.assertTrue(JetLanceItem.chargeProgress(cannon, h.getLevel().getGameTime(), 0) == 0, "the spool-up must start");
-        h.assertTrue(!JetLanceItem.tryFire(p), "started a second charge over the first");
-        h.assertTrue(Fe.stored(cannon) == Rules.LANCE_CAPACITY, "paid before the shot went off");
+        ItemStack cannon = hold(p, new ItemStack(ArsenalItems.JET_CANNON.get()));
+        h.assertTrue(JetCannonItem.tryFire(p), "first shot");
+        h.assertTrue(JetCannonItem.jetAge(cannon, h.getLevel().getGameTime(), 0) < 0, "the jet must wait for the spool-up");
+        h.assertTrue(JetCannonItem.chargeProgress(cannon, h.getLevel().getGameTime(), 0) == 0, "the spool-up must start");
+        h.assertTrue(!JetCannonItem.tryFire(p), "started a second charge over the first");
+        h.assertTrue(Fe.stored(cannon) == Rules.CANNON_CAPACITY, "paid before the shot went off");
         cannon.set(ArsenalData.CHARGE_UNTIL.get(), h.getLevel().getGameTime());
-        JetLanceItem.tickShot(cannon, p, h.getLevel());
-        h.assertTrue(JetLanceItem.jetAge(cannon, h.getLevel().getGameTime(), 0) == 0, "the jet must be lit at the end of the spool-up");
-        h.assertTrue(Fe.stored(cannon) == Rules.LANCE_CAPACITY - Rules.LANCE_SHOT_FE, "shot cost");
+        JetCannonItem.tickShot(cannon, p, h.getLevel());
+        h.assertTrue(JetCannonItem.jetAge(cannon, h.getLevel().getGameTime(), 0) == 0, "the jet must be lit at the end of the spool-up");
+        h.assertTrue(Fe.stored(cannon) == Rules.CANNON_CAPACITY - Rules.CANNON_SHOT_FE, "shot cost");
         cannon.remove(ArsenalData.SHOTS.get());
-        for (int i = 0; i < Rules.LANCE_MAGAZINE; i++) {
-            h.assertTrue(JetLanceItem.shotsLeft(cannon) == Rules.LANCE_MAGAZINE - i, "magazine count");
+        for (int i = 0; i < Rules.CANNON_MAGAZINE; i++) {
+            h.assertTrue(JetCannonItem.shotsLeft(cannon) == Rules.CANNON_MAGAZINE - i, "magazine count");
             completeShot(h, p, cannon);
         }
         h.assertTrue(Weapons.reloadProgress(cannon, h.getLevel().getGameTime(), 0) >= 0, "an empty magazine must reload");
-        h.assertTrue(JetLanceItem.shotsLeft(cannon) == Rules.LANCE_MAGAZINE, "the magazine was not refilled");
+        h.assertTrue(JetCannonItem.shotsLeft(cannon) == Rules.CANNON_MAGAZINE, "the magazine was not refilled");
         cannon.set(ArsenalData.JET_UNTIL.get(), 0L);
-        h.assertTrue(!JetLanceItem.tryFire(p), "fired during the reload");
+        h.assertTrue(!JetCannonItem.tryFire(p), "fired during the reload");
         h.succeed();
     }
 
     @GameTest(template = ARENA)
     public static void switchingAwayCannotSkipAnEmptyMagazinesReload(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 2.5);
-        ItemStack cannon = hold(p, new ItemStack(ArsenalItems.JET_LANCE.get()));
-        cannon.set(ArsenalData.SHOTS.get(), Rules.LANCE_MAGAZINE - 1);
+        ItemStack cannon = hold(p, new ItemStack(ArsenalItems.JET_CANNON.get()));
+        cannon.set(ArsenalData.SHOTS.get(), Rules.CANNON_MAGAZINE - 1);
         ignite(h, p, cannon);
         p.setItemSlot(EquipmentSlot.MAINHAND, ItemStack.EMPTY);
         cannon.getItem().inventoryTick(cannon, h.getLevel(), p, 1, false);
         p.setItemSlot(EquipmentSlot.MAINHAND, cannon);
-        h.assertTrue(!JetLanceItem.tryFire(p), "switching away allowed a fifth shot without reloading");
+        h.assertTrue(!JetCannonItem.tryFire(p), "switching away allowed a fifth shot without reloading");
         h.assertTrue(Weapons.reloadProgress(cannon, h.getLevel().getGameTime(), 0) >= 0, "putting an empty cannon away must start its reload");
         h.succeed();
     }
@@ -574,11 +574,11 @@ public final class ArsenalGameTests {
     @GameTest(template = ARENA)
     public static void expiredShotsStillReloadAnEmptyMagazine(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 2.5);
-        ItemStack cannon = hold(p, new ItemStack(ArsenalItems.JET_LANCE.get()));
-        cannon.set(ArsenalData.SHOTS.get(), Rules.LANCE_MAGAZINE);
-        cannon.set(ArsenalData.JET_UNTIL.get(), h.getLevel().getGameTime() - Rules.LANCE_SHOT_GAP);
-        h.assertTrue(!JetLanceItem.tryFire(p), "an expired fourth shot allowed a fifth shot");
-        JetLanceItem.tickShot(cannon, p, h.getLevel());
+        ItemStack cannon = hold(p, new ItemStack(ArsenalItems.JET_CANNON.get()));
+        cannon.set(ArsenalData.SHOTS.get(), Rules.CANNON_MAGAZINE);
+        cannon.set(ArsenalData.JET_UNTIL.get(), h.getLevel().getGameTime() - Rules.CANNON_SHOT_GAP);
+        h.assertTrue(!JetCannonItem.tryFire(p), "an expired fourth shot allowed a fifth shot");
+        JetCannonItem.tickShot(cannon, p, h.getLevel());
         h.assertTrue(Weapons.reloadProgress(cannon, h.getLevel().getGameTime(), 0) >= 0, "missing the final shot tick must not skip the reload");
         h.succeed();
     }
@@ -586,7 +586,7 @@ public final class ArsenalGameTests {
     @GameTest(template = ARENA)
     public static void onlyTheFirstInstantOfAShotDrillsTerrain(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 0.5);
-        ItemStack cannon = hold(p, new ItemStack(ArsenalItems.JET_LANCE.get()));
+        ItemStack cannon = hold(p, new ItemStack(ArsenalItems.JET_CANNON.get()));
         var near = new net.minecraft.core.BlockPos(2, 2, 2);
         var far = new net.minecraft.core.BlockPos(2, 2, 4);
         var chest = new net.minecraft.core.BlockPos(3, 2, 3);
@@ -604,7 +604,7 @@ public final class ArsenalGameTests {
         h.assertBlockPresent(Blocks.AIR, far);
         h.assertBlockPresent(Blocks.CHEST, chest);
         h.setBlock(near, Blocks.STONE);
-        JetLanceItem.pulse(p, h.getLevel());
+        JetCannonItem.pulse(p, h.getLevel());
         h.assertBlockPresent(Blocks.STONE, near);
         h.succeed();
     }
@@ -627,11 +627,11 @@ public final class ArsenalGameTests {
     @GameTest(template = ARENA, batch = "drilling_alone")
     public static void drillingGivesOutAtItsDepth(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 0.5);
-        ItemStack cannon = hold(p, new ItemStack(ArsenalItems.JET_LANCE.get()));
+        ItemStack cannon = hold(p, new ItemStack(ArsenalItems.JET_CANNON.get()));
         cannon.set(ArsenalData.TERRAIN_MODE.get(), 1);
         p.setYRot(0);
         p.setXRot(0);
-        int depth = (int) Rules.LANCE_BORE_DEPTH;
+        int depth = (int) Rules.CANNON_BORE_DEPTH;
         var first = new net.minecraft.core.BlockPos(2, 2, 2);
         var inside = first.south(depth - 1);
         var beyond = first.south(depth + 4);
@@ -658,9 +658,9 @@ public final class ArsenalGameTests {
     @GameTest(template = ARENA)
     public static void meltdownGoesOffTheInstantTheShotLands(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 1.5);
-        ItemStack cannon = hold(p, new ItemStack(ArsenalItems.JET_LANCE.get()));
+        ItemStack cannon = hold(p, new ItemStack(ArsenalItems.JET_CANNON.get()));
         Modules.install(cannon, List.of(module(ModuleType.MELTDOWN)));
-        Fe.set(cannon, Rules.LANCE_CAPACITY);
+        Fe.set(cannon, Rules.CANNON_CAPACITY);
         p.setYRot(0);
         p.setXRot(0);
         h.setBlock(2, 2, 4, Blocks.STONE);
@@ -855,11 +855,11 @@ public final class ArsenalGameTests {
     @GameTest(template = ARENA)
     public static void cannonPulseUsesItsAmplifier(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 2.5);
-        ItemStack cannon = hold(p, new ItemStack(ArsenalItems.JET_LANCE.get()));
+        ItemStack cannon = hold(p, new ItemStack(ArsenalItems.JET_CANNON.get()));
         Modules.install(cannon, List.of(module(ModuleType.AMPLIFIER)));
         Zombie mob = target(h, 2.5, 4.5);
-        JetLanceItem.pulse(p, h.getLevel());
-        near(h, 100 - mob.getHealth(), Rules.LANCE_DAMAGE * Rules.amplified(1), "cannon amplification");
+        JetCannonItem.pulse(p, h.getLevel());
+        near(h, 100 - mob.getHealth(), Rules.CANNON_DAMAGE * Rules.amplified(1), "cannon amplification");
         h.succeed();
     }
 
@@ -1194,8 +1194,12 @@ public final class ArsenalGameTests {
         var recipes = h.getLevel().getRecipeManager();
         int found = 0;
         for (var entry : ArsenalItems.ITEMS.getEntries()) {
-            ResourceLocation id = entry.getId();
-            h.assertTrue(recipes.byKey(id).isPresent(), "recipe failed to load: " + id);
+            // Recipe/advancement identity is stable even though the cannon item ID migrated.
+            ResourceLocation id = entry == ArsenalItems.JET_CANNON ? SinguloArsenal.id("jet_lance") : entry.getId();
+            var recipe = recipes.byKey(id);
+            h.assertTrue(recipe.isPresent(), "recipe failed to load: " + id);
+            h.assertTrue(recipe.orElseThrow().value().getResultItem(h.getLevel().registryAccess()).is(entry.get()),
+                    "recipe result does not match registered item: " + id);
             found++;
         }
         h.assertTrue(found == 39, "unexpected item count " + found);

@@ -2,10 +2,10 @@
   "entries": [
     {
       "enum": "net/minecraft/client/model/HumanoidModel$ArmPose",
-      "name": "SINGULO_ARSENAL_LANCE_RELOAD",
+      "name": "SINGULO_ARSENAL_CANNON_RELOAD",
       "constructor": "(ZLnet/neoforged/neoforge/client/IArmPoseTransformer;)V",
       "parameters": {
-        "class": "io/github/genichimaruo/singuloarsenal/client/LanceReloadPose",
+        "class": "io/github/genichimaruo/singuloarsenal/client/CannonReloadPose",
         "field": "PARAMETERS"
       }
     }

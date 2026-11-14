@@ -10,13 +10,13 @@ import net.minecraft.world.entity.LivingEntity;
 import net.neoforged.fml.common.asm.enumextension.EnumProxy;
 import net.neoforged.neoforge.client.IArmPoseTransformer;
 
-/** The two-handed pose during a lance reload: the firing hand keeps the grip while the support hand goes down to the magazine and back. */
-public final class LanceReloadPose {
-    private static final IArmPoseTransformer TRANSFORM = LanceReloadPose::apply;
+/** The two-handed pose during a cannon reload: the firing hand keeps the grip while the support hand goes down to the magazine and back. */
+public final class CannonReloadPose {
+    private static final IArmPoseTransformer TRANSFORM = CannonReloadPose::apply;
     /** Referenced from {@code META-INF/enumextensions.json}, which adds this as a member of {@code HumanoidModel.ArmPose}. */
     public static final EnumProxy<HumanoidModel.ArmPose> PARAMETERS = new EnumProxy<>(HumanoidModel.ArmPose.class, true, TRANSFORM);
 
-    private LanceReloadPose() {}
+    private CannonReloadPose() {}
 
     private static void apply(HumanoidModel<?> model, LivingEntity entity, HumanoidArm arm) {
         boolean rightHanded = entity.getMainArm() == HumanoidArm.RIGHT;

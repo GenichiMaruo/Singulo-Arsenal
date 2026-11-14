@@ -10,7 +10,7 @@ import io.github.genichimaruo.singuloarsenal.tool.DegeneracyBreakerItem;
 import io.github.genichimaruo.singuloarsenal.tool.ShearSawItem;
 import io.github.genichimaruo.singuloarsenal.tool.SquidPickItem;
 import io.github.genichimaruo.singuloarsenal.weapon.CasimirBladeItem;
-import io.github.genichimaruo.singuloarsenal.weapon.JetLanceItem;
+import io.github.genichimaruo.singuloarsenal.weapon.JetCannonItem;
 import io.github.genichimaruo.singuloarsenal.weapon.QuenchSaberItem;
 import io.github.genichimaruo.singuloarsenal.weapon.TidalReaverItem;
 import java.util.ArrayList;
@@ -51,7 +51,7 @@ public final class ArsenalItems {
     public static final DeferredItem<QuenchSaberItem> QUENCH_SABER = ITEMS.register("quench_saber", QuenchSaberItem::new);
     public static final DeferredItem<CasimirBladeItem> CASIMIR_BLADE = ITEMS.register("casimir_blade", CasimirBladeItem::new);
     public static final DeferredItem<TidalReaverItem> TIDAL_REAVER = ITEMS.register("tidal_reaver", TidalReaverItem::new);
-    public static final DeferredItem<JetLanceItem> JET_LANCE = ITEMS.register("jet_lance", JetLanceItem::new);
+    public static final DeferredItem<JetCannonItem> JET_CANNON = ITEMS.register("jet_cannon", JetCannonItem::new);
 
     public static final DeferredItem<SquidPickItem> SQUID_PICK = ITEMS.register("squid_pick", SquidPickItem::new);
     public static final DeferredItem<DegeneracyBreakerItem> DEGENERACY_BREAKER = ITEMS.register("degeneracy_breaker", DegeneracyBreakerItem::new);
@@ -61,6 +61,10 @@ public final class ArsenalItems {
             ITEMS.register("pellet_canister", io.github.genichimaruo.singuloarsenal.core.PelletCanisterItem::new);
 
     static {
+        // The registry alias resolves legacy stacks and datapack item references to the same item.
+        // Components stay untouched; subsequent saves use the canonical jet_cannon ID.
+        ITEMS.addAlias(ResourceLocation.fromNamespaceAndPath(SinguloArsenal.MOD_ID, "jet_lance"),
+                ResourceLocation.fromNamespaceAndPath(SinguloArsenal.MOD_ID, "jet_cannon"));
         // The suit is drawn by SuitLayer, so the material has no texture layers. Its sound is silent because vanilla
         // replays the equip sound whenever a worn stack's components change, which here is every FE payment.
         Holder<net.minecraft.sounds.SoundEvent> silent = BuiltInRegistries.SOUND_EVENT.wrapAsHolder(SoundEvents.EMPTY);
@@ -92,7 +96,7 @@ public final class ArsenalItems {
                     output.accept(charged(QUENCH_SABER.get()));
                     output.accept(charged(CASIMIR_BLADE.get()));
                     output.accept(charged(TIDAL_REAVER.get()));
-                    output.accept(charged(JET_LANCE.get()));
+                    output.accept(charged(JET_CANNON.get()));
                     output.accept(charged(SQUID_PICK.get()));
                     output.accept(charged(DEGENERACY_BREAKER.get()));
                     output.accept(charged(SHEAR_SAW.get()));
