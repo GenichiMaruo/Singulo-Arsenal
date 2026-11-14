@@ -112,6 +112,16 @@ public final class ArsenalItems {
         }
     }
 
+    private static void remapMissing(net.minecraftforge.registries.MissingMappingsEvent event) {
+        // Snapshot remapping is separate from live lookup aliases in Forge 47.
+        // Preserve the old world's numeric item mapping rather than accepting a missing entry.
+        for (var mapping : event.getMappings(Registries.ITEM, SinguloArsenal.MOD_ID)) {
+            if (mapping.getKey().equals(SinguloArsenal.id("jet_lance"))) {
+                mapping.remap(JET_CANNON.get());
+            }
+        }
+    }
+
     private static ItemStack charged(Item item) {
         ItemStack stack = new ItemStack(item);
         Fe.set(stack, Fe.capacity(stack));
@@ -128,6 +138,7 @@ public final class ArsenalItems {
 
     public static void register(IEventBus bus) {
         ITEMS.register(bus);
+        net.minecraftforge.common.MinecraftForge.EVENT_BUS.addListener(ArsenalItems::remapMissing);
         bus.addListener(ArsenalItems::aliases);
         TABS.register(bus);
         net.minecraftforge.common.MinecraftForge.EVENT_BUS.addGenericListener(ItemStack.class, ArsenalItems::capabilities);

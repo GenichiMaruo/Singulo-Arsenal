@@ -19,3 +19,9 @@
 
 - Singulo 0.19.x 必須（[0.19.0,0.20.0)）。旧版と互換性未検証の将来minor版は対象外です。
 - 通常の耐久・修理・エンチャント・防具装飾に対応するニホニウムのツールと防具を追加。FEやモジュールを使わない通常装備です。
+
+## 1.20.1 datapack migration notice
+
+Old saved cannon stacks and registry snapshots are migrated with the official alias and MissingMappingsEvent. External item tags do not follow aliases on Forge/NeoForge 47: datapack authors must replace `singulo_arsenal:jet_lance` item entries with `singulo_arsenal:jet_cannon` in `tags/items` JSON. Recipes using those tags require that tag update. Direct recipe item IDs and existing recipe/advancement unlock IDs remain compatible. Back up saves/datapacks before upgrading; do not downgrade an upgraded save without restoring its backup.
+
+1.20.1 の外部データパックでは、item tag 内の旧 `singulo_arsenal:jet_lance` を新 `singulo_arsenal:jet_cannon` へ更新してください。旧タグを使うレシピもタグ側の更新が必要です。保存アイテムと旧 registry snapshot は公式の移行処理で保護します。直接 item ID を使うレシピと解放履歴は引き継ぎます。更新前にワールドとデータパックをバックアップしてください。

@@ -319,6 +319,14 @@ public final class ArsenalReview {
     }
 
     /** Enlarged inventory for inspecting every icon against its slot. Enabled by the marker file build/gui-review/icons-only. */
+    private static void reviewInventory(Minecraft mc) {
+        mc.setScreen(new net.minecraft.client.gui.screens.inventory.InventoryScreen(mc.player) {
+            @Override
+            public void render(net.minecraft.client.gui.GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+                super.render(graphics, -100, -100, partialTick);
+            }
+        });
+    }
     private static void iconScript(Minecraft mc) {
         step(60, () -> {
             local(mc, p -> {
@@ -338,7 +346,7 @@ public final class ArsenalReview {
         step(20, () -> {
             mc.options.guiScale().set(4);
             mc.resizeDisplay();
-            mc.setScreen(new net.minecraft.client.gui.screens.inventory.InventoryScreen(mc.player));
+            reviewInventory(mc);
             // Park the cursor in the corner so no tooltip covers the icons.
             org.lwjgl.glfw.GLFW.glfwSetCursorPos(mc.getWindow().getWindow(), 0, 0);
         });
@@ -393,7 +401,7 @@ public final class ArsenalReview {
         step(2, () -> mc.player.getInventory().selected = 0);
         at += 10;
         step(2, () -> {
-            mc.setScreen(new net.minecraft.client.gui.screens.inventory.InventoryScreen(mc.player));
+            reviewInventory(mc);
             org.lwjgl.glfw.GLFW.glfwSetCursorPos(mc.getWindow().getWindow(), 0, 0);
         });
         at += 5;
