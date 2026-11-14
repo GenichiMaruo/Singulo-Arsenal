@@ -13,6 +13,8 @@ source = args.source_world.resolve()
 root = (args.build_dir / 'gui-migration').resolve()
 if root.parent.name != 'build' or not (source / 'level.dat').is_file():
     parser.error('use a build/gui-migration destination and a saved source world')
+if root.is_relative_to(source):
+    parser.error('destination must not be inside the source world')
 if root.exists():
     parser.error('destination already exists; archive it manually rather than overwrite evidence')
 root.mkdir(parents=True)
