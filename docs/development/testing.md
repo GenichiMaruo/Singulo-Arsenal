@@ -60,6 +60,6 @@ python3 -m unittest discover -s tests -p 'test_release.py' -v
 python3 tools/prepare_release.py
 ```
 
-公開処理の回帰テストは23件です。古い JAR の取り違え、バージョン・依存関係の不一致、テスト資材の混入、変更履歴の欠落、誤った公開先を拒否することを検証します。API 確認が GET のみであること、アップロード時の multipart が正しいこと、失敗時に再送や必須依存の除去を行わないこともモックで確認します。実際の API 設定確認と公開手順は [公開・配布手順](../curseforge.md) を参照してください。
+公開処理の回帰テストは26件、review world準備の3件と合わせてPythonテストは29件です。古い JAR の取り違え、バージョン・依存関係の不一致、テスト資材の混入、変更履歴の欠落、誤った公開先を拒否することを検証します。API 確認が GET のみであること、アップロード時の multipart が正しいこと、失敗時に再送や必須依存の除去を行わないこともモックで確認します。実際の API 設定確認と公開手順は [公開・配布手順](../curseforge.md) を参照してください。
 
-0.2.2 adds a Singulo 0.18 SMES interoperability test: partial charging, exact FE debit, full-charge transfer, blocked output and installed-module retention. This historical test remains in 0.3.0; the current full suite and production metadata require Singulo 0.19.x.
+0.2.2 adds a Singulo 0.18 SMES interoperability test: partial charging, exact FE debit, full-charge transfer, blocked output and installed-module retention. This historical test remains in 0.3.0; the current full suite and production metadata require Singulo 0.19.0 or newer without an upper bound. Only 0.19.0 compatibility is verified here; later versions remain unverified.

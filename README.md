@@ -10,13 +10,13 @@ Minecraft 1.21.1（NeoForge）向け。Singulo の工場で作った素材から
 Singulo 本体が必須です。Minecraft・ローダー・Singulo の版が合うファイルを選んでください。
 Singulo is required. Choose the file that matches your Minecraft version, loader and Singulo version.
 
-以下は **0.3.0** の対応範囲です。Singulo 0.19.0 以上・0.20.0 未満が必須です。0.2.2 は 0.16.x–0.18.x 対応です。
-The table describes **0.3.0**. Singulo >=0.19.0 and <0.20.0 is required. Arsenal 0.2.2 supports 0.16.x–0.18.x.
+以下は **0.3.0** の対応範囲です。Singulo 0.19.0 以上が必須です。0.19.0 で検証済みで、0.20 以降の互換性は未検証です。0.2.2 は 0.16.x–0.18.x 対応です。
+The table describes **0.3.0**. Singulo >=0.19.0 is required, without an upper bound. Tested with 0.19.0; compatibility with 0.20 and later is unverified. Arsenal 0.2.2 supports 0.16.x–0.18.x.
 
 | Minecraft | ローダー / Loader | Java | Singulo | ソース / Source | ダウンロード / Download |
 | --- | --- | --- | --- | --- | --- |
-| **1.21.1** | **NeoForge** 21.1.256+ | **21** | 0.19.x | [1.21.1](https://github.com/GenichiMaruo/Singulo-Arsenal/tree/1.21.1) | [CurseForge](https://www.curseforge.com/minecraft/mc-mods/singulo-arsenal/files) |
-| 1.20.1 | Forge / NeoForge | 17 | 0.19.x | [1.20.1](https://github.com/GenichiMaruo/Singulo-Arsenal/tree/1.20.1) | [CurseForge](https://www.curseforge.com/minecraft/mc-mods/singulo-arsenal/files) |
+| **1.21.1** | **NeoForge** 21.1.256+ | **21** | >=0.19.0 | [1.21.1](https://github.com/GenichiMaruo/Singulo-Arsenal/tree/1.21.1) | [CurseForge](https://www.curseforge.com/minecraft/mc-mods/singulo-arsenal/files) |
+| 1.20.1 | Forge / NeoForge | 17 | >=0.19.0 | [1.20.1](https://github.com/GenichiMaruo/Singulo-Arsenal/tree/1.20.1) | [CurseForge](https://www.curseforge.com/minecraft/mc-mods/singulo-arsenal/files) |
 
 ファイル名は `Singulo-Arsenal-<版>-<Minecraft><ローダー>` で、末尾の `N` は NeoForge です。マルチプレイではクライアントとサーバーの両方に導入してください。
 初回の 0.1.0 は GitHub Releases で配布しています。以後の版の配布先は [CurseForge](https://www.curseforge.com/minecraft/mc-mods/singulo-arsenal) です。0.2.0 は Minecraft 1.21.1 と 1.20.1 に対応しています。
@@ -66,7 +66,8 @@ The 0.2.2 compatibility build accepts Singulo 0.16.x, 0.17.x and 0.18.x. See [ve
 
 ## 0.3.0
 
-- Singulo 0.19.x 必須。将来の 0.20 以降は互換性確認後に対応範囲を広げます。
+- Singulo 0.19.0 以上が必須（上限なし）。0.20 以降も導入を許可しますが、将来版の互換性は未検証です。
+- 1.20.1 では、外部データパックの item tag にある旧 `singulo_arsenal:jet_lance` 要素は `singulo_arsenal:jet_cannon` へ更新が必要です。タグ名・旧レシピIDは変えません。所持品などの保存状態は自動移行します。
 - 能力・FE を持たないニホニウムの剣・工具・防具を追加。防具アイコンを刷新。
 - ジェット砲の shader / オフハンド表示と額縁配置を修正。
 - 内部名を `jet_cannon` に整理し、旧 `jet_lance` の保存アイテムを引き継ぎます。

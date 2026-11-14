@@ -8,11 +8,11 @@
 - Center all four weapons and four powered tools in item frames.
 - Rename the internal item ID to jet_cannon and migrate legacy jet_lance stacks through a NeoForge alias. Preserve recipe unlocks, item components and the existing Accretion Jet Cannon display name.
 
-Requires Singulo 0.19.0 or newer within 0.19.x (before 0.20.0). Back up worlds before upgrading; downgrading canonical jet_cannon saves to 0.2.2 is not supported.
+Requires Singulo 0.19.0 or newer, without an upper bound. Tested with 0.19.0; compatibility with 0.20 and later is unverified. Back up worlds before upgrading; downgrading canonical jet_cannon saves to 0.2.2 is not supported.
 
 ## 日本語
 
-- Singulo 0.19.x を必須化（0.19.0 以上・0.20.0 未満）。更新前にワールドをバックアップしてください。
+- Singulo 0.19.0 以上を必須化（上限なし）。0.19.0 で検証済み、0.20 以降の互換性は未検証です。更新前にワールドをバックアップしてください。
 - FEや特殊能力を持たないニホニウム製の工具・防具を追加。通常の修理・耐久・エンチャントに対応。
 - 防具のアイコンを刷新し、ジェット砲のアイコンを対角に配置。
 - shader 環境で銃の向き、腕、銃口とビームの座標系がずれる問題を修正。

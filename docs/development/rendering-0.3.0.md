@@ -3,7 +3,7 @@
 ## Scope
 
 The development branch targets Minecraft 1.21.1 / NeoForge 21.1.256 / Java 21
-and now requires Singulo 0.19.x. Earlier development checks used released
+and now requires Singulo 0.19.0 or newer (without an upper bound; later-version compatibility is unverified). Earlier development checks used released
 Singulo 0.18.0; those historical results do not substitute for the final
 0.19 verification recorded in [compatibility notes](singulo-0.19-compatibility.md).
 

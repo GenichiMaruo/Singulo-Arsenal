@@ -10,7 +10,7 @@ CurseForge のプロジェクト ID は `1793647`、配布先は [Singulo Arsena
 
 ## 0.3.0 の公開準備
 
-Minecraft 1.21.1 / NeoForge / Java 21 向けです。`gradle.properties` の `mod_version` と CI の成果物は `0.3.0`、配布ファイルは `build/libs/Singulo-Arsenal-0.3.0-1.21.1N.jar` です。必須依存は Singulo `[0.19.0,0.20.0)`（0.19.x）です。
+Minecraft 1.21.1 / NeoForge / Java 21 向けです。`gradle.properties` の `mod_version` と CI の成果物は `0.3.0`、配布ファイルは `build/libs/Singulo-Arsenal-0.3.0-1.21.1N.jar` です。必須依存は Singulo `[0.19.0,)`（0.19.0 以上、上限なし。0.20 以降の互換性は未検証）です。
 
 PR のレビュー、build / integration、確定した本体配布 JAR と実クライアント・旧ワールド移行の確認結果を判断してからマージします。公開用の変更履歴は [`changelog-0.3.0.md`](curseforge/changelog-0.3.0.md)、最終依存と検証記録は [0.19 互換性記録](development/singulo-0.19-compatibility.md) です。候補本体での成功だけでは公開しません。タグは確認したマージコミットに付け、CF 送信は下記手順で逐次行います。
 
