@@ -4,13 +4,13 @@ import com.mojang.math.Axis;
 import io.github.genichimaruo.singuloarsenal.core.Rules;
 
 /**
- * Weapons in item space, in pixels. Swords: Y up, blade along +Y, edge on +X. The lance: +Y toward the muzzle, +Z up, grips hanging
+ * Weapons in item space, in pixels. Swords: Y up, blade along +Y, edge on +X. The cannon: +Y toward the muzzle, +Z up, grips hanging
  * toward -Z. {@code use} runs 0..1 while the use key is held. Details stay on a half-pixel grid: finer than the suits, but no
  * hairlines, and every part is something a person would need: a grip to hold, a guard to stop a hand, a housing for what is inside.
  */
 public final class WeaponArt {
-    /** Where the lance's beam leaves it, on its +Y axis. */
-    public static final double LANCE_MUZZLE = 23;
+    /** Where the cannon's beam leaves it, on its +Y axis. */
+    public static final double CANNON_MUZZLE = 23;
 
     private static final int VOID = 0x3A3648, VOID_EDGE = 0x565068, VOID_DEEP = 0x262430, IVORY = 0xF2E4BC, THREAD = 0xFFE2A0, HOT = 0xA8E4FF, WHITE_HOT = 0xF4FBFF;
 
@@ -136,10 +136,10 @@ public final class WeaponArt {
         c.pose.popPose();
     }
 
-    // ---- Jet lance: a shouldered gun. A magnetic mirror seals the rear pole, so everything leaves through the barrel ---------
+    // ---- Jet cannon: a shouldered gun. A magnetic mirror seals the rear pole, so everything leaves through the barrel ---------
 
     /** {@code handleSide} is the X side of the charging handle, always toward the support hand so the hand never has to cross the gun. */
-    public static void lance(Canvas c, float ignition, float reload, float t, int handleSide) {
+    public static void cannon(Canvas c, float ignition, float reload, float t, int handleSide) {
         boolean reloading = reload >= 0;
         int status = ignition > 0 ? WHITE_HOT : reloading ? 0xFFB061 : 0x6A88A8;
         float vent = reloading ? Rules.reloadVent(reload) : 0;

@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    "N",
+    "S",
+    "S"
+  ],
+  "key": {
+    "N": {
+      "item": "singulo:nihonium_ingot"
+    },
+    "S": {
+      "item": "minecraft:stick"
+    }
+  },
+  "result": {
+    "item": "singulo_arsenal:nihonium_shovel",
+    "count": 1
+  }
+}

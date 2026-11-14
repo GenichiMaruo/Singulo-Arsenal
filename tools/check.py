@@ -15,13 +15,15 @@ ROOT = Path(__file__).resolve().parents[1]
 RES = ROOT / 'src/main/resources'
 SETS = ['meissner', 'degeneracy', 'collapsar']
 PARTS = ['helmet', 'chestplate', 'leggings', 'boots']
-WEAPONS = ['quench_saber', 'casimir_blade', 'tidal_reaver', 'jet_lance']
+WEAPONS = ['quench_saber', 'casimir_blade', 'tidal_reaver', 'jet_cannon']
 TOOLS = ['squid_pick', 'degeneracy_breaker', 'shear_saw', 'accretion_drill']
 MATERIALS = ['flux_weave', 'pressure_lattice', 'collapsar_lamina', 'jet_collimator', 'tidal_edge']
 MODULES = ['bit_drone_module', 'capacitor_module', 'plating_module', 'thruster_module', 'coolant_module', 'amplifier_module', 'metric_drive_module', 'meltdown_module', 'overclock_module', 'smelter_module', 'induction_module', 'collector_module']
-GEAR = [f'{s}_{p}' for s in SETS for p in PARTS] + WEAPONS + TOOLS + ['module_integrator']
+ARMOR = [f'{s}_{p}' for s in SETS for p in PARTS]
+GEAR = ARMOR + WEAPONS + TOOLS + ['module_integrator']
 CONTAINERS = ['pellet_canister']
-ITEMS = GEAR + MATERIALS + MODULES + CONTAINERS
+NIHONIUM = [f'nihonium_{p}' for p in ['sword', 'pickaxe', 'axe', 'shovel'] + PARTS]
+ITEMS = GEAR + MATERIALS + MODULES + CONTAINERS + NIHONIUM
 
 javac = str(Path(os.environ['JAVA_HOME']) / 'bin/javac') if os.environ.get('JAVA_HOME') else shutil.which('javac')
 java = str(Path(os.environ['JAVA_HOME']) / 'bin/java') if os.environ.get('JAVA_HOME') else shutil.which('java')
@@ -32,10 +34,20 @@ with tempfile.TemporaryDirectory(prefix='arsenal-tests-') as directory:
                     str(ROOT / 'tests/RulesTest.java')], check=True)
     subprocess.run([java, '-cp', directory, 'RulesTest'], check=True)
 
+# A sorted custom tier must not raise vanilla diamond/netherite requirements.
+assert json.loads((RES / 'data/singulo_arsenal/tags/blocks/needs_nihonium_tool.json').read_text())['values'] == []
 recipes = RES / 'data/singulo_arsenal/recipes'
-assert {p.stem for p in recipes.glob('*.json')} == set(ITEMS), 'missing or extra recipes'
+recipe_name = lambda item: 'jet_lance' if item == 'jet_cannon' else item
+assert {p.stem for p in recipes.glob('*.json')} == {recipe_name(item) for item in ITEMS}, 'missing or extra recipes'
 locales = [json.loads((RES / f'assets/singulo_arsenal/lang/{lang}.json').read_text(encoding='utf-8')) for lang in ['ja_jp', 'en_us']]
 assert locales[0].keys() == locales[1].keys(), 'locale key mismatch'
+# Public display is unchanged; the old registry ID migrates through the Forge registry alias.
+assert locales[1]['item.singulo_arsenal.jet_cannon'] == 'Accretion Jet Cannon'
+for locale in locales:
+    for key, value in locale.items():
+        if '.jet_cannon' in key:
+            assert locale[key.replace('.jet_cannon', '.jet_lance')] == value, 'legacy text key lost'
+
 for key in locales[0]:
     for token in ('%s', '%1$s', '%2$s'):
         assert locales[0][key].count(token) == locales[1][key].count(token), f'format placeholders differ: {key}'
@@ -43,19 +55,22 @@ for key in locales[0]:
 for item in ITEMS:
     assert f'item.singulo_arsenal.{item}' in locales[0] or f'block.singulo_arsenal.{item}' in locales[0], f'missing name {item}'
     model = json.loads((RES / f'assets/singulo_arsenal/models/item/{item}.json').read_text(encoding='utf-8'))
-    if item in GEAR:
+    # Armor items are flat icons like vanilla armor; worn armor is drawn by SuitLayer, not by these models.
+    if item in GEAR and item not in ARMOR:
         assert model['parent'] == 'minecraft:builtin/entity', f'{item} must use the gear renderer'
         assert all(context in model['display'] for context in ['gui', 'ground', 'fixed', 'firstperson_righthand', 'firstperson_lefthand',
                                                                 'thirdperson_righthand', 'thirdperson_lefthand']), item
     else:
+        handheld = item in NIHONIUM[:4]
+        assert model['parent'] == ('minecraft:item/handheld' if handheld else 'minecraft:item/generated'), item
         assert model['textures']['layer0'] == f'singulo_arsenal:item/{item}'
         data = (RES / f'assets/singulo_arsenal/textures/item/{item}.png').read_bytes()
         width, height = struct.unpack('>II', data[16:24])
         assert data[1:4] == b'PNG' and width == 16 and height % 16 == 0, f'bad icon {item}'
-    recipe = json.loads((recipes / f'{item}.json').read_text(encoding='utf-8'))
+    recipe = json.loads((recipes / f'{recipe_name(item)}.json').read_text(encoding='utf-8'))
     assert recipe['result']['item'] == f'singulo_arsenal:{item}', item
-    advancement = json.loads((RES / f'data/singulo_arsenal/advancements/recipes/{item}.json').read_text(encoding='utf-8'))
-    assert advancement['rewards']['recipes'] == [f'singulo_arsenal:{item}'], item
+    advancement = json.loads((RES / f'data/singulo_arsenal/advancements/recipes/{recipe_name(item)}.json').read_text(encoding='utf-8'))
+    assert advancement['rewards']['recipes'] == [f'singulo_arsenal:{recipe_name(item)}'], item
     if recipe['type'] == 'minecraft:crafting_shaped':
         symbols = set(''.join(recipe['pattern'])) - {' '}
         assert symbols == recipe['key'].keys(), f'bad crafting key: {item}'
@@ -79,6 +94,11 @@ for suit in SETS:
 for weapon in WEAPONS + TOOLS:
     for line in (1, 2, 3, 'summary'):
         assert f'tooltip.singulo_arsenal.{weapon}.{line}' in locales[0], weapon
+
+# Nihonium armor is drawn by the vanilla armor layer from the material's texture pair on the 64x32 player net.
+for n in (1, 2):
+    data = (RES / f'assets/singulo_arsenal/textures/models/armor/nihonium_layer_{n}.png').read_bytes()
+    assert data[1:4] == b'PNG' and struct.unpack('>II', data[16:24]) == (64, 32), f'bad nihonium armor layer {n}'
 
 # Materials tile at one texel per model pixel; Canvas.MATERIAL_SIZE assumes 32.
 for suit in SETS:

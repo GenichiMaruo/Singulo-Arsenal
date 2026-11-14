@@ -5,12 +5,13 @@ import io.github.genichimaruo.singuloarsenal.armor.SuitItem;
 import io.github.genichimaruo.singuloarsenal.core.Fe;
 import io.github.genichimaruo.singuloarsenal.core.Powered;
 import io.github.genichimaruo.singuloarsenal.module.ModuleContent;
+import io.github.genichimaruo.singuloarsenal.nihonium.Nihonium;
 import io.github.genichimaruo.singuloarsenal.tool.AccretionDrillItem;
 import io.github.genichimaruo.singuloarsenal.tool.DegeneracyBreakerItem;
 import io.github.genichimaruo.singuloarsenal.tool.ShearSawItem;
 import io.github.genichimaruo.singuloarsenal.tool.SquidPickItem;
 import io.github.genichimaruo.singuloarsenal.weapon.CasimirBladeItem;
-import io.github.genichimaruo.singuloarsenal.weapon.JetLanceItem;
+import io.github.genichimaruo.singuloarsenal.weapon.JetCannonItem;
 import io.github.genichimaruo.singuloarsenal.weapon.QuenchSaberItem;
 import io.github.genichimaruo.singuloarsenal.weapon.TidalReaverItem;
 import java.util.ArrayList;
@@ -48,7 +49,7 @@ public final class ArsenalItems {
     public static final RegistryObject<QuenchSaberItem> QUENCH_SABER = ITEMS.register("quench_saber", QuenchSaberItem::new);
     public static final RegistryObject<CasimirBladeItem> CASIMIR_BLADE = ITEMS.register("casimir_blade", CasimirBladeItem::new);
     public static final RegistryObject<TidalReaverItem> TIDAL_REAVER = ITEMS.register("tidal_reaver", TidalReaverItem::new);
-    public static final RegistryObject<JetLanceItem> JET_LANCE = ITEMS.register("jet_lance", JetLanceItem::new);
+    public static final RegistryObject<JetCannonItem> JET_CANNON = ITEMS.register("jet_cannon", JetCannonItem::new);
 
     public static final RegistryObject<SquidPickItem> SQUID_PICK = ITEMS.register("squid_pick", SquidPickItem::new);
     public static final RegistryObject<DegeneracyBreakerItem> DEGENERACY_BREAKER = ITEMS.register("degeneracy_breaker", DegeneracyBreakerItem::new);
@@ -68,6 +69,7 @@ public final class ArsenalItems {
             }
             SUITS.put(set, pieces);
         }
+        Nihonium.register(ITEMS, PIECES);
         TABS.register("arsenal", () -> CreativeModeTab.builder()
                 .title(Component.translatable("itemGroup.singulo_arsenal"))
                 .icon(() -> new ItemStack(ModuleContent.INTEGRATOR_ITEM.get()))
@@ -78,11 +80,16 @@ public final class ArsenalItems {
                     output.accept(charged(QUENCH_SABER.get()));
                     output.accept(charged(CASIMIR_BLADE.get()));
                     output.accept(charged(TIDAL_REAVER.get()));
-                    output.accept(charged(JET_LANCE.get()));
+                    output.accept(charged(JET_CANNON.get()));
                     output.accept(charged(SQUID_PICK.get()));
                     output.accept(charged(DEGENERACY_BREAKER.get()));
                     output.accept(charged(SHEAR_SAW.get()));
                     output.accept(charged(ACCRETION_DRILL.get()));
+                    for (ArmorItem.Type type : PIECES) output.accept(Nihonium.ARMOR.get(type).get());
+                    output.accept(Nihonium.SWORD.get());
+                    output.accept(Nihonium.PICKAXE.get());
+                    output.accept(Nihonium.AXE.get());
+                    output.accept(Nihonium.SHOVEL.get());
                     output.accept(PELLET_CANISTER.get());
                     output.accept(FLUX_WEAVE.get());
                     output.accept(PRESSURE_LATTICE.get());
@@ -95,6 +102,15 @@ public final class ArsenalItems {
     }
 
     private ArsenalItems() {}
+
+    private static void aliases(net.minecraftforge.registries.RegisterEvent event) {
+        if (event.getRegistryKey().equals(Registries.ITEM)) {
+            // Forge 47 exposes aliases on ForgeRegistry, before this register event freezes it.
+            // Preserve all stack NBT; normal re-save emits the canonical item identity.
+            ((net.minecraftforge.registries.ForgeRegistry<Item>) net.minecraftforge.registries.ForgeRegistries.ITEMS)
+                    .addAlias(SinguloArsenal.id("jet_lance"), SinguloArsenal.id("jet_cannon"));
+        }
+    }
 
     private static ItemStack charged(Item item) {
         ItemStack stack = new ItemStack(item);
@@ -112,6 +128,7 @@ public final class ArsenalItems {
 
     public static void register(IEventBus bus) {
         ITEMS.register(bus);
+        bus.addListener(ArsenalItems::aliases);
         TABS.register(bus);
         net.minecraftforge.common.MinecraftForge.EVENT_BUS.addGenericListener(ItemStack.class, ArsenalItems::capabilities);
     }

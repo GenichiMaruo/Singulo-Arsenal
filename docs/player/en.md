@@ -93,6 +93,20 @@ Powered by FE, with no durability. Out of power they dig at the speed of a bare 
 
 Area mining drops to a single block while you sneak, and never takes chests, machines, Singulo blocks or anything far harder than the block you struck.
 
+## Nihonium gear (0.3.0)
+
+Plain gear made from nihonium ingots (base-mod stage 3), with no abilities and no energy: a sword, pickaxe, axe and shovel, and a full armor set. The recipes use the vanilla shapes (sticks for handles). It is stronger than diamond and lasts far longer. It repairs with nihonium ingots, and the armor takes trims.
+
+| | Nihonium | Diamond |
+| --- | --- | --- |
+| Tool durability | 4,000 | 1,561 |
+| Mining speed | 10 | 8 |
+| Sword damage | 8 | 7 |
+| Armor (head/chest/legs/feet) | 3 / 8 / 7 / 3 | 3 / 8 / 6 / 3 |
+| Armor toughness | 2.5 | 2 |
+| Knockback resistance (full set) | 20% | 0% |
+| Armor durability (head/chest/legs/feet) | 660 / 960 / 900 / 780 | 363 / 528 / 495 / 429 |
+
 ## Modules (0.2.0)
 
 The **Module Integrator** builds upgrade modules into gear. Power the integrator, put the gear in the centre, place modules in the sockets around it and press Integrate. Integrating with empty sockets takes modules out.

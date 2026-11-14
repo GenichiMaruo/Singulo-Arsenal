@@ -68,8 +68,8 @@ tasks.named('runGameTestServer') {
     doFirst { delete layout.buildDirectory.file('gametest/logs/latest.log') }
     doLast {
         def log = layout.buildDirectory.file('gametest/logs/latest.log').get().asFile
-        if (!log.isFile() || !log.text.contains('All 57 required tests passed')) {
-            throw new GradleException('Expected all 57 required Arsenal GameTests to pass. Inspect the GameTest server log.')
+        if (!log.isFile() || !log.text.contains('All 66 required tests passed')) {
+            throw new GradleException('Expected all 66 required Arsenal GameTests to pass. Inspect the GameTest server log.')
         }
     }
 }
@@ -98,4 +98,10 @@ tasks.register('offlineTest', Exec) {
 }
 tasks.named('check') { dependsOn 'offlineTest' }
 mixin { add sourceSets.main, 'singulo_arsenal.refmap.json'; config 'singulo_arsenal.mixins.json' }
-dependencies { annotationProcessor 'org.spongepowered:mixin:0.8.5:processor' }
+dependencies {
+    testImplementation 'org.joml:joml:1.10.5'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.11.4'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.11.4'
+    annotationProcessor 'org.spongepowered:mixin:0.8.5:processor' }
+
+tasks.named('test') { useJUnitPlatform() }

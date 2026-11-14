@@ -10,7 +10,7 @@ public final class RulesTest {
 
     public static void main(String[] args) {
         // Tanks must conserve energy at every boundary, including nonsense input.
-        for (int capacity : new int[]{0, 240_000, Rules.LANCE_CAPACITY}) {
+        for (int capacity : new int[]{0, 240_000, Rules.CANNON_CAPACITY}) {
             for (int stored : new int[]{-1, 0, 1, capacity, Integer.MAX_VALUE}) {
                 for (int request : new int[]{Integer.MIN_VALUE, -1, 0, 1, 500_000, Integer.MAX_VALUE}) {
                     int taken = Rules.accepted(stored, capacity, request);
@@ -19,7 +19,7 @@ public final class RulesTest {
                 }
             }
         }
-        check(Rules.chargeRequest(Rules.LANCE_CAPACITY) == Rules.LANCE_CAPACITY / 8, "large tanks charge by fraction");
+        check(Rules.chargeRequest(Rules.CANNON_CAPACITY) == Rules.CANNON_CAPACITY / 8, "large tanks charge by fraction");
         check(Rules.chargeRequest(1000) == 20_000, "small tanks keep a sane minimum");
         check(!Rules.canAccrete(Rules.COLLAPSAR_CAPACITY - Rules.PELLET_FE + 1, Rules.COLLAPSAR_CAPACITY), "pellet wasted overfilling");
         check(Rules.canAccrete(Rules.COLLAPSAR_CAPACITY - Rules.PELLET_FE, Rules.COLLAPSAR_CAPACITY), "exact room refused");
@@ -81,13 +81,13 @@ public final class RulesTest {
         check(Rules.shearDamage(0) == 16, "shear base");
         check(Rules.stretchFor(0, 0) == 1, "stretch rest");
 
-        check(Rules.lanceRadius(0) > Rules.lanceRadius(10), "the jet flashes wide as it lights");
-        check(Rules.lanceRadius(10) > 0 && Rules.lanceRadius(Rules.LANCE_SHOT_TICKS) == 0, "the jet pinches off at the end");
-        check(Rules.lanceRadius(-1) == 0, "no jet before it is lit");
-        check(Rules.lanceFocus(0) == 0 && Rules.lanceFocus(3) == 1, "the jet focuses at once");
-        check(2.2F / Rules.LANCE_CHARGE_PITCH >= Rules.LANCE_CHARGE_TICKS / 20F, "the charge sound must not end before the spool-up");
-        check(1.2F / Rules.LANCE_CHARGE_BODY_PITCH >= Rules.LANCE_CHARGE_TICKS / 20F, "the spool's burst must fall after the shot has cut it off");
-        check(Rules.blastRadius(1) == Rules.LANCE_BLAST_RADIUS && Rules.blastRadius(2) > Rules.blastRadius(1), "blast radius");
+        check(Rules.cannonRadius(0) > Rules.cannonRadius(10), "the jet flashes wide as it lights");
+        check(Rules.cannonRadius(10) > 0 && Rules.cannonRadius(Rules.CANNON_SHOT_TICKS) == 0, "the jet pinches off at the end");
+        check(Rules.cannonRadius(-1) == 0, "no jet before it is lit");
+        check(Rules.cannonFocus(0) == 0 && Rules.cannonFocus(3) == 1, "the jet focuses at once");
+        check(2.2F / Rules.CANNON_CHARGE_PITCH >= Rules.CANNON_CHARGE_TICKS / 20F, "the charge sound must not end before the spool-up");
+        check(1.2F / Rules.CANNON_CHARGE_BODY_PITCH >= Rules.CANNON_CHARGE_TICKS / 20F, "the spool's burst must fall after the shot has cut it off");
+        check(Rules.blastRadius(1) == Rules.CANNON_BLAST_RADIUS && Rules.blastRadius(2) > Rules.blastRadius(1), "blast radius");
         check(Rules.blastFalloff(0, 7) == 1 && Math.abs(Rules.blastFalloff(7, 7) - 0.4F) < 0.001F && Math.abs(Rules.blastFalloff(70, 7) - 0.4F) < 0.001F, "blast falloff");
         check(Rules.compactEnergy(999).equals("999") && Rules.compactEnergy(1500).equals("1.5k") && Rules.compactEnergy(16_000_000).equals("16M"), "compact energy");
         check(Rules.compactEnergy(2_000_000_000L).equals("2G") && Rules.compactEnergy(12_345).equals("12.3k") && Rules.compactEnergy(0).equals("0"), "compact energy units");
@@ -109,8 +109,8 @@ public final class RulesTest {
         }
         check(Rules.reloadMagazine(0.4F) == 1 && Rules.reloadMagazineGone(0.4F), "magazine is out mid-reload");
         check(!Rules.reloadMagazineGone(0) && !Rules.reloadMagazineGone(1), "magazine is present at rest");
-        check(Rules.lanceKick(-1) == 0, "no recoil before firing");
-        check(Rules.lanceKick(0) == 1 && Rules.lanceKick(Rules.LANCE_PULSE) < 1 && Rules.lanceKick(Rules.LANCE_PULSE * 2) == 0, "one kick per shot");
+        check(Rules.cannonKick(-1) == 0, "no recoil before firing");
+        check(Rules.cannonKick(0) == 1 && Rules.cannonKick(Rules.CANNON_PULSE) < 1 && Rules.cannonKick(Rules.CANNON_PULSE * 2) == 0, "one kick per shot");
         check(Rules.moduleSlots(1) == 0 && Rules.moduleSlots(2) == 1 && Rules.moduleSlots(4) == 3 && Rules.moduleSlots(5) == 5, "socket tiers");
         check(Rules.collectRadius(0) == 0 && Rules.collectRadius(1) == 6 && Rules.collectRadius(2) == 9 && Rules.collectRadius(9) == 16, "collector reach");
         check(Rules.induced(1_000_000, Integer.MAX_VALUE, 1) == 20_000 && Rules.induced(1_000_000, Integer.MAX_VALUE, 3) == 60_000, "coils add up");
@@ -120,7 +120,7 @@ public final class RulesTest {
         check(Rules.cooled(160, 0) == 160 && Rules.cooled(160, 1) == 120 && Rules.cooled(1, 9) == 1, "coolant");
         check(Rules.amplified(0) == 1 && Rules.amplified(-1) == 1, "amplifier");
         check(Rules.overclocked(0) == 1 && Math.abs(Rules.overclocked(2) - 1.8F) < 0.001F && Rules.overclocked(-3) == 1, "overclock");
-        check(Rules.LANCE_MAGAZINE * Rules.LANCE_SHOT_FE <= Rules.LANCE_CAPACITY, "a full tank must cover one magazine");
+        check(Rules.CANNON_MAGAZINE * Rules.CANNON_SHOT_FE <= Rules.CANNON_CAPACITY, "a full tank must cover one magazine");
         System.out.println("Rules: " + checks + " checks passed");
     }
 }
