@@ -16,12 +16,12 @@ The plain nihonium set consumes `singulo:nihonium_ingot`, uses
 
 ## Release gate
 
-The initially pinned source is the 0.19 candidate
-`d12d72c0b312931276b655bb30062a09be591502`. This is not a claim that this candidate
-is the final released dependency. Before merge/publication, record the final
-source/CI/CurseForge IDs and compare the downloaded public JAR to the CI artifact,
-then rerun integration and client verification against that exact dependency.
-
+CI now pins the tagged Singulo 0.19.0 source
+`0f6fcff7645a2a5066a072acce55d4a03884080e` (`v0.19.0`). Base PR #74 was
+validated by CI `43628318212` before merging. This source pin alone is not the
+final distribution gate: before Arsenal merge/publication, record the base
+CurseForge ID and compare its downloaded JAR to the CI artifact, then rerun
+integration and client verification against that exact dependency.
 The migration and rendering checks from earlier 0.3.0 work remain relevant but
 do not replace validation against the final 0.19 binaries. Preserve the old
 cannon recipe/advancement IDs while remapping its item ID. Backups are required
