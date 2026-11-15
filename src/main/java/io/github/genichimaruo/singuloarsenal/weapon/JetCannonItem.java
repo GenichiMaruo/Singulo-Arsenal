@@ -87,7 +87,7 @@ public final class JetCannonItem extends Item implements ArsenalWeapon {
 
     /** Whether the gun could start a shot right now. Run on the client as well, to avoid sending clicks the server would refuse. */
     public static boolean ready(ItemStack stack, long now) {
-        return shotsLeft(stack) > 0 && now >= ArsenalData.time(stack, ArsenalData.JET_UNTIL) + Rules.CANNON_SHOT_GAP
+        return shotsLeft(stack) > 0 && (ArsenalData.time(stack, ArsenalData.JET_UNTIL) == 0 || now >= ArsenalData.time(stack, ArsenalData.JET_UNTIL) + Rules.CANNON_SHOT_GAP)
                 && ArsenalData.time(stack, ArsenalData.CHARGE_UNTIL) <= now && Weapons.reloadProgress(stack, now, 0) < 0;
     }
 

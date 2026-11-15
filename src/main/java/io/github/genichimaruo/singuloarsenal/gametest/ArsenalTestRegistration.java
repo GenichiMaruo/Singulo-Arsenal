@@ -79,6 +79,7 @@ public final class ArsenalTestRegistration {
     }
     private static void register(String name, Class<?> owner, String method) {
         FUNCTIONS.register(name, () -> helper -> {
+            org.slf4j.LoggerFactory.getLogger(ArsenalTestRegistration.class).info("ARSENAL_TEST_EXECUTED={}", name);
             try { owner.getMethod(method, GameTestHelper.class).invoke(null, helper); }
             catch (java.lang.reflect.InvocationTargetException e) {
                 if (e.getCause() instanceof RuntimeException runtime) throw runtime;

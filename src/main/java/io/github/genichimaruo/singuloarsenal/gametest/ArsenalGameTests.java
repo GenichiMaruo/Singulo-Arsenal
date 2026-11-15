@@ -70,15 +70,9 @@ public final class ArsenalGameTests {
         return player;
     }
 
-    /** Freshly placed players get vanilla's three seconds of immunity, which would swallow every damage assertion. */
+    /** MC26 keeps players immune until the login/load handshake completes; mock clients must acknowledge it. */
     private static void clearSpawnProtection(ServerPlayer player) {
-        try {
-            var field = ServerPlayer.class.getDeclaredField("spawnInvulnerableTime");
-            field.setAccessible(true);
-            field.setInt(player, 0);
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException(e);
-        }
+        player.connection.markClientLoaded();
     }
 
     private static void dress(ServerPlayer player, ArmorSet set) {
@@ -610,6 +604,7 @@ public final class ArsenalGameTests {
 
     /** In a batch of its own: its line of fire is longer than the gap to the next test's structure, and machines stop the drill. */
 
+    // Dedicated 32-block-deep structure keeps this 24-block ray away from neighboring test barriers.
     public static void drillingGivesOutAtItsDepth(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 0.5);
         ItemStack cannon = hold(p, new ItemStack(ArsenalItems.JET_CANNON.get()));
