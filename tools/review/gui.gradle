@@ -2,6 +2,12 @@
 allprojects {
     afterEvaluate {
         sourceSets.main.java.srcDir(file('tools/review/gui-src'))
+        if (providers.gradleProperty('reviewShaders').isPresent()) {
+            repositories { flatDir { dirs file('build/shader-deps') } }
+            fileTree(dir: 'build/shader-deps', include: ['*.jar']).each { jar ->
+                dependencies { modRuntimeOnly "local.review:${jar.name.substring(0, jar.name.length() - 4)}:local" }
+            }
+        }
         legacyForge.runs.client {
             gameDirectory = layout.buildDirectory.dir('gui-review')
             programArgument '--quickPlaySingleplayer'

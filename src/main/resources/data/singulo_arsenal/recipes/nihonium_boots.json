@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    "N N",
+    "N N"
+  ],
+  "key": {
+    "N": {
+      "item": "singulo:nihonium_ingot"
+    }
+  },
+  "result": {
+    "item": "singulo_arsenal:nihonium_boots",
+    "count": 1
+  }
+}

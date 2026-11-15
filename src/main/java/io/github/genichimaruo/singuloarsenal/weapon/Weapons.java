@@ -116,7 +116,7 @@ public final class Weapons {
 
     /** Called after vanilla armor absorption, before enchantment and resistance reductions. */
     public static float afterArmor(LivingEntity target, net.minecraft.world.damagesource.DamageSource source, float raw, float armored) {
-        if (source.is(ArsenalDamage.JET)) return raw - (raw - armored) * Rules.LANCE_ARMOR_KEPT;
+        if (source.is(ArsenalDamage.JET)) return raw - (raw - armored) * Rules.CANNON_ARMOR_KEPT;
         if (source.is(DamageTypes.PLAYER_ATTACK) && source.getDirectEntity() instanceof Player attacker
                 && source.getEntity() == attacker && attacker.getMainHandItem().getItem() instanceof CasimirBladeItem blade) {
             if (blade.consumeArmed(attacker, attacker.getMainHandItem(), target)) return raw * Rules.CASIMIR_ARMED_BONUS;
