@@ -21,7 +21,7 @@ public final class ArsenalRenderTypes {
     private ArsenalRenderTypes() {}
     private static RenderPipeline pipeline(String name, CompareOp depth) {
         return RenderPipeline.builder()
-                .withLocation("singulo_arsenal:pipeline/" + name)
+                .withLocation(net.minecraft.resources.Identifier.parse("singulo_arsenal:pipeline/" + name))
                 .withVertexShader("core/rendertype_lightning").withFragmentShader("core/rendertype_lightning")
                 .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
                 .withUniform("Projection", UniformType.UNIFORM_BUFFER)
@@ -33,5 +33,7 @@ public final class ArsenalRenderTypes {
     public static void register(RegisterRenderPipelinesEvent event) {
         event.registerPipeline(GLOW_PIPELINE);
         event.registerPipeline(XRAY_PIPELINE);
+        io.github.genichimaruo.singuloarsenal.client.ShaderCompat.registerPositionColorPipeline(GLOW_PIPELINE);
+        io.github.genichimaruo.singuloarsenal.client.ShaderCompat.registerPositionColorPipeline(XRAY_PIPELINE);
     }
 }

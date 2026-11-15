@@ -1,6 +1,6 @@
 # Minecraft 26.1.2 development port
 
-Status: compilation checkpoint, **not release-ready**. Existing 1.21.1 and 1.20.1 releases are unchanged.
+Status: headless and vanilla-renderer client validation checkpoint; **shader compatibility remains blocked, not release-ready**. Existing 1.21.1 and 1.20.1 releases are unchanged.
 
 ## Target
 
@@ -28,7 +28,7 @@ Status: compilation checkpoint, **not release-ready**. Existing 1.21.1 and 1.20.
 ## Required before merge or publication
 
 1. Headless integration is complete against real Singulo SHA-256 `793CA88A01C0EB57F1D1B3671938049452ECCF75CA7BFA55FF526EE78F9DA298`: all 65 distinct Arsenal tests, including six legacy cannon-ID migration tests and SMES charge conservation, passed (66 required including vanilla baseline). Keep this gate in CI.
-2. Run a client and visually check normal/shader rendering, cannon aim and hands, offhand suppression, beam origin, armor, item-frame centering, and Integrator GUI. Lensing/reflection bridges must agree with the completed Singulo renderer.
+2. Vanilla client checks are recorded below. Shader-enabled validation remains blocked by the reproduced vanilla-item renderer failure in the dependency-only control environment. Lensing/reflection bridges must remain aligned with the completed Singulo renderer.
 3. Update CI Java/toolchain and pin a validated 26.1.2 Singulo commit/artifact; the current integration workflow still targets the established 1.21.1 release. Configure release metadata deliberately only after these gates pass. Publishing remains restricted to the existing release branch.
 
 The build output is a development artifact, not a verified distributable release. No PR, merge, remote push, or publication was performed for this checkpoint.
@@ -45,3 +45,19 @@ Second real run with the recipe-corrected Singulo artifact executed all 65 Arsen
 Development JAR SHA-256: `75FF87102630690215441552CA318791EDB193997E3110FE4D1CED38F5CF4229`. Test classes, test instances, and the isolated drill arena are absent from this JAR.
 
 Final verification against Singulo SHA-256 `0B42F241C71ECF36C1DDEBD5D5303DCF79547522C5C2FC5166015A493A04AD25`: `final-singulo-integration.log` confirms all 65 Arsenal IDs, all 66 required tests, and Gradle `runGameTestServer build` succeeded. Arsenal JAR hash remains unchanged. No UI launched.
+
+## Client review, 2026-11-15
+
+Real vanilla-renderer client review completed 68 deterministic captures (dominant hand, main/offhand cannon, six camera angles per arm, charge/fire/reload, eight wall-frame weapons/tools, 24 cannon frame orientations). Images were inspected; orientation, beam alignment and frame centering are consistent. Offhand cannon intentionally has no custom two-arm pose, so its visible vanilla main hand is not a third hand. Main-hand cannon suppresses the other held item.
+
+Client-only startup exposed invalid namespaced String pipeline/shader IDs in MC26. These are now explicit Identifiers. MC26 also rejects the old empty powered equipment layers; valid transparent layers now preserve the custom suit renderer. The review harness models the new ItemTransform internal half-block translation when auditing FIXED centering.
+
+Shader boundary: official SHA-512-verified Iris 1.11.4/Sodium 0.9.2 and Iris 1.11.3/Sodium 0.9.1 both hit `Missing sampler Sampler1` for vanilla `item_cutout` (item atlas, overlay disabled), with Complementary Reimagined r5.9.3 and r5.8. The decisive control run removed BOTH Singulo and Arsenal: vanilla diamond sword in hand rendered, but dropping it reproduced the same crash (`shader-baseline.log`, mod list contains only Minecraft/NeoForge/Iris/Sodium). Therefore a shader pass is NOT claimed. No generic vanilla sampler injection or shader validation bypass was added. Arsenal glow/XRAY are explicitly assigned through Iris's optional public pipeline API while retaining their original depth and blend settings.
+
+All review worlds are disposable. Music and master volume are zero; weather is clear and `advance_weather=false`. OS sound and ordinary play worlds are unchanged.
+
+## Final visual checkpoint
+
+The full vanilla review completed 85 PNG captures with BUILD SUCCESSFUL (`visual-full-review.log`), in addition to the focused 68-capture hand/frame run. Inspected weapon directions, charge/reload effects, powered armor front/back, bits, Integrator block and GUI, and collapse/meltdown effects have no obvious missing geometry or missing textures. Coverage limitations: the scan fixture found zero ores because sensitivity was insufficient, so XRAY ore markers are not visually verified; the final inventory capture is the creative inventory rather than the equipped-player preview.
+
+After restoring the normal production build configuration, `final-visual-build.log` confirms all 65 distinct Arsenal tests and all 66 required tests passed, 5,331 rules and the normal build passed against real Singulo SHA-256 `521AAA4699FDF7CB7306C5047CA09A2AC9141711884C51C40373987CFD2F73A1`. No stub was used. The resulting development JAR SHA-256 is `D6DAE91927180F7970550CAF1446AE08E44953FCA80EDAF2686D0FD21C73E51E`. Archive inspection confirms no review classes, diagnostic mixin/config, GameTests, test instances, or drill arena are packaged. The shader control failure above remains a release limitation, not a successful shader test. Clients have exited; no publish/push/merge performed.

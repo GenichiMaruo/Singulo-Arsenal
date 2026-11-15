@@ -22,8 +22,8 @@ import net.minecraft.world.phys.Vec3;
  */
 final class JetTube {
     private static final com.mojang.blaze3d.pipeline.RenderPipeline PIPELINE = com.mojang.blaze3d.pipeline.RenderPipeline.builder()
-            .withLocation("singulo_arsenal:pipeline/jet")
-            .withVertexShader("singulo:core/jet_beam").withFragmentShader("singulo:core/jet_beam")
+            .withLocation(Identifier.parse("singulo_arsenal:pipeline/jet"))
+            .withVertexShader(Identifier.parse("singulo:core/jet_beam")).withFragmentShader(Identifier.parse("singulo:core/jet_beam"))
             .withUniform("DynamicTransforms", com.mojang.blaze3d.shaders.UniformType.UNIFORM_BUFFER)
             .withUniform("Projection", com.mojang.blaze3d.shaders.UniformType.UNIFORM_BUFFER)
             .withUniform("Globals", com.mojang.blaze3d.shaders.UniformType.UNIFORM_BUFFER)

@@ -1,0 +1,8 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "io.github.genichimaruo.singuloarsenal.review.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "client": ["RenderTypeDiagnosticMixin"],
+  "injectors": {"defaultRequire": 1}
+}

@@ -1454,3 +1454,14 @@ FINE_BANDS = [fine_rng.randint(-16, 16) for _ in range(FINE_SIZE)]
 png(f'assets/{MOD}/textures/misc/material_fine.png', FINE_SIZE, FINE_SIZE,
     [grey(226 + FINE_BANDS[x] + fine_rng.randint(-6, 6) - (34 if fine_rng.random() < 0.012 else 0))
      for y in range(FINE_SIZE) for x in range(FINE_SIZE)])
+
+# Powered armor is rendered by SuitLayer. Minecraft 26 requires a non-empty
+# equipment map and non-empty layer lists, so retain a valid invisible vanilla
+# layer rather than relying on a rejected empty asset / missing-model fallback.
+write(f'assets/{MOD}/equipment/powered.json', {'layers': {
+    layer: [{'texture': own('powered_invisible')}]
+    for layer in ('humanoid', 'humanoid_leggings', 'humanoid_baby')
+}})
+for layer in ('humanoid', 'humanoid_leggings', 'humanoid_baby'):
+    png(f'assets/{MOD}/textures/entity/equipment/{layer}/powered_invisible.png', 64, 32,
+        [(0, 0, 0, 0)] * (64 * 32))

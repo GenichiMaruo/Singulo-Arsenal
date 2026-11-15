@@ -1,1 +1,19 @@
-{"layers":{}}
+{
+  "layers": {
+    "humanoid": [
+      {
+        "texture": "singulo_arsenal:powered_invisible"
+      }
+    ],
+    "humanoid_leggings": [
+      {
+        "texture": "singulo_arsenal:powered_invisible"
+      }
+    ],
+    "humanoid_baby": [
+      {
+        "texture": "singulo_arsenal:powered_invisible"
+      }
+    ]
+  }
+}
