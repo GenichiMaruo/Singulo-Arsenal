@@ -125,17 +125,21 @@ assert 'singulo_arsenal:collapsar_lamina' in (recipes / 'jet_lance.json').read_t
 # With a Singulo checkout, every ingredient is checked against the real generated recipe/item data.
 if os.environ.get('SINGULO_SOURCE'):
     singulo = Path(os.environ['SINGULO_SOURCE']) / 'src/generated/resources'
-    known = {p.stem for p in (singulo / 'assets/singulo/models/item').glob('*.json')}
+    known = {p.stem for p in (singulo / 'assets/singulo/items').glob('*.json')}
+    assert known, 'Singulo checkout has no 26.x item definitions'
     fluids = {m for p in (singulo / 'data/singulo/recipe').rglob('*.json')
               for m in re.findall(r'"fluid": "singulo:([a-z0-9_]+)"', p.read_text(encoding='utf-8'))}
     used = 0
     for path in recipes.glob('*.json'):
         text = path.read_text(encoding='utf-8')
-        for ref in re.findall(r'"item": "singulo:([a-z0-9_]+)"', text):
+        recipe = json.loads(text)
+        ingredient_data = recipe.get('key', {}) if recipe['type'] == 'minecraft:crafting_shaped' else recipe.get('ingredients', [])
+        for ref in re.findall(r'"singulo:([a-z0-9_]+)"', json.dumps(ingredient_data)):
             assert ref in known, f'unknown Singulo item {ref} in {path.name}'
             used += 1
         for ref in re.findall(r'"fluid": "singulo:([a-z0-9_]+)"', text):
             assert ref in fluids, f'unknown Singulo fluid {ref} in {path.name}'
+    assert used > 0, 'No Singulo ingredient references were checked'
     print(f'{used} Singulo ingredient references resolved against the checkout')
 
 

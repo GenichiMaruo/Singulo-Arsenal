@@ -1,4 +1,12 @@
-# Singulo Arsenal 0.3.0
+# Singulo Arsenal 0.3.0 for Minecraft 26.1.2 NeoForge
+
+- Port to Minecraft 26.1.2, NeoForge 26.1.2.126 or newer, and Java 25.
+- Requires the matching Minecraft 26.1.2 build of Singulo 0.19.0 or newer.
+- Update transactional energy, persistence, item definitions, armor and render pipelines.
+- Verified with 65 addon GameTests and vanilla client visual review.
+- Known limitation: shader support is not verified on this port. Iris 1.11.3/1.11.4 with Complementary can fail development GL validation with `Missing sampler Sampler1`, also reproduced without Singulo or Arsenal. Use the normal renderer if affected. See Iris issue #3347. This does not establish that the same exception occurs in production installations.
+
+## Features retained from 0.3.0
 
 - Add ordinary nihonium tools and armor with durability, repair and vanilla enchantments, but no FE or special abilities.
 - Refresh armor inventory sprites and fit the cannon icon diagonally.

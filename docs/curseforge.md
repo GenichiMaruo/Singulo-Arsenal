@@ -1,3 +1,13 @@
+# Minecraft 26.1.2 release branch
+
+This branch publishes only `Singulo-Arsenal-0.3.0-26.1.2N.jar` for NeoForge, Java 25, with required Singulo 0.19.0+ for the same Minecraft version. Existing 1.21.1/1.20.1 branches are unchanged.
+
+Use `.github/workflows/publish-curseforge.yml` on `26.1.2`: first `dry_run=true`, then one authorized `dry_run=false` run after reviewing the same-commit build/integration result and existing CurseForge files. The workflow rebuilds and tests its exact commit, then uploads only that run's validated artifact. Record the SHA-256 and returned file ID; an uncertain upload must be investigated, never automatically retried. Verify the matching base Singulo file is publicly accessible before publishing this addon.
+
+Client results and the unverified Iris shader limitation are in [port validation](development/port-26.1.2.md). Current release notes are [0.3.0](curseforge/changelog-0.3.0.md).
+
+## Historical 1.21.1 instructions (not the current branch)
+
 # 公開・配布手順
 
 ## 配布方針
