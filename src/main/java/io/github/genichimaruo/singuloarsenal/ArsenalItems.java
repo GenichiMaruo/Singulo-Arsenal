@@ -22,10 +22,10 @@ import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.sounds.SoundEvents;
-import net.minecraft.world.item.ArmorItem;
-import net.minecraft.world.item.ArmorMaterial;
+import net.minecraft.world.item.equipment.ArmorType;
+import net.minecraft.world.item.equipment.ArmorMaterial;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -38,10 +38,9 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 
 public final class ArsenalItems {
     public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(SinguloArsenal.MOD_ID);
-    private static final DeferredRegister<ArmorMaterial> MATERIALS = DeferredRegister.create(Registries.ARMOR_MATERIAL, SinguloArsenal.MOD_ID);
     private static final DeferredRegister<CreativeModeTab> TABS = DeferredRegister.create(Registries.CREATIVE_MODE_TAB, SinguloArsenal.MOD_ID);
-    public static final List<ArmorItem.Type> PIECES = List.of(ArmorItem.Type.HELMET, ArmorItem.Type.CHESTPLATE, ArmorItem.Type.LEGGINGS, ArmorItem.Type.BOOTS);
-    public static final Map<ArmorSet, Map<ArmorItem.Type, DeferredItem<SuitItem>>> SUITS = new EnumMap<>(ArmorSet.class);
+    public static final List<ArmorType> PIECES = List.of(ArmorType.HELMET, ArmorType.CHESTPLATE, ArmorType.LEGGINGS, ArmorType.BOOTS);
+    public static final Map<ArmorSet, Map<ArmorType, DeferredItem<SuitItem>>> SUITS = new EnumMap<>(ArmorSet.class);
 
     public static final DeferredItem<Item> FLUX_WEAVE = ITEMS.registerSimpleItem("flux_weave");
     public static final DeferredItem<Item> PRESSURE_LATTICE = ITEMS.registerSimpleItem("pressure_lattice");
@@ -49,51 +48,50 @@ public final class ArsenalItems {
     public static final DeferredItem<Item> JET_COLLIMATOR = ITEMS.registerSimpleItem("jet_collimator");
     public static final DeferredItem<Item> TIDAL_EDGE = ITEMS.registerSimpleItem("tidal_edge");
 
-    public static final DeferredItem<QuenchSaberItem> QUENCH_SABER = ITEMS.register("quench_saber", QuenchSaberItem::new);
-    public static final DeferredItem<CasimirBladeItem> CASIMIR_BLADE = ITEMS.register("casimir_blade", CasimirBladeItem::new);
-    public static final DeferredItem<TidalReaverItem> TIDAL_REAVER = ITEMS.register("tidal_reaver", TidalReaverItem::new);
-    public static final DeferredItem<JetCannonItem> JET_CANNON = ITEMS.register("jet_cannon", JetCannonItem::new);
+    public static final DeferredItem<QuenchSaberItem> QUENCH_SABER = ITEMS.registerItem("quench_saber", QuenchSaberItem::new);
+    public static final DeferredItem<CasimirBladeItem> CASIMIR_BLADE = ITEMS.registerItem("casimir_blade", CasimirBladeItem::new);
+    public static final DeferredItem<TidalReaverItem> TIDAL_REAVER = ITEMS.registerItem("tidal_reaver", TidalReaverItem::new);
+    public static final DeferredItem<JetCannonItem> JET_CANNON = ITEMS.registerItem("jet_cannon", JetCannonItem::new);
 
-    public static final DeferredItem<SquidPickItem> SQUID_PICK = ITEMS.register("squid_pick", SquidPickItem::new);
-    public static final DeferredItem<DegeneracyBreakerItem> DEGENERACY_BREAKER = ITEMS.register("degeneracy_breaker", DegeneracyBreakerItem::new);
-    public static final DeferredItem<ShearSawItem> SHEAR_SAW = ITEMS.register("shear_saw", ShearSawItem::new);
-    public static final DeferredItem<AccretionDrillItem> ACCRETION_DRILL = ITEMS.register("accretion_drill", AccretionDrillItem::new);
+    public static final DeferredItem<SquidPickItem> SQUID_PICK = ITEMS.registerItem("squid_pick", SquidPickItem::new);
+    public static final DeferredItem<DegeneracyBreakerItem> DEGENERACY_BREAKER = ITEMS.registerItem("degeneracy_breaker", DegeneracyBreakerItem::new);
+    public static final DeferredItem<ShearSawItem> SHEAR_SAW = ITEMS.registerItem("shear_saw", ShearSawItem::new);
+    public static final DeferredItem<AccretionDrillItem> ACCRETION_DRILL = ITEMS.registerItem("accretion_drill", AccretionDrillItem::new);
     public static final DeferredItem<io.github.genichimaruo.singuloarsenal.core.PelletCanisterItem> PELLET_CANISTER =
-            ITEMS.register("pellet_canister", io.github.genichimaruo.singuloarsenal.core.PelletCanisterItem::new);
+            ITEMS.registerItem("pellet_canister", io.github.genichimaruo.singuloarsenal.core.PelletCanisterItem::new);
 
     static {
         // The registry alias resolves legacy stacks and datapack item references to the same item.
         // Components stay untouched; subsequent saves use the canonical jet_cannon ID.
-        ITEMS.addAlias(ResourceLocation.fromNamespaceAndPath(SinguloArsenal.MOD_ID, "jet_lance"),
-                ResourceLocation.fromNamespaceAndPath(SinguloArsenal.MOD_ID, "jet_cannon"));
+        ITEMS.addAlias(Identifier.fromNamespaceAndPath(SinguloArsenal.MOD_ID, "jet_lance"),
+                Identifier.fromNamespaceAndPath(SinguloArsenal.MOD_ID, "jet_cannon"));
         // The suit is drawn by SuitLayer, so the material has no texture layers. Its sound is silent because vanilla
         // replays the equip sound whenever a worn stack's components change, which here is every FE payment.
         Holder<net.minecraft.sounds.SoundEvent> silent = BuiltInRegistries.SOUND_EVENT.wrapAsHolder(SoundEvents.EMPTY);
         for (ArmorSet set : ArmorSet.values()) {
-            Holder<ArmorMaterial> material = MATERIALS.register(set.id, () -> {
-                var defense = new EnumMap<ArmorItem.Type, Integer>(ArmorItem.Type.class);
-                defense.put(ArmorItem.Type.BOOTS, set.defense[0]);
-                defense.put(ArmorItem.Type.LEGGINGS, set.defense[1]);
-                defense.put(ArmorItem.Type.CHESTPLATE, set.defense[2]);
-                defense.put(ArmorItem.Type.HELMET, set.defense[3]);
-                defense.put(ArmorItem.Type.BODY, set.defense[2]);
-                return new ArmorMaterial(defense, set.enchantability, silent,
-                        () -> Ingredient.of(BuiltInRegistries.ITEM.get(ResourceLocation.fromNamespaceAndPath("singulo", set.repairMaterial))),
-                        List.of(), set.toughness, set.knockbackResistance);
-            });
-            var pieces = new EnumMap<ArmorItem.Type, DeferredItem<SuitItem>>(ArmorItem.Type.class);
-            for (ArmorItem.Type type : PIECES) {
-                pieces.put(type, ITEMS.register(set.id + "_" + type.getName(), () -> new SuitItem(material, type, set)));
+            var defense = new EnumMap<ArmorType, Integer>(ArmorType.class);
+            defense.put(ArmorType.BOOTS, set.defense[0]);
+            defense.put(ArmorType.LEGGINGS, set.defense[1]);
+            defense.put(ArmorType.CHESTPLATE, set.defense[2]);
+            defense.put(ArmorType.HELMET, set.defense[3]);
+            defense.put(ArmorType.BODY, set.defense[2]);
+            ArmorMaterial material = new ArmorMaterial(set.durability, defense, set.enchantability, silent,
+                    set.toughness, set.knockbackResistance,
+                    net.minecraft.tags.TagKey.create(Registries.ITEM, SinguloArsenal.id("repair/" + set.repairMaterial)),
+                    net.minecraft.resources.ResourceKey.create(net.minecraft.world.item.equipment.EquipmentAssets.ROOT_ID, SinguloArsenal.id("powered")));
+            var pieces = new EnumMap<ArmorType, DeferredItem<SuitItem>>(ArmorType.class);
+            for (ArmorType type : PIECES) {
+                pieces.put(type, ITEMS.registerItem(set.id + "_" + type.getName(), properties -> new SuitItem(properties, material, type, set)));
             }
             SUITS.put(set, pieces);
         }
-        Nihonium.register(ITEMS, MATERIALS, PIECES);
+        Nihonium.register(ITEMS, PIECES);
         TABS.register("arsenal", () -> CreativeModeTab.builder()
                 .title(Component.translatable("itemGroup.singulo_arsenal"))
                 .icon(() -> new ItemStack(ModuleContent.INTEGRATOR_ITEM.get()))
                 .displayItems((params, output) -> {
                     for (ArmorSet set : ArmorSet.values()) {
-                        for (ArmorItem.Type type : PIECES) output.accept(charged(SUITS.get(set).get(type).get()));
+                        for (ArmorType type : PIECES) output.accept(charged(SUITS.get(set).get(type).get()));
                     }
                     output.accept(charged(QUENCH_SABER.get()));
                     output.accept(charged(CASIMIR_BLADE.get()));
@@ -103,7 +101,7 @@ public final class ArsenalItems {
                     output.accept(charged(DEGENERACY_BREAKER.get()));
                     output.accept(charged(SHEAR_SAW.get()));
                     output.accept(charged(ACCRETION_DRILL.get()));
-                    for (ArmorItem.Type type : PIECES) output.accept(Nihonium.ARMOR.get(type).get());
+                    for (ArmorType type : PIECES) output.accept(Nihonium.ARMOR.get(type).get());
                     output.accept(Nihonium.SWORD.get());
                     output.accept(Nihonium.PICKAXE.get());
                     output.accept(Nihonium.AXE.get());
@@ -136,7 +134,7 @@ public final class ArsenalItems {
     }
 
     public static void register(IEventBus bus) {
-        MATERIALS.register(bus);
+
         ITEMS.register(bus);
         TABS.register(bus);
         bus.addListener(ArsenalItems::capabilities);
@@ -144,7 +142,7 @@ public final class ArsenalItems {
 
     private static void capabilities(RegisterCapabilitiesEvent event) {
         for (Item item : powered()) {
-            event.registerItem(Capabilities.EnergyStorage.ITEM, (stack, context) -> Fe.storage(stack), item);
+            event.registerItem(Capabilities.Energy.ITEM, Fe::handler, item);
         }
     }
 }

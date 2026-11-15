@@ -23,7 +23,7 @@ public final class IntegratorBlock extends BaseEntityBlock {
 
     @Override protected MapCodec<? extends BaseEntityBlock> codec() { return CODEC; }
     /** The whole machine is drawn by its block entity renderer, so its arms and work piece can move. */
-    @Override protected RenderShape getRenderShape(BlockState state) { return RenderShape.ENTITYBLOCK_ANIMATED; }
+    @Override protected RenderShape getRenderShape(BlockState state) { return RenderShape.INVISIBLE; }
     @Override public BlockEntity newBlockEntity(BlockPos pos, BlockState state) { return new IntegratorBlockEntity(pos, state); }
 
     @Override
@@ -33,20 +33,10 @@ public final class IntegratorBlock extends BaseEntityBlock {
 
     @Override
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit) {
-        if (!level.isClientSide && level.getBlockEntity(pos) instanceof IntegratorBlockEntity entity) {
+        if (!level.isClientSide() && level.getBlockEntity(pos) instanceof IntegratorBlockEntity entity) {
             player.openMenu(entity, pos);
         }
-        return InteractionResult.sidedSuccess(level.isClientSide);
+        return InteractionResult.SUCCESS;
     }
 
-    /** Nothing a player put in here may vanish with the block. */
-    @Override
-    protected void onRemove(BlockState state, Level level, BlockPos pos, BlockState next, boolean moved) {
-        if (!state.is(next.getBlock()) && level.getBlockEntity(pos) instanceof IntegratorBlockEntity entity) {
-            for (int i = 0; i < IntegratorBlockEntity.SLOTS; i++) {
-                Containers.dropItemStack(level, pos.getX(), pos.getY(), pos.getZ(), entity.items().getStackInSlot(i));
-            }
-        }
-        super.onRemove(state, level, pos, next, moved);
-    }
 }

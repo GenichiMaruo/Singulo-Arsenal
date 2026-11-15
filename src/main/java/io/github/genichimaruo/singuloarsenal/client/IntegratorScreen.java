@@ -8,7 +8,7 @@ import io.github.genichimaruo.singuloarsenal.module.IntegratorBlockEntity;
 import io.github.genichimaruo.singuloarsenal.module.IntegratorMenu;
 import java.util.ArrayList;
 import java.util.List;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
@@ -16,7 +16,7 @@ import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.Slot;
-import net.minecraft.world.item.ArmorItem;
+import net.minecraft.world.item.equipment.ArmorType;
 import net.minecraft.world.item.ItemStack;
 
 /** Laid out by Singulo's rules: header with a status chip, the machine's own part, a groove, the inventory. Numbers are icons and values; sentences live in tooltips. */
@@ -28,14 +28,13 @@ public final class IntegratorScreen extends AbstractContainerScreen<IntegratorMe
     private final ItemStack ghost;
 
     public IntegratorScreen(IntegratorMenu menu, Inventory inventory, Component title) {
-        super(menu, inventory, title);
-        imageWidth = IntegratorMenu.WIDTH;
-        imageHeight = IntegratorMenu.HEIGHT;
+        super(menu, inventory, title, IntegratorMenu.WIDTH, IntegratorMenu.HEIGHT);
+
         titleLabelX = 8;
         titleLabelY = 6;
         inventoryLabelX = IntegratorMenu.INVENTORY_X;
         inventoryLabelY = imageHeight - 93;
-        ghost = new ItemStack(ArsenalItems.SUITS.get(ArmorSet.COLLAPSAR).get(ArmorItem.Type.CHESTPLATE).get());
+        ghost = new ItemStack(ArsenalItems.SUITS.get(ArmorSet.COLLAPSAR).get(ArmorType.CHESTPLATE).get());
     }
 
     private record State(GuiKit.Status icon, int color, String key) {}
@@ -59,7 +58,8 @@ public final class IntegratorScreen extends AbstractContainerScreen<IntegratorMe
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {
+        double mouseX=event.x(), mouseY=event.y(); int button=event.button();
         if (button == 0 && menu.canStart() && GuiKit.inside(mouseX, mouseY, leftPos + BUTTON_X, topPos + BUTTON_Y, BUTTON_W, BUTTON_H)) {
             if (minecraft != null && minecraft.gameMode != null) {
                 minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 0);
@@ -67,13 +67,13 @@ public final class IntegratorScreen extends AbstractContainerScreen<IntegratorMe
             }
             return true;
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClicked(event, doubleClick);
     }
 
     @Override
-    public void render(GuiGraphics gui, int mouseX, int mouseY, float partial) {
-        super.render(gui, mouseX, mouseY, partial);
-        renderTooltip(gui, mouseX, mouseY);
+    public void extractRenderState(GuiGraphicsExtractor gui, int mouseX, int mouseY, float partial) {
+        super.extractRenderState(gui, mouseX, mouseY, partial);
+
         List<Component> tip = hovered(mouseX, mouseY);
         if (!tip.isEmpty() && hoveredSlot == null) GuiKit.tooltip(gui, font, tip, 200, mouseX, mouseY);
     }
@@ -97,7 +97,8 @@ public final class IntegratorScreen extends AbstractContainerScreen<IntegratorMe
     }
 
     @Override
-    protected void renderBg(GuiGraphics gui, float partial, int mouseX, int mouseY) {
+    public void extractBackground(GuiGraphicsExtractor gui, int mouseX, int mouseY, float partial) {
+        super.extractBackground(gui, mouseX, mouseY, partial);
         int x = leftPos, y = topPos;
         GuiKit.frame(gui, x, y, imageWidth, imageHeight);
         GuiKit.header(gui, x, y, imageWidth);
@@ -114,30 +115,30 @@ public final class IntegratorScreen extends AbstractContainerScreen<IntegratorMe
                 GuiKit.lockedSlot(gui, sx, sy);
             } else {
                 GuiKit.slot(gui, sx, sy);
-                if (socket && slot.hasItem() && !menu.socketHolds(i - IntegratorBlockEntity.FIRST_SOCKET)) gui.renderOutline(sx - 1, sy - 1, 18, 18, GuiKit.BAD);
+                if (socket && slot.hasItem() && !menu.socketHolds(i - IntegratorBlockEntity.FIRST_SOCKET)) gui.outline(sx - 1, sy - 1, 18, 18, GuiKit.BAD);
             }
         }
         if (!menu.slots.get(IntegratorBlockEntity.GEAR).hasItem()) {
             Slot bed = menu.slots.get(IntegratorBlockEntity.GEAR);
-            gui.pose().pushPose();
-            gui.renderItem(ghost, x + bed.x, y + bed.y);
-            gui.pose().translate(0, 0, 200);
+            gui.pose().pushMatrix();
+            gui.item(ghost, x + bed.x, y + bed.y);
+            gui.nextStratum();
             gui.fill(x + bed.x, y + bed.y, x + bed.x + 16, y + bed.y + 16, 0xA05A646E);
-            gui.pose().popPose();
+            gui.pose().popMatrix();
         }
 
         GuiKit.labelButton(gui, font, x + BUTTON_X, y + BUTTON_Y, BUTTON_W, BUTTON_H, line("integrate"), buttonState(mouseX, mouseY));
 
         GuiKit.bolt(gui, x + COST_X, y + STAT_Y, GuiKit.WARN);
-        gui.drawString(font, Rules.compactEnergy((long) Rules.INTEGRATE_TICKS * Rules.INTEGRATE_FE_PER_TICK), x + COST_X + 10, y + STAT_Y, GuiKit.TEXT, false);
+        gui.text(font, Rules.compactEnergy((long) Rules.INTEGRATE_TICKS * Rules.INTEGRATE_FE_PER_TICK), x + COST_X + 10, y + STAT_Y, GuiKit.TEXT, false);
         GuiKit.hourglass(gui, x + TIME_X, y + STAT_Y, GuiKit.DIM);
-        gui.drawString(font, Rules.INTEGRATE_TICKS / 20 + "s", x + TIME_X + 10, y + STAT_Y, GuiKit.TEXT, false);
+        gui.text(font, Rules.INTEGRATE_TICKS / 20 + "s", x + TIME_X + 10, y + STAT_Y, GuiKit.TEXT, false);
     }
 
     @Override
-    protected void renderLabels(GuiGraphics gui, int mouseX, int mouseY) {
-        gui.drawString(font, title, titleLabelX, titleLabelY, GuiKit.TEXT, false);
-        gui.drawString(font, playerInventoryTitle, inventoryLabelX, inventoryLabelY, GuiKit.TEXT, false);
+    protected void extractLabels(GuiGraphicsExtractor gui, int mouseX, int mouseY) {
+        gui.text(font, title, titleLabelX, titleLabelY, GuiKit.TEXT, false);
+        gui.text(font, playerInventoryTitle, inventoryLabelX, inventoryLabelY, GuiKit.TEXT, false);
         State state = state();
         GuiKit.chip(gui, imageWidth - 6, GuiKit.POWER_Y, state.icon, state.color);
     }

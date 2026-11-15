@@ -7,15 +7,9 @@
     " F "
   ],
   "key": {
-    "M": {
-      "item": "singulo:mirror_plate"
-    },
-    "E": {
-      "item": "singulo:exotic_matter"
-    },
-    "F": {
-      "item": "singulo:nihonium_frame"
-    }
+    "M": "singulo:mirror_plate",
+    "E": "singulo:exotic_matter",
+    "F": "singulo:nihonium_frame"
   },
   "result": {
     "id": "singulo_arsenal:casimir_blade",

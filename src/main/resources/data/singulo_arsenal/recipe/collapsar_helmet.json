@@ -6,18 +6,10 @@
     "FOF"
   ],
   "key": {
-    "L": {
-      "item": "singulo_arsenal:collapsar_lamina"
-    },
-    "Q": {
-      "item": "singulo:quantum_computing_module"
-    },
-    "F": {
-      "item": "singulo:tidal_filament"
-    },
-    "O": {
-      "item": "singulo:optical_lattice_substrate"
-    }
+    "L": "singulo_arsenal:collapsar_lamina",
+    "Q": "singulo:quantum_computing_module",
+    "F": "singulo:tidal_filament",
+    "O": "singulo:optical_lattice_substrate"
   },
   "result": {
     "id": "singulo_arsenal:collapsar_helmet",

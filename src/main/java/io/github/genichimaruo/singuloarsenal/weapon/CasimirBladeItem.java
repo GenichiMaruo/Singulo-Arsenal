@@ -7,12 +7,12 @@ import io.github.genichimaruo.singuloarsenal.net.FxPayload;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResultHolder;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Rarity;
-import net.minecraft.world.item.UseAnim;
+import net.minecraft.world.item.ItemUseAnimation;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
@@ -21,30 +21,30 @@ import net.minecraft.world.phys.Vec3;
  * vacuum. Holding use draws the mirrors together; the next hit then ignores armor outright.
  */
 public final class CasimirBladeItem extends PoweredSword {
-    public CasimirBladeItem() {
-        super(WeaponTier.CASIMIR, 12, -2.4F, Rules.CASIMIR_CAPACITY, 4, Rarity.RARE);
+    public CasimirBladeItem(net.minecraft.world.item.Item.Properties properties) {
+        super(properties, WeaponTier.CASIMIR, 12, -2.4F, Rules.CASIMIR_CAPACITY, 4, Rarity.RARE);
     }
 
     @Override public int getUseDuration(ItemStack stack, LivingEntity entity) { return Rules.CASIMIR_CLOSE_TICKS; }
-    @Override public UseAnim getUseAnimation(ItemStack stack) { return UseAnim.NONE; }
+    @Override public ItemUseAnimation getUseAnimation(ItemStack stack) { return ItemUseAnimation.NONE; }
 
     @Override
-    public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
+    public InteractionResult use(Level level, Player player, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
-        if (hand != InteractionHand.MAIN_HAND || player.getCooldowns().isOnCooldown(this)) return InteractionResultHolder.fail(stack);
+        if (hand != InteractionHand.MAIN_HAND || player.getCooldowns().isOnCooldown(stack)) return InteractionResult.FAIL;
         if (Fe.stored(stack) < Rules.CASIMIR_FE) {
-            if (!level.isClientSide) player.displayClientMessage(Component.translatable("message.singulo_arsenal.no_energy"), true);
-            return InteractionResultHolder.fail(stack);
+            if (!level.isClientSide()) player.sendOverlayMessage(Component.translatable("message.singulo_arsenal.no_energy"));
+            return InteractionResult.FAIL;
         }
         player.startUsingItem(hand);
-        return InteractionResultHolder.consume(stack);
+        return InteractionResult.CONSUME;
     }
 
     @Override
     public ItemStack finishUsingItem(ItemStack stack, Level level, LivingEntity entity) {
         if (level instanceof ServerLevel server && entity instanceof Player player && Fe.spend(stack, Rules.CASIMIR_FE)) {
             stack.set(ArsenalData.ARMED_UNTIL.get(), server.getGameTime() + Rules.CASIMIR_ARMED_TICKS);
-            player.getCooldowns().addCooldown(this, Weapons.cooled(stack, Rules.CASIMIR_COOLDOWN));
+            player.getCooldowns().addCooldown(player.getMainHandItem(), Weapons.cooled(stack, Rules.CASIMIR_COOLDOWN));
             Weapons.beginReload(stack, server.getGameTime(), Weapons.cooled(stack, Rules.CASIMIR_COOLDOWN));
             Weapons.sound(player, "casimir_cavity_running", 1, 1.7F);
         }

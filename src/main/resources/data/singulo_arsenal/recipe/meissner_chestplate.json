@@ -7,15 +7,9 @@
     "CWC"
   ],
   "key": {
-    "W": {
-      "item": "singulo_arsenal:flux_weave"
-    },
-    "C": {
-      "item": "singulo:white_ceramic_composite"
-    },
-    "K": {
-      "item": "singulo:coolant_cartridge"
-    }
+    "W": "singulo_arsenal:flux_weave",
+    "C": "singulo:white_ceramic_composite",
+    "K": "singulo:coolant_cartridge"
   },
   "result": {
     "id": "singulo_arsenal:meissner_chestplate",

@@ -14,14 +14,14 @@ import net.minecraft.world.level.block.state.BlockState;
 
 /** A saw whose chain runs in a shear field: cut one log of a living tree and the rest of the trunk comes down. Sneak to cut a single log. */
 public final class ShearSawItem extends PoweredTool {
-    public ShearSawItem() {
-        super(ToolTier.PRESSURE, BlockTags.MINEABLE_WITH_AXE, 13, -3.0F, Rules.TIER4_TOOL_CAPACITY, 4, Rules.SAW_FE, Rarity.RARE);
+    public ShearSawItem(net.minecraft.world.item.Item.Properties properties) {
+        super(properties, ToolTier.PRESSURE, BlockTags.MINEABLE_WITH_AXE, 13, -3.0F, Rules.TIER4_TOOL_CAPACITY, 4, Rules.SAW_FE, Rarity.RARE);
     }
 
     @Override
     public List<BlockPos> alsoBreaks(ServerPlayer player, ItemStack stack, BlockPos origin, BlockState state) {
         if (player.isShiftKeyDown() || !state.is(BlockTags.LOGS)) return List.of();
-        ServerLevel level = player.serverLevel();
+        ServerLevel level = player.level();
         List<BlockPos> trunk = Mining.connected(origin, pos -> level.isLoaded(pos) && level.getBlockState(pos).is(BlockTags.LOGS)
                 && Mining.mayTake(level, stack, pos, level.getBlockState(pos), state, origin), Rules.TREE_LIMIT);
         // Only a living tree falls. Log walls and beams in a building have no natural leaves on them.

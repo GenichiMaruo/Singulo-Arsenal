@@ -10,7 +10,7 @@ import org.joml.Matrix4f;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.entity.player.PlayerRenderer;
+import net.minecraft.client.renderer.entity.player.AvatarRenderer;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemDisplayContext;
@@ -30,11 +30,11 @@ final class FirstPersonHands {
     private FirstPersonHands() {}
 
     /** Both hands: the firing hand on the pistol grip, the support hand on the fore grip or wherever the reload has taken it. */
-    static void drawCannon(Player owner, PoseStack art, MultiBufferSource buffers, int light, ItemDisplayContext context, float reload) {
-        if (!visible(owner, context)) return;
+    static void drawCannon(Hands hands, PoseStack art, MultiBufferSource buffers, int light, ItemDisplayContext context, float reload) {
+        if (hands == null || !context.firstPerson()) return;
         boolean right = context == ItemDisplayContext.FIRST_PERSON_RIGHT_HAND;
-        AbstractClientPlayer player = (AbstractClientPlayer) owner;
-        arm(player, art, buffers, light, right, 0, -0.5F, -6);
+
+        arm(hands, art, buffers, light, right, 0, -0.5F, -6);
         float x = 0, y = 12.5F, z = -4.5F;
         if (reload >= 0) {
             float reach = Rules.reloadReach(reload), cock = Rules.reloadCock(reload);
@@ -46,15 +46,41 @@ final class FirstPersonHands {
             y += (3F - y) * cock;
             z += (1 - z) * cock;
         }
-        arm(player, art, buffers, light, !right, x, y, z);
+        arm(hands, art, buffers, light, !right, x, y, z);
     }
 
-    private static boolean visible(Player owner, ItemDisplayContext context) {
-        return context.firstPerson() && owner instanceof AbstractClientPlayer && !owner.isInvisible();
+    record Hands(GeometrySnapshot right, GeometrySnapshot left) {}
+    static Hands capture(Player owner) {
+        if (!(owner instanceof AbstractClientPlayer player) || player.isInvisible()) return null;
+        return new Hands(captureArm(player, true), captureArm(player, false));
     }
-
-    private static void arm(AbstractClientPlayer player, PoseStack art, MultiBufferSource buffers, int light, boolean right, float x, float y, float z) {
-        // Solve the arm in view space, independent of how the pipeline splits the
+    private static GeometrySnapshot captureArm(AbstractClientPlayer player, boolean right) {
+        GeometrySnapshot out = new GeometrySnapshot();
+        PoseStack pose = new PoseStack();
+        pose.pushPose();
+        pose.translate((right ? 5F : -5F) / 16, -2F / 16, 0);
+        AvatarRenderer<?> renderer = Minecraft.getInstance().getEntityRenderDispatcher().getPlayerRenderer(player);
+        var model = renderer.getModel();
+        var arm = right ? model.rightArm : model.leftArm;
+        var previous = arm.storePose();
+        float sx = arm.xScale, sy = arm.yScale, sz = arm.zScale;
+        boolean visible = arm.visible, leftSleeve = model.leftSleeve.visible, rightSleeve = model.rightSleeve.visible;
+        arm.resetPose(); arm.visible = true;
+        model.leftSleeve.visible = player.isModelPartShown(net.minecraft.world.entity.player.PlayerModelPart.LEFT_SLEEVE);
+        model.rightSleeve.visible = player.isModelPartShown(net.minecraft.world.entity.player.PlayerModelPart.RIGHT_SLEEVE);
+        arm.zRot = right ? 0.1F : -0.1F;
+        arm.render(pose, out.getBuffer(net.minecraft.client.renderer.rendertype.RenderTypes.entityTranslucent(player.getSkin().body().texturePath())), -1, Canvas.noOverlay());
+        arm.loadPose(previous); arm.xScale = sx; arm.yScale = sy; arm.zScale = sz; arm.visible = visible;
+        model.leftSleeve.visible = leftSleeve; model.rightSleeve.visible = rightSleeve;
+        pose.popPose();
+        if (player.getItemBySlot(EquipmentSlot.CHEST).getItem() instanceof SuitItem suit) {
+            pose.scale(1F / 16, 1F / 16, 1F / 16);
+            Canvas.drawMaterial(pose, out, player.level().getGameTime(), -1, Canvas.noOverlay(), SuitArt.material(suit.set), false,
+                c -> SuitArt.draw(c, suit.set, right ? SuitArt.Piece.ARM_R : SuitArt.Piece.ARM_L, SuitArt.State.IDLE));
+        }
+        return out;
+    }
+    private static void arm(Hands hands, PoseStack art, MultiBufferSource buffers, int light, boolean right, float x, float y, float z) {        // Solve the arm in view space, independent of how the pipeline splits the
         // camera/bob transforms between ModelView and the item pose.
         Matrix4f modelView = new Matrix4f(RenderSystem.getModelViewMatrix());
         Vector3f hand = modelView.transformPosition(art.last().pose().transformPosition(x, y, z, new Vector3f()));
@@ -76,19 +102,6 @@ final class FirstPersonHands {
         // The arm is close to the camera while the weapon is drawn small, so a full-width arm would swamp it.
         pose.scale(0.68F, 1, 0.68F);
 
-        pose.pushPose();
-        // The model part applies its own offset from the body; cancel it so the pivot is where it was just put.
-        pose.translate((right ? 5F : -5F) / 16, -2F / 16, 0);
-        PlayerRenderer renderer = (PlayerRenderer) Minecraft.getInstance().getEntityRenderDispatcher().getRenderer(player);
-        if (right) renderer.renderRightHand(pose, buffers, light, player);
-        else renderer.renderLeftHand(pose, buffers, light, player);
-        pose.popPose();
-
-        if (player.getItemBySlot(EquipmentSlot.CHEST).getItem() instanceof SuitItem suit) {
-            pose.scale(1F / 16, 1F / 16, 1F / 16);
-            float t = player.level().getGameTime();
-            Canvas.drawMaterial(pose, buffers, t, light, Canvas.noOverlay(), SuitArt.material(suit.set), false,
-                    c -> SuitArt.draw(c, suit.set, right ? SuitArt.Piece.ARM_R : SuitArt.Piece.ARM_L, SuitArt.State.IDLE));
-        }
+        (right ? hands.right : hands.left).replay(pose, buffers, light, Canvas.noOverlay());
     }
 }

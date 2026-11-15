@@ -7,17 +7,17 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Rarity;
-import net.minecraft.world.item.SwordItem;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.context.UseOnContext;
 
 /** A sword with a charge bar, FE tooltip and the shared sneak-use charging gesture. */
-abstract class PoweredSword extends SwordItem implements ArsenalWeapon {
+abstract class PoweredSword extends Item implements ArsenalWeapon {
     private final int capacity;
     private final int stage;
 
-    PoweredSword(WeaponTier tier, int damage, float attackSpeed, int capacity, int stage, Rarity rarity) {
-        super(tier, new Properties().rarity(rarity).fireResistant().attributes(createAttributes(tier, damage, attackSpeed)));
+    PoweredSword(Properties properties, WeaponTier tier, int damage, float attackSpeed, int capacity, int stage, Rarity rarity) {
+        super(properties.sword(tier.material(), damage, attackSpeed).rarity(rarity).fireResistant());
         this.capacity = capacity;
         this.stage = stage;
     }
@@ -31,7 +31,12 @@ abstract class PoweredSword extends SwordItem implements ArsenalWeapon {
     @Override public int getBarColor(ItemStack stack) { return 0x6FE3FF; }
 
     @Override
-    public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> lines, TooltipFlag flag) {
+    public void appendHoverText(ItemStack stack, TooltipContext context, net.minecraft.world.item.component.TooltipDisplay display, java.util.function.Consumer<Component> output, TooltipFlag flag) {
+        List<Component> lines = new java.util.ArrayList<>();
+        describeHoverText(stack, context, lines, flag);
+        lines.forEach(output);
+    }
+    protected void describeHoverText(ItemStack stack, TooltipContext context, List<Component> lines, TooltipFlag flag) {
         Weapons.describe(BuiltInRegistries.ITEM.getKey(this).getPath(), stack, stage, lines);
     }
 }

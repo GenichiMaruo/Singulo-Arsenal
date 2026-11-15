@@ -5,34 +5,45 @@ import com.mojang.math.Axis;
 import io.github.genichimaruo.singuloarsenal.client.art.Canvas;
 import io.github.genichimaruo.singuloarsenal.client.art.MachineArt;
 import io.github.genichimaruo.singuloarsenal.module.IntegratorBlockEntity;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
+import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState;
+import net.minecraft.client.renderer.feature.ModelFeatureRenderer;
+import net.minecraft.client.renderer.item.ItemModelResolver;
+import net.minecraft.client.renderer.item.ItemStackRenderState;
+import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.world.item.ItemDisplayContext;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.phys.Vec3;
 
-/** The machine itself, and the gear floating on its bed while the arms work on it. */
-public final class IntegratorRenderer implements BlockEntityRenderer<IntegratorBlockEntity> {
-    public IntegratorRenderer(BlockEntityRendererProvider.Context context) {}
-
-    @Override
-    public void render(IntegratorBlockEntity entity, float partial, PoseStack pose, MultiBufferSource buffers, int light, int overlay) {
-        float t = (entity.getLevel() == null ? 0 : entity.getLevel().getGameTime()) + partial;
-        float work = entity.working() ? entity.progress(partial) : -1;
-        pose.pushPose();
+/** Extracts the machine and floating gear before deferred rendering. */
+public final class IntegratorRenderer implements BlockEntityRenderer<IntegratorBlockEntity, IntegratorRenderer.State> {
+    private final ItemModelResolver items;
+    public IntegratorRenderer(BlockEntityRendererProvider.Context context) { items = context.itemModelResolver(); }
+    public static final class State extends BlockEntityRenderState {
+        float time, work;
+        GeometrySnapshot machine;
+        final ItemStackRenderState gear = new ItemStackRenderState();
+    }
+    @Override public State createRenderState() { return new State(); }
+    @Override public void extractRenderState(IntegratorBlockEntity entity, State state, float partial, Vec3 camera, ModelFeatureRenderer.CrumblingOverlay breaking) {
+        BlockEntityRenderer.super.extractRenderState(entity, state, partial, camera, breaking);
+        state.time = (entity.getLevel() == null ? 0 : entity.getLevel().getGameTime()) + partial;
+        state.work = entity.working() ? entity.progress(partial) : -1;
+        state.machine = new GeometrySnapshot();
+        PoseStack pose = new PoseStack();
         pose.translate(0.5, 0.5, 0.5);
-        pose.pushPose();
         pose.scale(1F / 16, 1F / 16, 1F / 16);
-        Canvas.drawFine(pose, buffers, t, light, overlay, true, c -> MachineArt.integrator(c, work, t));
-        pose.popPose();
-        ItemStack gear = entity.items().getStackInSlot(IntegratorBlockEntity.GEAR);
-        if (!gear.isEmpty()) {
-            pose.translate(0, 0.28 + 0.03 * Math.sin(t * 0.08), 0);
-            pose.mulPose(Axis.YP.rotationDegrees(t * (work >= 0 ? 6 : 1.5F)));
-            pose.scale(0.62F, 0.62F, 0.62F);
-            Minecraft.getInstance().getItemRenderer().renderStatic(gear, ItemDisplayContext.FIXED, light, overlay, pose, buffers, entity.getLevel(), 0);
-        }
+        Canvas.drawFine(pose, state.machine, state.time, state.lightCoords, Canvas.noOverlay(), true, c -> MachineArt.integrator(c, state.work, state.time));
+        items.updateForTopItem(state.gear, entity.items().getStackInSlot(IntegratorBlockEntity.GEAR), ItemDisplayContext.FIXED, entity.getLevel(), null, 0);
+    }
+    @Override public void submit(State state, PoseStack pose, SubmitNodeCollector collector, CameraRenderState camera) {
+        state.machine.submit(pose, collector);
+        pose.pushPose();
+        pose.translate(0.5, 0.78 + 0.03 * Math.sin(state.time * 0.08), 0.5);
+        pose.mulPose(Axis.YP.rotationDegrees(state.time * (state.work >= 0 ? 6 : 1.5F)));
+        pose.scale(0.62F, 0.62F, 0.62F);
+        state.gear.submit(pose, collector, state.lightCoords, Canvas.noOverlay(), 0);
         pose.popPose();
     }
 }

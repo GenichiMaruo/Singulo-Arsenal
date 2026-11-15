@@ -20,11 +20,11 @@ import io.github.genichimaruo.singuloarsenal.weapon.TidalReaverItem;
 import io.github.genichimaruo.singuloarsenal.weapon.Weapons;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.model.HumanoidModel;
-import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
+
 import net.minecraft.client.renderer.entity.ArmorStandRenderer;
-import net.minecraft.client.renderer.entity.player.PlayerRenderer;
+import net.minecraft.client.renderer.entity.player.AvatarRenderer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EntityType;
@@ -44,14 +44,14 @@ import net.neoforged.neoforge.client.event.RenderHandEvent;
 import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
 import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
 import net.neoforged.neoforge.common.NeoForge;
-import net.neoforged.neoforge.network.PacketDistributor;
+import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 import org.lwjgl.glfw.GLFW;
 
 @Mod(value = SinguloArsenal.MOD_ID, dist = Dist.CLIENT)
 public final class ArsenalClient {
     // G and H are taken by Singulo. Rebindable in Controls.
     private static final KeyMapping ABILITY = new KeyMapping("key.singulo_arsenal.ability", InputConstants.Type.KEYSYM,
-            GLFW.GLFW_KEY_V, "key.categories.singulo_arsenal");
+            GLFW.GLFW_KEY_V, new KeyMapping.Category(net.minecraft.resources.Identifier.fromNamespaceAndPath("singulo_arsenal", "main")));
 
     private static boolean triggerPulled, triggerHeld;
     private static int triggerWait;
@@ -60,11 +60,14 @@ public final class ArsenalClient {
         bus.addListener(ArsenalClient::keys);
         bus.addListener(ArsenalClient::extensions);
         bus.addListener(ArsenalClient::layers);
-        bus.addListener(JetTube::registerShaders);
+        bus.addListener(JetTube::registerPipelines);
+        bus.addListener(io.github.genichimaruo.singuloarsenal.client.art.ArsenalRenderTypes::register);
+        bus.addListener(ArsenalClient::specialModels);
+        bus.addListener(ArsenalRenderState::register);
         bus.addListener(ArsenalClient::machineRenderers);
         bus.addListener(ArsenalClient::screens);
         FxClient.register();
-        Tips.detail = net.minecraft.client.gui.screens.Screen::hasShiftDown;
+        Tips.detail = () -> InputConstants.isKeyDown(Minecraft.getInstance().getWindow(), GLFW.GLFW_KEY_LEFT_SHIFT) || InputConstants.isKeyDown(Minecraft.getInstance().getWindow(), GLFW.GLFW_KEY_RIGHT_SHIFT);
         NeoForge.EVENT_BUS.addListener(ArsenalClient::tick);
         NeoForge.EVENT_BUS.addListener(ArsenalClient::hud);
         NeoForge.EVENT_BUS.addListener(ArsenalClient::trigger);
@@ -72,23 +75,19 @@ public final class ArsenalClient {
     }
 
     private static void keys(RegisterKeyMappingsEvent event) {
+        event.registerCategory(ABILITY.getCategory());
         event.register(ABILITY);
     }
 
     private static void extensions(RegisterClientExtensionsEvent event) {
         IClientItemExtensions gear = new IClientItemExtensions() {
-            private GearRenderer renderer;
-            @Override public BlockEntityWithoutLevelRenderer getCustomRenderer() {
-                if (renderer == null) renderer = new GearRenderer();
-                return renderer;
-            }
             @Override public HumanoidModel.ArmPose getArmPose(LivingEntity entity, InteractionHand hand, ItemStack stack) {
                 if (hand != InteractionHand.MAIN_HAND) return null;
                 if (stack.getItem() instanceof JetCannonItem) {
                     boolean reloading = Weapons.reloadProgress(stack, entity.level().getGameTime(), 0) >= 0;
                     return reloading ? CannonReloadPose.pose() : HumanoidModel.ArmPose.CROSSBOW_HOLD;
                 }
-                if (stack.getItem() instanceof TidalReaverItem && TidalReaverItem.focusProgress(stack, entity.level().getGameTime(), 0) >= 0) return HumanoidModel.ArmPose.THROW_SPEAR;
+                if (stack.getItem() instanceof TidalReaverItem && TidalReaverItem.focusProgress(stack, entity.level().getGameTime(), 0) >= 0) return HumanoidModel.ArmPose.THROW_TRIDENT;
                 if (entity.isUsingItem() && stack.getItem() instanceof CasimirBladeItem) return HumanoidModel.ArmPose.BLOCK;
                 return null;
             }
@@ -97,6 +96,9 @@ public final class ArsenalClient {
         event.registerItem(gear, ModuleContent.INTEGRATOR_ITEM.get());
     }
 
+    private static void specialModels(net.neoforged.neoforge.client.event.RegisterSpecialModelRendererEvent event) {
+        event.register(net.minecraft.resources.Identifier.fromNamespaceAndPath("singulo_arsenal", "gear"), GearRenderer.Unbaked.CODEC);
+    }
     private static void machineRenderers(EntityRenderersEvent.RegisterRenderers event) {
         event.registerBlockEntityRenderer(ModuleContent.INTEGRATOR_ENTITY.get(), IntegratorRenderer::new);
     }
@@ -108,7 +110,7 @@ public final class ArsenalClient {
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static void layers(EntityRenderersEvent.AddLayers event) {
         for (var skin : event.getSkins()) {
-            if (event.getSkin(skin) instanceof PlayerRenderer renderer) renderer.addLayer(new SuitLayer<>(renderer));
+            if (event.getPlayerRenderer(skin) instanceof AvatarRenderer renderer) renderer.addLayer(new SuitLayer<>(renderer));
         }
         if (event.getRenderer(EntityType.ARMOR_STAND) instanceof ArmorStandRenderer renderer) renderer.addLayer(new SuitLayer(renderer));
     }
@@ -137,7 +139,7 @@ public final class ArsenalClient {
     private static void tick(ClientTickEvent.Post event) {
         var mc = Minecraft.getInstance();
         while (ABILITY.consumeClick()) {
-            if (mc.player != null && mc.screen == null && mc.getConnection() != null) PacketDistributor.sendToServer(AbilityPayload.INSTANCE);
+            if (mc.player != null && mc.screen == null && mc.getConnection() != null) ClientPacketDistributor.sendToServer(AbilityPayload.INSTANCE);
         }
         ActiveSounds.tick(mc);
         // One click, one shot: holding the button down does not fire again.
@@ -148,7 +150,7 @@ public final class ArsenalClient {
         if (triggerWait > 0) triggerWait--;
         if (wanted && triggerWait == 0 && mc.screen == null && holdingCannon(mc) && mc.level != null && mc.getConnection() != null
                 && JetCannonItem.ready(mc.player.getMainHandItem(), mc.level.getGameTime())) {
-            PacketDistributor.sendToServer(FirePayload.INSTANCE);
+            ClientPacketDistributor.sendToServer(FirePayload.INSTANCE);
             // Long enough for the server's answer to reach this client, so one click is one packet.
             triggerWait = 4;
         }
@@ -159,7 +161,7 @@ public final class ArsenalClient {
     private static void hud(RenderGuiEvent.Post event) {
         var mc = Minecraft.getInstance();
         if (mc.player == null || mc.options.hideGui || mc.player.isSpectator() || mc.screen != null) return;
-        GuiGraphics gui = event.getGuiGraphics();
+        GuiGraphicsExtractor gui = event.getGuiGraphics();
         ItemStack chest = mc.player.getItemBySlot(EquipmentSlot.CHEST);
         int y = 8;
         if (chest.getItem() instanceof SuitItem suit) {
@@ -172,14 +174,14 @@ public final class ArsenalClient {
                 Component line = locked > 0
                         ? Component.translatable("hud.singulo_arsenal.collapsed", seconds(locked))
                         : Component.translatable("hud.singulo_arsenal.pressure", load, Rules.PRESSURE_MAX);
-                gui.drawString(mc.font, line, 8, y, locked > 0 ? 0xFF8A5A : 0xFFC36B, true);
+                gui.text(mc.font, line, 8, y, locked > 0 ? 0xFF8A5A : 0xFFC36B, true);
                 y += 12;
             } else if (suit.set == ArmorSet.COLLAPSAR) {
-                gui.drawString(mc.font, Component.translatable("hud.singulo_arsenal.phase." + Rules.phaseOf(load), load, Rules.LOAD_MAX), 8, y, 0xFFE2A0, true);
+                gui.text(mc.font, Component.translatable("hud.singulo_arsenal.phase." + Rules.phaseOf(load), load, Rules.LOAD_MAX), 8, y, 0xFFE2A0, true);
                 y += 12;
                 long ready = ArsenalData.time(chest, ArsenalData.HORIZON_READY) - now;
                 if (ready > 0) {
-                    gui.drawString(mc.font, Component.translatable("hud.singulo_arsenal.horizon_cooling", seconds(ready)), 8, y, 0xB8A8FF, true);
+                    gui.text(mc.font, Component.translatable("hud.singulo_arsenal.horizon_cooling", seconds(ready)), 8, y, 0xB8A8FF, true);
                     y += 12;
                 }
             }
@@ -189,18 +191,18 @@ public final class ArsenalClient {
             drawBar(gui, 8, y, held.getHoverName(), held, 0xFFC36B);
             y += 14;
             if (held.getItem() instanceof AccretionDrillItem) {
-                gui.drawString(mc.font, Component.translatable("tool.singulo_arsenal.drill_mode." + AccretionDrillItem.mode(held)), 8, y, 0xFFE2A0, true);
+                gui.text(mc.font, Component.translatable("tool.singulo_arsenal.drill_mode." + AccretionDrillItem.mode(held)), 8, y, 0xFFE2A0, true);
             }
             if (held.getItem() instanceof JetCannonItem) {
                 Component mode = Component.translatable(JetCannonItem.breaksTerrain(held) ? "hud.singulo_arsenal.terrain_break" : "hud.singulo_arsenal.terrain_protect");
-                gui.drawString(mc.font, Component.translatable("hud.singulo_arsenal.magazine", JetCannonItem.shotsLeft(held), Rules.CANNON_MAGAZINE, mode), 8, y, 0xFFE2A0, true);
+                gui.text(mc.font, Component.translatable("hud.singulo_arsenal.magazine", JetCannonItem.shotsLeft(held), Rules.CANNON_MAGAZINE, mode), 8, y, 0xFFE2A0, true);
             }
         }
     }
 
-    private static void drawBar(GuiGraphics gui, int x, int y, Component label, ItemStack stack, int color) {
+    private static void drawBar(GuiGraphicsExtractor gui, int x, int y, Component label, ItemStack stack, int color) {
         var font = Minecraft.getInstance().font;
-        gui.drawString(font, label, x, y, 0xE9EEF2, true);
+        gui.text(font, label, x, y, 0xE9EEF2, true);
         int barX = x + font.width(label) + 6;
         gui.fill(barX, y + 2, barX + 60, y + 6, 0xA0141820);
         int width = (int) (60 * ((double) Fe.stored(stack) / Math.max(1, Fe.capacity(stack))));

@@ -6,15 +6,9 @@
     "W W"
   ],
   "key": {
-    "C": {
-      "item": "singulo:white_ceramic_composite"
-    },
-    "S": {
-      "item": "singulo:superconducting_coil"
-    },
-    "W": {
-      "item": "singulo_arsenal:flux_weave"
-    }
+    "C": "singulo:white_ceramic_composite",
+    "S": "singulo:superconducting_coil",
+    "W": "singulo_arsenal:flux_weave"
   },
   "result": {
     "id": "singulo_arsenal:meissner_helmet",

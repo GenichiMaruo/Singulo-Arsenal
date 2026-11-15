@@ -6,12 +6,8 @@
     "J J"
   ],
   "key": {
-    "L": {
-      "item": "singulo_arsenal:collapsar_lamina"
-    },
-    "J": {
-      "item": "singulo:jet_condensate"
-    }
+    "L": "singulo_arsenal:collapsar_lamina",
+    "J": "singulo:jet_condensate"
   },
   "result": {
     "id": "singulo_arsenal:collapsar_boots",

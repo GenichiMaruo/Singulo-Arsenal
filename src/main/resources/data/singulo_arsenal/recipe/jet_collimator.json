@@ -6,27 +6,19 @@
   "energy": 200000,
   "ingredients": [
     {
-      "ingredient": {
-        "item": "singulo:confinement_ring"
-      },
+      "ingredient": "singulo:confinement_ring",
       "count": 2
     },
     {
-      "ingredient": {
-        "item": "singulo:optical_lattice_substrate"
-      },
+      "ingredient": "singulo:optical_lattice_substrate",
       "count": 2
     },
     {
-      "ingredient": {
-        "item": "singulo:jet_condensate"
-      },
+      "ingredient": "singulo:jet_condensate",
       "count": 4
     },
     {
-      "ingredient": {
-        "item": "singulo:collapsar_ingot"
-      },
+      "ingredient": "singulo:collapsar_ingot",
       "count": 1
     }
   ],

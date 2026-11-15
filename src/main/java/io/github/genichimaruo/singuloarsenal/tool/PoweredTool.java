@@ -14,7 +14,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.item.DiggerItem;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Rarity;
 import net.minecraft.world.item.TooltipFlag;
@@ -24,13 +24,13 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 
 /** A mining tool that runs on FE instead of wearing out. Out of power it still works, at the speed of a bare hand. */
-public abstract class PoweredTool extends DiggerItem implements Powered {
+public abstract class PoweredTool extends Item implements Powered {
     private final int capacity;
     private final int stage;
     private final int fePerBlock;
 
-    protected PoweredTool(ToolTier tier, TagKey<Block> mineable, float damage, float attackSpeed, int capacity, int stage, int fePerBlock, Rarity rarity) {
-        super(tier, mineable, new Properties().rarity(rarity).fireResistant().attributes(createAttributes(tier, damage, attackSpeed)));
+    protected PoweredTool(Properties properties, ToolTier tier, TagKey<Block> mineable, float damage, float attackSpeed, int capacity, int stage, int fePerBlock, Rarity rarity) {
+        super(properties.tool(tier.material(), mineable, damage, attackSpeed, 0).rarity(rarity).fireResistant());
         this.capacity = capacity;
         this.stage = stage;
         this.fePerBlock = fePerBlock;
@@ -65,7 +65,12 @@ public abstract class PoweredTool extends DiggerItem implements Powered {
     @Override public int getBarColor(ItemStack stack) { return 0x6FE3FF; }
 
     @Override
-    public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> lines, TooltipFlag flag) {
+    public void appendHoverText(ItemStack stack, TooltipContext context, net.minecraft.world.item.component.TooltipDisplay display, java.util.function.Consumer<Component> output, TooltipFlag flag) {
+        List<Component> lines = new java.util.ArrayList<>();
+        describeHoverText(stack, context, lines, flag);
+        lines.forEach(output);
+    }
+    protected void describeHoverText(ItemStack stack, TooltipContext context, List<Component> lines, TooltipFlag flag) {
         Weapons.describe(BuiltInRegistries.ITEM.getKey(this).getPath(), stack, stage, lines);
     }
 }

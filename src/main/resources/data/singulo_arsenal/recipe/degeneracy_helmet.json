@@ -6,12 +6,8 @@
     "G G"
   ],
   "key": {
-    "G": {
-      "item": "singulo_arsenal:pressure_lattice"
-    },
-    "Q": {
-      "item": "singulo:quantum_computing_module"
-    }
+    "G": "singulo_arsenal:pressure_lattice",
+    "Q": "singulo:quantum_computing_module"
   },
   "result": {
     "id": "singulo_arsenal:degeneracy_helmet",

@@ -9,45 +9,32 @@ import io.github.genichimaruo.singuloarsenal.client.art.ArsenalRenderTypes;
 import io.github.genichimaruo.singuloarsenal.client.art.Canvas;
 import java.io.IOException;
 import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderType;
-import net.minecraft.client.renderer.ShaderInstance;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.client.renderer.rendertype.RenderType;
+
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.neoforge.client.event.RegisterShadersEvent;
+
 
 /**
  * The same jet as the Accretion Jet Forge: Singulo's own {@code jet_beam} shader, on three nested tubes (halo, plasma, core) with the
  * Forge's widths and colours. Each vertex carries how far across the tube it is as seen from the camera, so it looks round from any side.
  */
-final class JetTube extends RenderType {
-    private static ShaderInstance shader;
-    private static final RenderType BEAM = create("singulo_arsenal_jet", DefaultVertexFormat.POSITION_TEX_COLOR, VertexFormat.Mode.QUADS,
-            16384, false, false, CompositeState.builder()
-                    .setShaderState(new ShaderStateShard(() -> shader))
-                    .setTransparencyState(LIGHTNING_TRANSPARENCY)
-                    .setWriteMaskState(COLOR_WRITE)
-                    .setCullState(NO_CULL)
-                    .createCompositeState(false));
+final class JetTube {
+    private static final com.mojang.blaze3d.pipeline.RenderPipeline PIPELINE = com.mojang.blaze3d.pipeline.RenderPipeline.builder()
+            .withLocation("singulo_arsenal:pipeline/jet")
+            .withVertexShader("singulo:core/jet_beam").withFragmentShader("singulo:core/jet_beam")
+            .withUniform("DynamicTransforms", com.mojang.blaze3d.shaders.UniformType.UNIFORM_BUFFER)
+            .withUniform("Projection", com.mojang.blaze3d.shaders.UniformType.UNIFORM_BUFFER)
+            .withUniform("Globals", com.mojang.blaze3d.shaders.UniformType.UNIFORM_BUFFER)
+            .withColorTargetState(new com.mojang.blaze3d.pipeline.ColorTargetState(com.mojang.blaze3d.pipeline.BlendFunction.LIGHTNING))
+            .withDepthStencilState(new com.mojang.blaze3d.pipeline.DepthStencilState(com.mojang.blaze3d.platform.CompareOp.LESS_THAN_OR_EQUAL, false))
+            .withCull(false).withVertexFormat(DefaultVertexFormat.POSITION_TEX_COLOR, VertexFormat.Mode.QUADS).build();
+    private static final RenderType BEAM = RenderType.create("singulo_arsenal_jet", net.minecraft.client.renderer.rendertype.RenderSetup.builder(PIPELINE).createRenderSetup());
     private static final int SIDES = 12;
-
-    private JetTube() {
-        super("unused", DefaultVertexFormat.POSITION_TEX_COLOR, VertexFormat.Mode.QUADS, 256, false, false, () -> {}, () -> {});
-    }
-
-    static void registerShaders(RegisterShadersEvent event) {
-        try {
-            event.registerShader(new ShaderInstance(event.getResourceProvider(), ResourceLocation.fromNamespaceAndPath("singulo", "jet_beam"),
-                    DefaultVertexFormat.POSITION_TEX_COLOR), s -> shader = s);
-        } catch (IOException e) {
-            LogUtils.getLogger().error("Could not load Singulo's jet shader; jets fall back to plain tubes", e);
-        }
-    }
-
-    static RenderType type() {
-        return shader == null || ShaderCompat.active() ? ArsenalRenderTypes.GLOW : BEAM;
-    }
-
+    private JetTube() {}
+    static void registerPipelines(net.neoforged.neoforge.client.event.RegisterRenderPipelinesEvent event) { event.registerPipeline(PIPELINE); }
+    static RenderType type() { return ShaderCompat.active() ? ArsenalRenderTypes.GLOW : BEAM; }
     /**
      * @param camera   camera position in the pose's space
      * @param radius   full radius of the jet

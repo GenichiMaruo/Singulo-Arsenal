@@ -6,27 +6,19 @@
   "energy": 400,
   "ingredients": [
     {
-      "ingredient": {
-        "item": "singulo:heat_exchange_core"
-      },
+      "ingredient": "singulo:heat_exchange_core",
       "count": 2
     },
     {
-      "ingredient": {
-        "item": "singulo:white_ceramic_composite"
-      },
+      "ingredient": "singulo:white_ceramic_composite",
       "count": 2
     },
     {
-      "ingredient": {
-        "item": "singulo:steel_plate"
-      },
+      "ingredient": "singulo:steel_plate",
       "count": 2
     },
     {
-      "ingredient": {
-        "item": "singulo:superconducting_wire"
-      },
+      "ingredient": "singulo:superconducting_wire",
       "count": 1
     }
   ],

@@ -7,21 +7,11 @@
     "SSS"
   ],
   "key": {
-    "A": {
-      "item": "singulo:precision_actuator"
-    },
-    "T": {
-      "item": "singulo:optical_lattice_substrate"
-    },
-    "Q": {
-      "item": "singulo:quantum_computing_module"
-    },
-    "F": {
-      "item": "singulo:nihonium_frame"
-    },
-    "S": {
-      "item": "singulo:steel_plate"
-    }
+    "A": "singulo:precision_actuator",
+    "T": "singulo:optical_lattice_substrate",
+    "Q": "singulo:quantum_computing_module",
+    "F": "singulo:nihonium_frame",
+    "S": "singulo:steel_plate"
   },
   "result": {
     "id": "singulo_arsenal:module_integrator",

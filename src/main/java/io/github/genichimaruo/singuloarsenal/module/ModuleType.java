@@ -6,22 +6,22 @@ import io.github.genichimaruo.singuloarsenal.tool.PoweredTool;
 import io.github.genichimaruo.singuloarsenal.weapon.ArsenalWeapon;
 import io.github.genichimaruo.singuloarsenal.weapon.JetCannonItem;
 import java.util.function.Predicate;
-import net.minecraft.world.item.ArmorItem;
+import net.minecraft.world.item.equipment.ArmorType;
 import net.minecraft.world.item.Item;
 
 /** What can be built into gear, and which gear each one physically makes sense in. */
 public enum ModuleType {
-    BIT_DRONE("bit_drone_module", item -> item instanceof SuitItem suit && suit.getType() == ArmorItem.Type.CHESTPLATE),
+    BIT_DRONE("bit_drone_module", item -> item instanceof SuitItem suit && suit.getType() == ArmorType.CHESTPLATE),
     CAPACITOR("capacitor_module", item -> item instanceof Powered),
     PLATING("plating_module", item -> item instanceof SuitItem),
-    THRUSTER("thruster_module", item -> item instanceof SuitItem suit && suit.getType() == ArmorItem.Type.BOOTS),
+    THRUSTER("thruster_module", item -> item instanceof SuitItem suit && suit.getType() == ArmorType.BOOTS),
     COOLANT("coolant_module", item -> item instanceof ArsenalWeapon),
     AMPLIFIER("amplifier_module", item -> item instanceof ArsenalWeapon),
     METRIC_DRIVE("metric_drive_module", item -> item instanceof SuitItem),
     MELTDOWN("meltdown_module", item -> item instanceof JetCannonItem),
     OVERCLOCK("overclock_module", item -> item instanceof PoweredTool),
     SMELTER("smelter_module", item -> item instanceof PoweredTool),
-    INDUCTION("induction_module", item -> item instanceof SuitItem suit && suit.getType() == ArmorItem.Type.CHESTPLATE),
+    INDUCTION("induction_module", item -> item instanceof SuitItem suit && suit.getType() == ArmorType.CHESTPLATE),
     COLLECTOR("collector_module", item -> item instanceof SuitItem);
 
     public final String id;

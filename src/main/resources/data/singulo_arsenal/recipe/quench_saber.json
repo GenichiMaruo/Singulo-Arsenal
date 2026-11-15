@@ -7,18 +7,10 @@
     " P "
   ],
   "key": {
-    "S": {
-      "item": "singulo:superconducting_coil"
-    },
-    "W": {
-      "item": "singulo_arsenal:flux_weave"
-    },
-    "K": {
-      "item": "singulo:coolant_cartridge"
-    },
-    "P": {
-      "item": "singulo:steel_plate"
-    }
+    "S": "singulo:superconducting_coil",
+    "W": "singulo_arsenal:flux_weave",
+    "K": "singulo:coolant_cartridge",
+    "P": "singulo:steel_plate"
   },
   "result": {
     "id": "singulo_arsenal:quench_saber",

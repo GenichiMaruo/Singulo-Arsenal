@@ -45,7 +45,7 @@ public final class Mining {
         if (!(stack.getItem() instanceof PoweredTool tool) || !Fe.spend(stack, tool.fePerBlock()) || BUSY.contains(player.getUUID())) return;
         List<BlockPos> more = tool.alsoBreaks(player, stack, origin, struck);
         if (more.isEmpty()) return;
-        ServerLevel level = player.serverLevel();
+        ServerLevel level = player.level();
         BUSY.add(player.getUUID());
         try {
             for (BlockPos pos : more) {
@@ -86,12 +86,12 @@ public final class Mining {
             ItemStack stack = drop.getItem();
             if (!stack.is(Tags.Items.ORES) && !stack.is(Tags.Items.RAW_MATERIALS)) continue;
             var input = new SingleRecipeInput(stack);
-            var recipe = level.getRecipeManager().getRecipeFor(RecipeType.SMELTING, input, level);
+            var recipe = level.getServer().getRecipeManager().getRecipeFor(RecipeType.SMELTING, input, level);
             if (recipe.isEmpty()) continue;
-            ItemStack result = recipe.get().value().assemble(input, level.registryAccess());
+            ItemStack result = recipe.get().value().assemble(input);
             if (result.isEmpty() || !Fe.spend(tool, Rules.SMELT_FE * stack.getCount())) continue;
             result.setCount(result.getCount() * stack.getCount());
-            experience += recipe.get().value().getExperience() * stack.getCount();
+            experience += recipe.get().value().experience() * stack.getCount();
             int limit = result.getMaxStackSize();
             drop.setItem(result.split(limit));
             while (!result.isEmpty()) {
@@ -104,7 +104,7 @@ public final class Mining {
         event.getDrops().addAll(overflow);
         // As a furnace pays it out: the fraction is the chance of one more point.
         int whole = (int) experience;
-        if (level.random.nextFloat() < experience - whole) whole++;
+        if (level.getRandom().nextFloat() < experience - whole) whole++;
         event.setDroppedExperience(event.getDroppedExperience() + whole);
     }
 
@@ -124,7 +124,7 @@ public final class Mining {
 
     /** The square of blocks around the struck one, in the plane of the face being mined. */
     static List<BlockPos> square(ServerPlayer player, ItemStack stack, BlockPos origin, BlockState struck, int reach) {
-        ServerLevel level = player.serverLevel();
+        ServerLevel level = player.level();
         HitResult hit = player.pick(player.blockInteractionRange(), 1, false);
         Direction face = hit instanceof BlockHitResult block && hit.getType() == HitResult.Type.BLOCK ? block.getDirection() : Direction.orderedByNearest(player)[0];
         Direction.Axis axis = face.getAxis();

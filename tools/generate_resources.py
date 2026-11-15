@@ -40,7 +40,7 @@ def own(name):
 
 
 def ingredient(ref):
-    return {'tag': ref[1:]} if ref.startswith('#') else {'item': ref}
+    return ref
 
 
 def unlock_advancement(name, unlock):
@@ -220,7 +220,7 @@ write('data/minecraft/tags/item/enchantable/durability.json', {'replace': False,
 
 # ---- Item models ---------------------------------------------------------------------------------------------------
 
-BUILTIN = {'parent': 'minecraft:builtin/entity', 'textures': {'particle': 'minecraft:block/gray_concrete'}}
+BUILTIN = {'textures': {'particle': 'minecraft:block/gray_concrete'}}
 SWORD_DISPLAY = {
     'gui': {'rotation': [14, -26, -45], 'translation': [-0.8, -0.8, 0], 'scale': [0.5, 0.5, 0.5]},
     'ground': {'translation': [0, 2, 0], 'scale': [0.38, 0.38, 0.38]},
@@ -344,6 +344,24 @@ for name in NIHONIUM_TOOLS:
 for name in MATERIALS + MODULES + ['pellet_canister'] + NIHONIUM_ARMOR:
     write(f'assets/{MOD}/models/item/{name}.json', {'parent': 'minecraft:item/generated', 'textures': {'layer0': f'{MOD}:item/{name}'}})
 
+# Minecraft 26.1 item definitions are separate from baked block-model geometry.
+# Select the display context explicitly because SpecialModelRenderer receives no context argument.
+DISPLAY_CONTEXTS = ['gui', 'ground', 'fixed', 'head', 'firstperson_righthand',
+                    'firstperson_lefthand', 'thirdperson_righthand', 'thirdperson_lefthand']
+for model_path in sorted((ROOT / f'assets/{MOD}/models/item').glob('*.json')):
+    name = model_path.stem
+    base = f'{MOD}:item/{name}'
+    baked = json.loads(model_path.read_text(encoding='utf-8'))
+    if 'parent' not in baked:
+        def special(context):
+            return {'type': 'minecraft:special', 'base': base,
+                    'model': {'type': f'{MOD}:gear', 'context': context}}
+        definition = {'type': 'minecraft:select', 'property': 'minecraft:display_context',
+                      'cases': [{'when': context, 'model': special(context)} for context in DISPLAY_CONTEXTS],
+                      'fallback': special('none')}
+    else:
+        definition = {'type': 'minecraft:model', 'model': base}
+    write(f'assets/{MOD}/items/{name}.json', {'model': definition})
 # ---- Translations --------------------------------------------------------------------------------------------------
 
 ja, en = {}, {}
@@ -515,7 +533,7 @@ for data in (ja, en):
             data[key.replace('.jet_cannon', '.jet_lance')] = value
 for locale, data in [('ja_jp', ja), ('en_us', en)]:
     write(f'assets/{MOD}/lang/{locale}.json', dict(sorted(data.items())))
-write('pack.mcmeta', {'pack': {'pack_format': 34, 'description': 'Singulo Arsenal equipment resources'}})
+write('pack.mcmeta', {'pack': {'min_format': [84, 0], 'max_format': [101, 1], 'description': 'Singulo Arsenal equipment resources'}})
 
 
 # ---- Icons ---------------------------------------------------------------------------------------------------------

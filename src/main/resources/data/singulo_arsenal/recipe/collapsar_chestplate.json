@@ -7,18 +7,10 @@
     "LFL"
   ],
   "key": {
-    "L": {
-      "item": "singulo_arsenal:collapsar_lamina"
-    },
-    "R": {
-      "item": "singulo:confinement_ring"
-    },
-    "B": {
-      "item": "singulo:micro_black_hole"
-    },
-    "F": {
-      "item": "singulo:tidal_filament"
-    }
+    "L": "singulo_arsenal:collapsar_lamina",
+    "R": "singulo:confinement_ring",
+    "B": "singulo:micro_black_hole",
+    "F": "singulo:tidal_filament"
   },
   "result": {
     "id": "singulo_arsenal:collapsar_chestplate",

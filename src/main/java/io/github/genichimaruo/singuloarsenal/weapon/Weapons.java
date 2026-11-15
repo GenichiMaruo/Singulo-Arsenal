@@ -13,7 +13,7 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
@@ -78,19 +78,19 @@ public final class Weapons {
     }
 
     static void sound(Entity at, String singuloEvent, float volume, float pitch) {
-        SoundEvent event = BuiltInRegistries.SOUND_EVENT.get(ResourceLocation.fromNamespaceAndPath("singulo", singuloEvent));
+        SoundEvent event = BuiltInRegistries.SOUND_EVENT.getValue(Identifier.fromNamespaceAndPath("singulo", singuloEvent));
         if (event != null) at.level().playSound(null, at.getX(), at.getY(), at.getZ(), event, SoundSource.PLAYERS, volume, pitch);
     }
 
     static void soundAt(ServerLevel level, Vec3 at, String singuloEvent, float volume, float pitch) {
-        SoundEvent event = BuiltInRegistries.SOUND_EVENT.get(ResourceLocation.fromNamespaceAndPath("singulo", singuloEvent));
+        SoundEvent event = BuiltInRegistries.SOUND_EVENT.getValue(Identifier.fromNamespaceAndPath("singulo", singuloEvent));
         if (event != null) level.playSound(null, at.x, at.y, at.z, event, SoundSource.PLAYERS, volume, pitch);
     }
 
     /** Tidal stress decays by expiry, not per tick, so a mob nobody is fighting costs nothing. */
     public static int stress(LivingEntity target) {
         CompoundTag data = target.getPersistentData();
-        return data.getLong(STRESS_UNTIL) > target.level().getGameTime() ? Rules.clamp(data.getInt(STRESS), Rules.STRESS_MAX) : 0;
+        return data.getLongOr(STRESS_UNTIL, 0L) > target.level().getGameTime() ? Rules.clamp(data.getIntOr(STRESS, 0), Rules.STRESS_MAX) : 0;
     }
 
     public static void setStress(LivingEntity target, int stress) {

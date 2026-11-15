@@ -26,18 +26,18 @@ public final class ModuleContent {
     private static final DeferredRegister<MenuType<?>> MENUS = DeferredRegister.create(Registries.MENU, SinguloArsenal.MOD_ID);
 
     public static final Map<ModuleType, DeferredItem<ModuleItem>> MODULES = new EnumMap<>(ModuleType.class);
-    public static final DeferredBlock<IntegratorBlock> INTEGRATOR = BLOCKS.register("module_integrator", () -> new IntegratorBlock(
-            BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GRAY).strength(3.5F, 6F).sound(SoundType.NETHERITE_BLOCK).requiresCorrectToolForDrops().noOcclusion()));
+    public static final DeferredBlock<IntegratorBlock> INTEGRATOR = BLOCKS.register("module_integrator", id -> new IntegratorBlock(
+            BlockBehaviour.Properties.of().setId(net.minecraft.resources.ResourceKey.create(Registries.BLOCK, id)).mapColor(MapColor.COLOR_GRAY).strength(3.5F, 6F).sound(SoundType.NETHERITE_BLOCK).requiresCorrectToolForDrops().noOcclusion()));
     public static final DeferredItem<net.minecraft.world.item.BlockItem> INTEGRATOR_ITEM = ArsenalItems.ITEMS.registerSimpleBlockItem(INTEGRATOR);
     @SuppressWarnings("DataFlowIssue")
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<IntegratorBlockEntity>> INTEGRATOR_ENTITY = BLOCK_ENTITIES.register("module_integrator",
-            () -> BlockEntityType.Builder.of(IntegratorBlockEntity::new, INTEGRATOR.get()).build(null));
+            () -> new BlockEntityType<>(IntegratorBlockEntity::new, java.util.Set.of(INTEGRATOR.get())));
     public static final DeferredHolder<MenuType<?>, MenuType<IntegratorMenu>> INTEGRATOR_MENU = MENUS.register("module_integrator",
             () -> IMenuTypeExtension.create(IntegratorMenu::new));
 
     static {
         for (ModuleType type : ModuleType.values()) {
-            MODULES.put(type, ArsenalItems.ITEMS.register(type.id, () -> new ModuleItem(type)));
+            MODULES.put(type, ArsenalItems.ITEMS.registerItem(type.id, props -> new ModuleItem(type, props)));
         }
     }
 
@@ -52,6 +52,6 @@ public final class ModuleContent {
     }
 
     private static void capabilities(RegisterCapabilitiesEvent event) {
-        event.registerBlockEntity(Capabilities.EnergyStorage.BLOCK, INTEGRATOR_ENTITY.get(), (entity, side) -> entity.energy());
+        event.registerBlockEntity(Capabilities.Energy.BLOCK, INTEGRATOR_ENTITY.get(), (entity, side) -> entity.energy());
     }
 }

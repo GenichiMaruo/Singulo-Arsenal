@@ -4,7 +4,7 @@ import io.github.genichimaruo.singuloarsenal.module.ModuleType;
 import io.github.genichimaruo.singuloarsenal.module.Modules;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
@@ -12,12 +12,15 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.UseOnContext;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.energy.IEnergyStorage;
+import net.neoforged.neoforge.transfer.access.ItemAccess;
+import net.neoforged.neoforge.transfer.energy.ItemAccessEnergyHandler;
+import net.neoforged.neoforge.transfer.transaction.Transaction;
 import net.neoforged.neoforge.registries.DeferredHolder;
 
 /** FE bookkeeping for gear. The capability only accepts: gear can never be used as a battery for machines. */
 public final class Fe {
     public static final DeferredHolder<Item, Item> MASS_PELLET =
-            DeferredHolder.create(Registries.ITEM, ResourceLocation.fromNamespaceAndPath("singulo", "mass_pellet"));
+            DeferredHolder.create(Registries.ITEM, Identifier.fromNamespaceAndPath("singulo", "mass_pellet"));
 
     private Fe() {}
 
@@ -56,21 +59,30 @@ public final class Fe {
         };
     }
 
+    public static ItemAccessEnergyHandler handler(ItemStack stack, ItemAccess access) {
+        int capacity = capacity(stack);
+        return new ItemAccessEnergyHandler(access, ArsenalData.ENERGY.get(), capacity, capacity, 0);
+    }
+
     /** Hold the gear and sneak-use the output face of any FE source, the same gesture as Singulo's gauntlet. */
     public static InteractionResult chargeFromBlock(UseOnContext context) {
         Player player = context.getPlayer();
         ItemStack stack = context.getItemInHand();
         if (player == null || !player.isShiftKeyDown() || capacity(stack) == 0) return InteractionResult.PASS;
-        var source = context.getLevel().getCapability(Capabilities.EnergyStorage.BLOCK, context.getClickedPos(), context.getClickedFace());
-        if (source == null || !source.canExtract()) return InteractionResult.PASS;
-        if (!context.getLevel().isClientSide) {
-            var own = storage(stack);
-            int wanted = own.receiveEnergy(Rules.chargeRequest(capacity(stack)), true);
-            int got = source.extractEnergy(wanted, false);
-            own.receiveEnergy(got, false);
-            player.displayClientMessage(Component.translatable("message.singulo_arsenal.charged", Rules.compactEnergy(got), Rules.compactEnergy(stored(stack))), true);
+        var source = context.getLevel().getCapability(Capabilities.Energy.BLOCK, context.getClickedPos(), context.getClickedFace());
+        if (source == null) return InteractionResult.PASS;
+        if (!context.getLevel().isClientSide()) {
+            var own = handler(stack, ItemAccess.forPlayerInteraction(player, context.getHand()));
+            int got;
+            try (var tx = Transaction.openRoot()) {
+                int wanted = Math.min(Rules.chargeRequest(capacity(stack)), capacity(stack) - stored(stack));
+                got = source.extract(wanted, tx);
+                if (own.insert(got, tx) != got) return InteractionResult.FAIL;
+                tx.commit();
+            }
+            player.sendOverlayMessage(Component.translatable("message.singulo_arsenal.charged", Rules.compactEnergy(got), Rules.compactEnergy(stored(player.getItemInHand(context.getHand())))));
         }
-        return InteractionResult.sidedSuccess(context.getLevel().isClientSide);
+        return InteractionResult.SUCCESS;
     }
 
     /** Swallow one pellet if the tank has room for all of it. Returns whether a pellet was consumed. */
@@ -82,7 +94,7 @@ public final class Fe {
             set(gear, stored(gear) + Rules.PELLET_FE);
             return true;
         }
-        for (ItemStack fuel : player.getInventory().items) {
+        for (ItemStack fuel : player.getInventory().getNonEquipmentItems()) {
             if (fuel.is(MASS_PELLET.get())) {
                 fuel.shrink(1);
                 set(gear, stored(gear) + Rules.PELLET_FE);

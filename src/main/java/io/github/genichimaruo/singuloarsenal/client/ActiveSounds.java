@@ -11,7 +11,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.sounds.AbstractTickableSoundInstance;
 import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.player.Player;
@@ -77,7 +77,7 @@ final class ActiveSounds {
 
     private static void ensure(Minecraft mc, Key key, String sound, boolean looping, float volume, float pitch, BooleanSupplier alive, Supplier<Vec3> position) {
         if (ACTIVE.containsKey(key) || !alive.getAsBoolean()) return;
-        SoundEvent event = BuiltInRegistries.SOUND_EVENT.get(ResourceLocation.fromNamespaceAndPath("singulo", sound));
+        SoundEvent event = BuiltInRegistries.SOUND_EVENT.getValue(Identifier.fromNamespaceAndPath("singulo", sound));
         if (event == null) return;
         Live live = new Live(event, looping, volume, pitch, alive, position);
         ACTIVE.put(key, live);
@@ -102,7 +102,7 @@ final class ActiveSounds {
         Vec3 axis = FxClient.aim(player, 1).getLocation().subtract(from);
         double length = axis.length();
         if (length < 1.0E-3) return from;
-        Vec3 listener = mc.gameRenderer.getMainCamera().getPosition();
+        Vec3 listener = mc.gameRenderer.getMainCamera().position();
         double along = Math.max(0, Math.min(length, listener.subtract(from).dot(axis) / length));
         return from.add(axis.scale(along / length));
     }

@@ -6,12 +6,8 @@
     "D D"
   ],
   "key": {
-    "N": {
-      "item": "singulo:nihonium_plate"
-    },
-    "D": {
-      "item": "singulo:degenerate_matter_shell"
-    }
+    "N": "singulo:nihonium_plate",
+    "D": "singulo:degenerate_matter_shell"
   },
   "result": {
     "id": "singulo_arsenal:degeneracy_boots",

@@ -6,27 +6,19 @@
   "energy": 200000,
   "ingredients": [
     {
-      "ingredient": {
-        "item": "singulo:jet_condensate"
-      },
+      "ingredient": "singulo:jet_condensate",
       "count": 4
     },
     {
-      "ingredient": {
-        "item": "singulo:heat_exchange_core"
-      },
+      "ingredient": "singulo:heat_exchange_core",
       "count": 2
     },
     {
-      "ingredient": {
-        "item": "singulo:entangled_element"
-      },
+      "ingredient": "singulo:entangled_element",
       "count": 2
     },
     {
-      "ingredient": {
-        "item": "singulo:confinement_ring"
-      },
+      "ingredient": "singulo:confinement_ring",
       "count": 1
     }
   ],

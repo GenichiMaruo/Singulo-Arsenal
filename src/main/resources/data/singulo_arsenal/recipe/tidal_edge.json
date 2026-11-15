@@ -6,15 +6,11 @@
   "energy": 20000000,
   "ingredients": [
     {
-      "ingredient": {
-        "item": "singulo:collapsar_ingot"
-      },
+      "ingredient": "singulo:collapsar_ingot",
       "count": 2
     },
     {
-      "ingredient": {
-        "item": "singulo:tidal_filament"
-      },
+      "ingredient": "singulo:tidal_filament",
       "count": 8
     }
   ],

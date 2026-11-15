@@ -17,13 +17,13 @@ import net.minecraft.world.phys.Vec3;
  * dumps as heat at once. Without FE it is just a good sword.
  */
 public final class QuenchSaberItem extends PoweredSword {
-    public QuenchSaberItem() {
-        super(WeaponTier.QUENCH, 8, -2.4F, Rules.QUENCH_CAPACITY, 2, Rarity.UNCOMMON);
+    public QuenchSaberItem(net.minecraft.world.item.Item.Properties properties) {
+        super(properties, WeaponTier.QUENCH, 8, -2.4F, Rules.QUENCH_CAPACITY, 2, Rarity.UNCOMMON);
     }
 
     @Override
-    public boolean hurtEnemy(ItemStack stack, LivingEntity target, LivingEntity attacker) {
-        if (attacker instanceof Player player && player.level() instanceof ServerLevel level && !player.getCooldowns().isOnCooldown(this)) {
+    public void hurtEnemy(ItemStack stack, LivingEntity target, LivingEntity attacker) {
+        if (attacker instanceof Player player && player.level() instanceof ServerLevel level && !player.getCooldowns().isOnCooldown(stack)) {
             long now = level.getGameTime();
             int current = now - ArsenalData.time(stack, ArsenalData.LAST_HIT) > Rules.QUENCH_DECAY_TICKS ? 0 : ArsenalData.get(stack, ArsenalData.CURRENT);
             int next = Rules.currentAfterHit(current);
@@ -35,7 +35,7 @@ public final class QuenchSaberItem extends PoweredSword {
                 stack.set(ArsenalData.CURRENT.get(), Math.min(next, Rules.QUENCH_MAX_CURRENT - 1));
             }
         }
-        return super.hurtEnemy(stack, target, attacker);
+        super.hurtEnemy(stack, target, attacker);
     }
 
     private void quench(Player player, ServerLevel level, LivingEntity origin, ItemStack stack) {
@@ -43,10 +43,10 @@ public final class QuenchSaberItem extends PoweredSword {
         var source = ArsenalDamage.source(level, ArsenalDamage.QUENCH, player);
         for (LivingEntity target : ArsenalDamage.around(player, center, Rules.QUENCH_RADIUS)) {
             target.invulnerableTime = 0;
-            target.hurt(source, Weapons.amplified(stack, Rules.QUENCH_DAMAGE));
+            target.hurtServer((net.minecraft.server.level.ServerLevel) target.level(), source, Weapons.amplified(stack, Rules.QUENCH_DAMAGE));
             target.igniteForSeconds(3);
         }
-        player.getCooldowns().addCooldown(this, Weapons.cooled(player.getMainHandItem(), Rules.QUENCH_COOLDOWN));
+        player.getCooldowns().addCooldown(player.getMainHandItem(), Weapons.cooled(player.getMainHandItem(), Rules.QUENCH_COOLDOWN));
         Weapons.beginReload(player.getMainHandItem(), level.getGameTime(), Weapons.cooled(player.getMainHandItem(), Rules.QUENCH_COOLDOWN));
         FxPayload.send(level, FxPayload.QUENCH, center, Vec3.ZERO, (float) Rules.QUENCH_RADIUS);
         Weapons.sound(origin, "keraunos_tower.discharge", 1.1F, 1.3F);

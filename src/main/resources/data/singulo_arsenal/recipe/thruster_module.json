@@ -6,27 +6,19 @@
   "energy": 400,
   "ingredients": [
     {
-      "ingredient": {
-        "item": "singulo:precision_actuator"
-      },
+      "ingredient": "singulo:precision_actuator",
       "count": 1
     },
     {
-      "ingredient": {
-        "item": "singulo:superconducting_coil"
-      },
+      "ingredient": "singulo:superconducting_coil",
       "count": 2
     },
     {
-      "ingredient": {
-        "item": "singulo:muon_bundle"
-      },
+      "ingredient": "singulo:muon_bundle",
       "count": 2
     },
     {
-      "ingredient": {
-        "item": "singulo:steel_plate"
-      },
+      "ingredient": "singulo:steel_plate",
       "count": 2
     }
   ],

@@ -7,18 +7,10 @@
     " F "
   ],
   "key": {
-    "T": {
-      "item": "singulo_arsenal:tidal_edge"
-    },
-    "L": {
-      "item": "singulo_arsenal:collapsar_lamina"
-    },
-    "G": {
-      "item": "singulo:gravity_field_stabilizer"
-    },
-    "F": {
-      "item": "singulo:tidal_filament"
-    }
+    "T": "singulo_arsenal:tidal_edge",
+    "L": "singulo_arsenal:collapsar_lamina",
+    "G": "singulo:gravity_field_stabilizer",
+    "F": "singulo:tidal_filament"
   },
   "result": {
     "id": "singulo_arsenal:tidal_reaver",

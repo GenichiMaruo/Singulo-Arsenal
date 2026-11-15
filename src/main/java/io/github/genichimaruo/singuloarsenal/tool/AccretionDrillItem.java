@@ -14,7 +14,7 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResultHolder;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Rarity;
@@ -28,8 +28,8 @@ import net.neoforged.neoforge.common.Tags;
 public final class AccretionDrillItem extends PoweredTool {
     private static final TagKey<Block> MINEABLE = TagKey.create(Registries.BLOCK, SinguloArsenal.id("mineable/drill"));
 
-    public AccretionDrillItem() {
-        super(ToolTier.ACCRETION, MINEABLE, 11, -2.8F, Rules.DRILL_CAPACITY, 5, Rules.DRILL_FE, Rarity.EPIC);
+    public AccretionDrillItem(net.minecraft.world.item.Item.Properties properties) {
+        super(properties, ToolTier.ACCRETION, MINEABLE, 11, -2.8F, Rules.DRILL_CAPACITY, 5, Rules.DRILL_FE, Rarity.EPIC);
     }
 
     @Override public boolean accretes() { return true; }
@@ -39,21 +39,21 @@ public final class AccretionDrillItem extends PoweredTool {
     }
 
     @Override
-    public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
+    public InteractionResult use(Level level, Player player, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
-        if (hand != InteractionHand.MAIN_HAND) return InteractionResultHolder.pass(stack);
-        if (!level.isClientSide) {
+        if (hand != InteractionHand.MAIN_HAND) return InteractionResult.PASS;
+        if (!level.isClientSide()) {
             int next = (mode(stack) + 1) % (Rules.DRILL_VEIN + 1);
             stack.set(ArsenalData.TOOL_MODE.get(), next);
-            player.displayClientMessage(Component.translatable("message.singulo_arsenal.drill_mode", Component.translatable("tool.singulo_arsenal.drill_mode." + next)), true);
+            player.sendOverlayMessage(Component.translatable("message.singulo_arsenal.drill_mode", Component.translatable("tool.singulo_arsenal.drill_mode." + next)));
             level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.DISPENSER_DISPENSE, SoundSource.PLAYERS, 0.6F, 1 + next * 0.2F);
         }
-        return InteractionResultHolder.consume(stack);
+        return InteractionResult.CONSUME;
     }
 
     @Override
     public List<BlockPos> alsoBreaks(ServerPlayer player, ItemStack stack, BlockPos origin, BlockState state) {
-        ServerLevel level = player.serverLevel();
+        ServerLevel level = player.level();
         return switch (mode(stack)) {
             case Rules.DRILL_AREA -> Mining.square(player, stack, origin, state, 1);
             case Rules.DRILL_VEIN -> state.is(Tags.Blocks.ORES)
@@ -65,8 +65,13 @@ public final class AccretionDrillItem extends PoweredTool {
     }
 
     @Override
-    public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> lines, TooltipFlag flag) {
+    public void appendHoverText(ItemStack stack, TooltipContext context, net.minecraft.world.item.component.TooltipDisplay display, java.util.function.Consumer<Component> output, TooltipFlag flag) {
+        List<Component> lines = new java.util.ArrayList<>();
+        describeHoverText(stack, context, lines, flag);
+        lines.forEach(output);
+    }
+    protected void describeHoverText(ItemStack stack, TooltipContext context, List<Component> lines, TooltipFlag flag) {
         lines.add(Component.translatable("tool.singulo_arsenal.drill_mode." + mode(stack)).withStyle(ChatFormatting.YELLOW));
-        super.appendHoverText(stack, context, lines, flag);
+        super.describeHoverText(stack, context, lines, flag);
     }
 }

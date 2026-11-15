@@ -16,7 +16,7 @@ import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
@@ -55,11 +55,11 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 /** Every suit effect. All decisions are made on the server; only the flux pin also runs on the client, because movement is client-side. */
 public final class SuitEvents {
     public static final EquipmentSlot[] SLOTS = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET};
-    private static final ResourceLocation SPEED = SinguloArsenal.id("suit_speed");
-    private static final ResourceLocation REACH = SinguloArsenal.id("suit_reach");
-    private static final ResourceLocation KNOCKBACK = SinguloArsenal.id("suit_knockback");
-    private static final ResourceLocation METRIC_FLIGHT = SinguloArsenal.id("metric_flight");
-    private static final ResourceLocation METRIC_FALL = SinguloArsenal.id("metric_fall");
+    private static final Identifier SPEED = SinguloArsenal.id("suit_speed");
+    private static final Identifier REACH = SinguloArsenal.id("suit_reach");
+    private static final Identifier KNOCKBACK = SinguloArsenal.id("suit_knockback");
+    private static final Identifier METRIC_FLIGHT = SinguloArsenal.id("metric_flight");
+    private static final Identifier METRIC_FALL = SinguloArsenal.id("metric_fall");
     private static final String LAST_DEFLECT = "singulo_arsenal.last_deflect";
     private static final String LAST_ABILITY = "singulo_arsenal.last_ability";
 
@@ -92,7 +92,7 @@ public final class SuitEvents {
     private static long now(LivingEntity entity) { return entity.level().getGameTime(); }
 
     private static SoundEvent singulo(String name) {
-        return BuiltInRegistries.SOUND_EVENT.get(ResourceLocation.fromNamespaceAndPath("singulo", name));
+        return BuiltInRegistries.SOUND_EVENT.getValue(Identifier.fromNamespaceAndPath("singulo", name));
     }
 
     private static void sound(Entity at, SoundEvent event, float volume, float pitch) {
@@ -124,7 +124,7 @@ public final class SuitEvents {
             player.setDeltaMovement(motion.x * 0.8, Rules.FLUX_CREEP, motion.z * 0.8);
         }
         player.resetFallDistance();
-        if (!player.level().isClientSide && player.tickCount % 10 == 0) {
+        if (!player.level().isClientSide() && player.tickCount % 10 == 0) {
             ItemStack boots = player.getItemBySlot(EquipmentSlot.FEET);
             Fe.spend(boots, Math.min(Fe.stored(boots), Rules.PIN_FE_PER_10_TICKS));
         }
@@ -163,12 +163,12 @@ public final class SuitEvents {
                 e -> e instanceof Enemy && ArsenalDamage.canHit(player, e) && player.distanceTo(e) <= Rules.BIT_RANGE && player.hasLineOfSight(e)));
         if (targets.isEmpty()) return;
         targets.sort(java.util.Comparator.comparingDouble(player::distanceToSqr));
-        var source = ArsenalDamage.source(player.serverLevel(), ArsenalDamage.BIT, player);
+        var source = ArsenalDamage.source(player.level(), ArsenalDamage.BIT, player);
         for (int bit = 0; bit < bits; bit++) {
             if (!Fe.spend(chest, Rules.BIT_FE)) return;
             Mob target = targets.get(bit % targets.size());
-            target.hurt(source, Rules.BIT_DAMAGE);
-            FxPayload.sendEntity(player.serverLevel(), FxPayload.BIT_SHOT, player, target.getBoundingBox().getCenter(), bit);
+            target.hurtServer((net.minecraft.server.level.ServerLevel) target.level(), source, Rules.BIT_DAMAGE);
+            FxPayload.sendEntity(player.level(), FxPayload.BIT_SHOT, player, target.getBoundingBox().getCenter(), bit);
         }
     }
 
@@ -181,14 +181,19 @@ public final class SuitEvents {
         int coils = Modules.count(chest, ModuleType.INDUCTION);
         if (coils == 0) return;
         int budget = Rules.induced(Fe.stored(chest), Integer.MAX_VALUE, coils);
-        List<ItemStack> carried = new ArrayList<>(List.of(player.getMainHandItem(), player.getOffhandItem()));
-        for (ItemStack stack : player.getInventory().items) if (stack != carried.getFirst()) carried.add(stack);
-        for (ItemStack stack : carried) {
+        var inventory = player.getInventory();
+        List<Integer> carried = new ArrayList<>(List.of(inventory.getSelectedSlot(), net.minecraft.world.entity.player.Inventory.SLOT_OFFHAND));
+        for (int i = 0; i < net.minecraft.world.entity.player.Inventory.INVENTORY_SIZE; i++) if (i != inventory.getSelectedSlot()) carried.add(i);
+        for (int slot : carried) {
             if (budget <= 0) return;
-            if (stack.isEmpty()) continue;
-            var storage = stack.getCapability(Capabilities.EnergyStorage.ITEM);
-            if (storage == null || !storage.canReceive()) continue;
-            int got = storage.receiveEnergy(budget, false);
+            var access = net.neoforged.neoforge.transfer.access.ItemAccess.forPlayerSlot(player, slot);
+            var storage = access.getCapability(Capabilities.Energy.ITEM);
+            if (storage == null) continue;
+            int got;
+            try (var tx = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+                got = storage.insert(budget, tx);
+                if (got > 0) tx.commit();
+            }
             if (got <= 0) continue;
             Fe.set(chest, Fe.stored(chest) - got);
             budget -= got;
@@ -248,7 +253,7 @@ public final class SuitEvents {
     private static void moduleAttributes(net.neoforged.neoforge.event.ItemAttributeModifierEvent event) {
         ItemStack stack = event.getItemStack();
         if (!(stack.getItem() instanceof SuitItem suit) || !stack.has(ArsenalData.MODULES.get())) return;
-        var slot = net.minecraft.world.entity.EquipmentSlotGroup.bySlot(suit.getEquipmentSlot());
+        var slot = net.minecraft.world.entity.EquipmentSlotGroup.bySlot(suit.getType().getSlot());
         int plating = Modules.count(stack, ModuleType.PLATING);
         if (plating > 0) {
             addToBase(event, Attributes.ARMOR, plating * Rules.PLATING_ARMOR, slot, "module_armor_" + suit.getType().getName());
@@ -338,7 +343,7 @@ public final class SuitEvents {
         modifier(player, Attributes.KNOCKBACK_RESISTANCE, KNOCKBACK, knockback, AttributeModifier.Operation.ADD_VALUE);
     }
 
-    private static void modifier(Player player, Holder<Attribute> attribute, ResourceLocation id, double amount, AttributeModifier.Operation operation) {
+    private static void modifier(Player player, Holder<Attribute> attribute, Identifier id, double amount, AttributeModifier.Operation operation) {
         var instance = player.getAttribute(attribute);
         if (instance == null) return;
         if (amount == 0) instance.removeModifier(id);
@@ -349,11 +354,11 @@ public final class SuitEvents {
 
     private static void projectile(ProjectileImpactEvent event) {
         Projectile projectile = event.getProjectile();
-        if (projectile.level().isClientSide || !(event.getRayTraceResult() instanceof EntityHitResult hit)
+        if (projectile.level().isClientSide() || !(event.getRayTraceResult() instanceof EntityHitResult hit)
                 || !(hit.getEntity() instanceof ServerPlayer player) || projectile.getOwner() == player
                 || !wearing(player, EquipmentSlot.CHEST, ArmorSet.MEISSNER)) return;
         CompoundTag data = player.getPersistentData();
-        if (data.contains(LAST_DEFLECT) && now(player) - data.getLong(LAST_DEFLECT) < Rules.DEFLECT_COOLDOWN) return;
+        if (data.contains(LAST_DEFLECT) && now(player) - data.getLongOr(LAST_DEFLECT, 0L) < Rules.DEFLECT_COOLDOWN) return;
         if (!Fe.spend(player.getItemBySlot(EquipmentSlot.CHEST), Rules.DEFLECT_FE)) return;
         data.putLong(LAST_DEFLECT, now(player));
         event.setCanceled(true);
@@ -361,8 +366,8 @@ public final class SuitEvents {
         projectile.setDeltaMovement(away.scale(Math.max(0.6, projectile.getDeltaMovement().length() * 0.5)));
         projectile.hurtMarked = true;
         projectile.setOwner(player);
-        FxPayload.send(player.serverLevel(), FxPayload.RIPPLE, projectile.position(), away, 1);
-        sound(player, SoundEvents.SHIELD_BLOCK, 0.8F, 1.3F);
+        FxPayload.send(player.level(), FxPayload.RIPPLE, projectile.position(), away, 1);
+        sound(player, SoundEvents.SHIELD_BLOCK.value(), 0.8F, 1.3F);
     }
 
     // ---- damage -------------------------------------------------------------------------------------------------
@@ -384,7 +389,7 @@ public final class SuitEvents {
                 push = push.normalize().scale(Rules.LENZ_PUSH);
                 attacker.push(push.x, 0.2, push.z);
                 attacker.hurtMarked = true;
-                FxPayload.send(player.serverLevel(), FxPayload.RIPPLE, attacker.getEyePosition(), push.normalize().reverse(), 1);
+                FxPayload.send(player.level(), FxPayload.RIPPLE, attacker.getEyePosition(), push.normalize().reverse(), 1);
             }
         }
     }
@@ -406,11 +411,11 @@ public final class SuitEvents {
                 damage -= pressure;
                 int total = ArsenalData.get(chest, ArsenalData.LOAD) + pressure;
                 chest.set(ArsenalData.LOAD.get(), Math.min(total, Rules.PRESSURE_MAX));
-                FxPayload.send(player.serverLevel(), FxPayload.RIPPLE, player.getEyePosition(), Vec3.ZERO, 2);
+                FxPayload.send(player.level(), FxPayload.RIPPLE, player.getEyePosition(), Vec3.ZERO, 2);
                 if (total >= Rules.PRESSURE_MAX) {
                     collapse(player, chest, Rules.PRESSURE_MAX);
                     chest.set(ArsenalData.LOCKED_UNTIL.get(), now(player) + Rules.COLLAPSE_LOCKOUT);
-                    player.displayClientMessage(Component.translatable("message.singulo_arsenal.collapse"), true);
+                    player.sendOverlayMessage(Component.translatable("message.singulo_arsenal.collapse"));
                 }
             }
         }
@@ -448,15 +453,15 @@ public final class SuitEvents {
         if (absorbed <= 0) return damage;
         // A hit the suit paid for still strains the lining, or the pasta phases would never move.
         chest.set(ArsenalData.LOAD.get(), Math.min(Rules.LOAD_MAX, ArsenalData.get(chest, ArsenalData.LOAD) + Rules.loadFromDamage(absorbed)));
-        FxPayload.send(player.serverLevel(), FxPayload.RIPPLE, player.getBoundingBox().getCenter(), Vec3.ZERO, 1);
+        FxPayload.send(player.level(), FxPayload.RIPPLE, player.getBoundingBox().getCenter(), Vec3.ZERO, 1);
         return damage - absorbed;
     }
 
     private static void afterDamage(LivingDamageEvent.Post event) {
-        if (event.getEntity() instanceof ServerPlayer player && event.getNewDamage() > 0
+        if (event.getEntity() instanceof ServerPlayer player && event.getHealthDamage() > 0
                 && wearing(player, EquipmentSlot.CHEST, ArmorSet.COLLAPSAR)) {
             ItemStack chest = player.getItemBySlot(EquipmentSlot.CHEST);
-            int load = Math.min(Rules.LOAD_MAX, ArsenalData.get(chest, ArsenalData.LOAD) + Rules.loadFromDamage(event.getNewDamage()));
+            int load = Math.min(Rules.LOAD_MAX, ArsenalData.get(chest, ArsenalData.LOAD) + Rules.loadFromDamage(event.getHealthDamage()));
             chest.set(ArsenalData.LOAD.get(), load);
         }
     }
@@ -468,9 +473,9 @@ public final class SuitEvents {
         chest.set(ArsenalData.LOAD.get(), 0);
         player.setHealth(player.getMaxHealth() * Rules.HORIZON_HEALTH_FRACTION);
         Vec3 center = player.getBoundingBox().getCenter();
-        var source = ArsenalDamage.source(player.serverLevel(), ArsenalDamage.HORIZON, player);
-        for (LivingEntity target : ArsenalDamage.around(player, center, Rules.HORIZON_RADIUS)) target.hurt(source, Rules.HORIZON_DAMAGE);
-        FxPayload.send(player.serverLevel(), FxPayload.HORIZON, center, Vec3.ZERO, (float) Rules.HORIZON_RADIUS);
+        var source = ArsenalDamage.source(player.level(), ArsenalDamage.HORIZON, player);
+        for (LivingEntity target : ArsenalDamage.around(player, center, Rules.HORIZON_RADIUS)) target.hurtServer((net.minecraft.server.level.ServerLevel) target.level(), source, Rules.HORIZON_DAMAGE);
+        FxPayload.send(player.level(), FxPayload.HORIZON, center, Vec3.ZERO, (float) Rules.HORIZON_RADIUS);
         sound(player, singulo("black_hole.open"), 2.5F, 1);
     }
 
@@ -479,14 +484,14 @@ public final class SuitEvents {
         chest.set(ArsenalData.LOAD.get(), 0);
         double radius = Rules.COLLAPSE_RADIUS * Math.max(0.5, (double) pressure / Rules.PRESSURE_MAX);
         Vec3 center = player.getBoundingBox().getCenter();
-        var source = ArsenalDamage.source(player.serverLevel(), ArsenalDamage.COLLAPSE, player);
+        var source = ArsenalDamage.source(player.level(), ArsenalDamage.COLLAPSE, player);
         for (LivingEntity target : ArsenalDamage.around(player, center, radius)) {
-            if (target.hurt(source, Rules.collapseDamage(pressure))) {
+            if (target.hurtServer((net.minecraft.server.level.ServerLevel) target.level(), source, Rules.collapseDamage(pressure))) {
                 Vec3 away = target.position().subtract(player.position()).multiply(1, 0, 1);
                 if (away.lengthSqr() > 1.0E-4) target.knockback(1.6, -away.x, -away.z);
             }
         }
-        FxPayload.send(player.serverLevel(), FxPayload.COLLAPSE, center, Vec3.ZERO, (float) radius);
+        FxPayload.send(player.level(), FxPayload.COLLAPSE, center, Vec3.ZERO, (float) radius);
         sound(player, singulo("degenerate_furnace_press"), 2, 0.7F);
     }
 
@@ -497,16 +502,16 @@ public final class SuitEvents {
             return;
         }
         if (!wearing(player, EquipmentSlot.FEET, ArmorSet.DEGENERACY)) return;
-        float blocks = event.getDistance();
+        float blocks = (float) event.getDistance();
         ItemStack boots = player.getItemBySlot(EquipmentSlot.FEET);
         if (blocks < 4 || !Fe.spend(boots, (int) (blocks * Rules.SLAM_FE_PER_BLOCK))) return;
         event.setDamageMultiplier(0);
         BlockPos below = player.blockPosition();
         Vec3 center = Vec3.atBottomCenterOf(below);
         double radius = Rules.slamRadius(blocks);
-        var source = ArsenalDamage.source(player.serverLevel(), ArsenalDamage.COLLAPSE, player);
-        for (LivingEntity target : ArsenalDamage.around(player, center, radius)) target.hurt(source, Rules.slamDamage(blocks));
-        FxPayload.send(player.serverLevel(), FxPayload.SLAM, center, new Vec3(0, 1, 0), (float) radius);
+        var source = ArsenalDamage.source(player.level(), ArsenalDamage.COLLAPSE, player);
+        for (LivingEntity target : ArsenalDamage.around(player, center, radius)) target.hurtServer((net.minecraft.server.level.ServerLevel) target.level(), source, Rules.slamDamage(blocks));
+        FxPayload.send(player.level(), FxPayload.SLAM, center, new Vec3(0, 1, 0), (float) radius);
         sound(player, SoundEvents.ANVIL_LAND, 1, 0.5F);
     }
 
@@ -519,7 +524,7 @@ public final class SuitEvents {
 
     /** Equipment sounds are played here because the armor material's own sound would fire on every FE change. */
     private static void equipment(LivingEquipmentChangeEvent event) {
-        if (event.getEntity().level().isClientSide || event.getSlot().getType() != EquipmentSlot.Type.HUMANOID_ARMOR) return;
+        if (event.getEntity().level().isClientSide() || event.getSlot().getType() != EquipmentSlot.Type.HUMANOID_ARMOR) return;
         if (event.getTo().getItem() instanceof SuitItem && !ItemStack.isSameItem(event.getFrom(), event.getTo())) {
             sound(event.getEntity(), SoundEvents.ARMOR_EQUIP_NETHERITE.value(), 0.8F, 1.1F);
         }
@@ -531,18 +536,18 @@ public final class SuitEvents {
     public static void activate(ServerPlayer player) {
         if (!player.isAlive() || player.isSpectator() || player.isSleeping()) return;
         CompoundTag data = player.getPersistentData();
-        if (data.contains(LAST_ABILITY) && now(player) - data.getLong(LAST_ABILITY) < 4) return;
+        if (data.contains(LAST_ABILITY) && now(player) - data.getLongOr(LAST_ABILITY, 0L) < 4) return;
         data.putLong(LAST_ABILITY, now(player));
         ItemStack chest = player.getItemBySlot(EquipmentSlot.CHEST);
         if (wearing(player, EquipmentSlot.CHEST, ArmorSet.COLLAPSAR)) jetBurst(player, chest);
         else if (wearing(player, EquipmentSlot.CHEST, ArmorSet.DEGENERACY)) vent(player, chest);
-        else player.displayClientMessage(Component.translatable("message.singulo_arsenal.no_ability"), true);
+        else player.sendOverlayMessage(Component.translatable("message.singulo_arsenal.no_ability"));
     }
 
     private static void vent(ServerPlayer player, ItemStack chest) {
         int pressure = ArsenalData.get(chest, ArsenalData.LOAD);
         if (now(player) < ArsenalData.time(chest, ArsenalData.LOCKED_UNTIL) || pressure < Rules.VENT_MINIMUM) {
-            player.displayClientMessage(Component.translatable("message.singulo_arsenal.vent_unavailable", Rules.VENT_MINIMUM), true);
+            player.sendOverlayMessage(Component.translatable("message.singulo_arsenal.vent_unavailable", Rules.VENT_MINIMUM));
             return;
         }
         collapse(player, chest, pressure);
@@ -550,29 +555,29 @@ public final class SuitEvents {
 
     private static void jetBurst(ServerPlayer player, ItemStack chest) {
         if (!wearing(player, EquipmentSlot.FEET, ArmorSet.COLLAPSAR)) {
-            player.displayClientMessage(Component.translatable("message.singulo_arsenal.need_boots"), true);
+            player.sendOverlayMessage(Component.translatable("message.singulo_arsenal.need_boots"));
             return;
         }
-        if (player.getCooldowns().isOnCooldown(chest.getItem())) return;
+        if (player.getCooldowns().isOnCooldown(chest)) return;
         if (!Fe.spend(chest, Rules.JET_BURST_FE)) {
-            player.displayClientMessage(Component.translatable("message.singulo_arsenal.no_energy"), true);
+            player.sendOverlayMessage(Component.translatable("message.singulo_arsenal.no_energy"));
             return;
         }
         chest.set(ArsenalData.LOAD.get(), Math.max(0, ArsenalData.get(chest, ArsenalData.LOAD) - Rules.JET_BURST_LOAD));
         Vec3 look = player.getLookAngle().normalize();
         Vec3 center = player.getBoundingBox().getCenter();
         Vec3 rear = center.subtract(look.scale(Rules.JET_BURST_REAR_RANGE));
-        var source = ArsenalDamage.source(player.serverLevel(), ArsenalDamage.JET, player);
+        var source = ArsenalDamage.source(player.level(), ArsenalDamage.JET, player);
         for (LivingEntity target : ArsenalDamage.along(player, center, rear, 0.8)) {
-            target.hurt(source, Rules.JET_BURST_DAMAGE);
+            target.hurtServer((net.minecraft.server.level.ServerLevel) target.level(), source, Rules.JET_BURST_DAMAGE);
             target.setRemainingFireTicks(Math.max(target.getRemainingFireTicks(), 60));
         }
         player.setDeltaMovement(look.scale(Rules.JET_BURST_SPEED));
         player.hurtMarked = true;
         player.resetFallDistance();
         player.invulnerableTime = Math.max(player.invulnerableTime, 8);
-        player.getCooldowns().addCooldown(chest.getItem(), Rules.JET_BURST_COOLDOWN);
-        FxPayload.send(player.serverLevel(), FxPayload.JET_BURST, center, rear, 1);
+        player.getCooldowns().addCooldown(chest, Rules.JET_BURST_COOLDOWN);
+        FxPayload.send(player.level(), FxPayload.JET_BURST, center, rear, 1);
         sound(player, singulo("jet_forge.jet"), 1.5F, 1.4F);
     }
 }

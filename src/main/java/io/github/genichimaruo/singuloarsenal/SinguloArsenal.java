@@ -10,7 +10,7 @@ import io.github.genichimaruo.singuloarsenal.net.FxPayload;
 import io.github.genichimaruo.singuloarsenal.net.ScanPayload;
 import io.github.genichimaruo.singuloarsenal.tool.Mining;
 import io.github.genichimaruo.singuloarsenal.weapon.Weapons;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
@@ -23,6 +23,12 @@ public final class SinguloArsenal {
     private static final Logger LOGGER = LogUtils.getLogger();
 
     public SinguloArsenal(IEventBus bus) {
+        if (net.neoforged.neoforge.gametest.GameTestHooks.isGametestEnabled()) {
+            try {
+                Class.forName("io.github.genichimaruo.singuloarsenal.gametest.ArsenalTestRegistration")
+                    .getMethod("register", IEventBus.class).invoke(null, bus);
+            } catch (ReflectiveOperationException e) { throw new IllegalStateException("Cannot register Arsenal tests", e); }
+        }
         ArsenalData.REGISTER.register(bus);
         ModuleContent.register(bus);
         ArsenalItems.register(bus);
@@ -42,7 +48,7 @@ public final class SinguloArsenal {
         registrar.playToClient(ScanPayload.TYPE, ScanPayload.CODEC, ScanPayload::handle);
     }
 
-    public static ResourceLocation id(String path) {
-        return ResourceLocation.fromNamespaceAndPath(MOD_ID, path);
+    public static Identifier id(String path) {
+        return Identifier.fromNamespaceAndPath(MOD_ID, path);
     }
 }

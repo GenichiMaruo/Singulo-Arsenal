@@ -9,23 +9,27 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.core.Holder;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionResult;
-import net.minecraft.world.item.ArmorItem;
-import net.minecraft.world.item.ArmorMaterial;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.equipment.ArmorMaterial;
+import net.minecraft.world.item.equipment.ArmorType;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Rarity;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.context.UseOnContext;
 
-public final class SuitItem extends ArmorItem implements Powered {
+public final class SuitItem extends Item implements Powered {
     public final ArmorSet set;
+    private final ArmorType type;
+    public ArmorType getType() { return type; }
 
-    public SuitItem(Holder<ArmorMaterial> material, Type type, ArmorSet set) {
-        super(material, type, properties(type, set));
+    public SuitItem(Properties properties, ArmorMaterial material, ArmorType type, ArmorSet set) {
+        super(properties(properties, material, type, set));
+        this.type = type;
         this.set = set;
     }
 
-    private static Properties properties(Type type, ArmorSet set) {
-        Properties properties = new Properties().durability(type.getDurability(set.durability))
+    private static Properties properties(Properties properties, ArmorMaterial material, ArmorType type, ArmorSet set) {
+        properties.humanoidArmor(material, type)
                 .rarity(set == ArmorSet.COLLAPSAR ? Rarity.EPIC : set == ArmorSet.DEGENERACY ? Rarity.RARE : Rarity.UNCOMMON);
         return set.fireproof ? properties.fireResistant() : properties;
     }
@@ -45,7 +49,12 @@ public final class SuitItem extends ArmorItem implements Powered {
     @Override public int getBarColor(ItemStack stack) { return 0x6FE3FF; }
 
     @Override
-    public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> lines, TooltipFlag flag) {
+    public void appendHoverText(ItemStack stack, TooltipContext context, net.minecraft.world.item.component.TooltipDisplay display, java.util.function.Consumer<Component> output, TooltipFlag flag) {
+        List<Component> lines = new java.util.ArrayList<>();
+        describeHoverText(stack, context, lines, flag);
+        lines.forEach(output);
+    }
+    protected void describeHoverText(ItemStack stack, TooltipContext context, List<Component> lines, TooltipFlag flag) {
         String id = set.id + "." + getType().getName();
         lines.add(Component.translatable("tooltip.singulo_arsenal." + id + ".summary").withStyle(ChatFormatting.GRAY));
         Tips.energyLine(stack, lines);

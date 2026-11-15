@@ -14,15 +14,15 @@ import net.neoforged.neoforge.client.IArmPoseTransformer;
 public final class CannonReloadPose {
     private static final IArmPoseTransformer TRANSFORM = CannonReloadPose::apply;
     /** Referenced from {@code META-INF/enumextensions.json}, which adds this as a member of {@code HumanoidModel.ArmPose}. */
-    public static final EnumProxy<HumanoidModel.ArmPose> PARAMETERS = new EnumProxy<>(HumanoidModel.ArmPose.class, true, TRANSFORM);
+    public static final EnumProxy<HumanoidModel.ArmPose> PARAMETERS = new EnumProxy<>(HumanoidModel.ArmPose.class, true, true, TRANSFORM);
 
     private CannonReloadPose() {}
 
-    private static void apply(HumanoidModel<?> model, LivingEntity entity, HumanoidArm arm) {
-        boolean rightHanded = entity.getMainArm() == HumanoidArm.RIGHT;
+    private static void apply(HumanoidModel<?> model, net.minecraft.client.renderer.entity.state.HumanoidRenderState entity, HumanoidArm arm) {
+        boolean rightHanded = entity.mainArm == HumanoidArm.RIGHT;
         AnimationUtils.animateCrossbowHold(model.rightArm, model.leftArm, model.head, rightHanded);
-        float partial = net.minecraft.client.Minecraft.getInstance().getTimer().getGameTimeDeltaPartialTick(true);
-        float progress = Weapons.reloadProgress(entity.getMainHandItem(), entity.level().getGameTime(), partial);
+        var data = entity.getRenderData(ArsenalRenderState.DATA);
+        float progress = data == null ? -1 : data.reload();
         if (progress < 0) return;
         ModelPart main = rightHanded ? model.rightArm : model.leftArm;
         ModelPart support = rightHanded ? model.leftArm : model.rightArm;

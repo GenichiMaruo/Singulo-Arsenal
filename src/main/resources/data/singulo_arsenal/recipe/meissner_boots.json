@@ -6,12 +6,8 @@
     "S S"
   ],
   "key": {
-    "W": {
-      "item": "singulo_arsenal:flux_weave"
-    },
-    "S": {
-      "item": "singulo:superconducting_coil"
-    }
+    "W": "singulo_arsenal:flux_weave",
+    "S": "singulo:superconducting_coil"
   },
   "result": {
     "id": "singulo_arsenal:meissner_boots",
