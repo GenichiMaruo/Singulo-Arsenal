@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Deterministic generator for every data file, translation and icon. Python 3 stdlib only; run from any directory."""
+import colorsys
 import json
 import math
 from pathlib import Path
@@ -12,10 +13,13 @@ ROOT = Path(__file__).resolve().parents[1] / 'src/main/resources'
 MOD = 'singulo_arsenal'
 SETS = ['meissner', 'degeneracy', 'collapsar']
 PARTS = ['helmet', 'chestplate', 'leggings', 'boots']
-WEAPONS = ['quench_saber', 'casimir_blade', 'tidal_reaver', 'jet_lance']
+WEAPONS = ['quench_saber', 'casimir_blade', 'tidal_reaver', 'jet_cannon']
 TOOLS = ['squid_pick', 'degeneracy_breaker', 'shear_saw', 'accretion_drill']
 MATERIALS = ['flux_weave', 'pressure_lattice', 'collapsar_lamina', 'jet_collimator', 'tidal_edge']
 MODULES = ['bit_drone_module', 'capacitor_module', 'plating_module', 'thruster_module', 'coolant_module', 'amplifier_module', 'metric_drive_module', 'meltdown_module', 'overclock_module', 'smelter_module', 'induction_module', 'collector_module']
+# Plain nihonium gear: vanilla tools and armor on the vanilla armor layer, no abilities and no FE.
+NIHONIUM_TOOLS = ['nihonium_sword', 'nihonium_pickaxe', 'nihonium_axe', 'nihonium_shovel']
+NIHONIUM_ARMOR = [f'nihonium_{part}' for part in PARTS]
 DAMAGE = ['quench', 'collapse', 'jet', 'shear', 'horizon', 'bit']
 MATERIAL_SIZE = 32
 FINE_SIZE = 64
@@ -51,14 +55,15 @@ def unlock_advancement(name, unlock):
     })
 
 
-def shaped(name, pattern, key, unlock):
+def shaped(name, pattern, key, unlock, *, recipe_name=None):
     """A crafting-table recipe. Every pattern below is a drawing of the thing being built; see docs/arsenal.md."""
-    write(f'data/{MOD}/recipe/{name}.json', {
+    recipe_name = recipe_name or name
+    write(f'data/{MOD}/recipe/{recipe_name}.json', {
         'type': 'minecraft:crafting_shaped', 'category': 'equipment', 'pattern': pattern,
         'key': {symbol: ingredient(ref) for symbol, ref in key.items()},
         'result': {'id': own(name), 'count': 1},
     })
-    unlock_advancement(name, unlock)
+    unlock_advancement(recipe_name, unlock)
 
 
 def machine(name, station, stage, time, energy, ingredients, unlock, fluids=(), count=1):
@@ -133,8 +138,9 @@ shaped('casimir_blade', ['M M', 'MEM', ' F '],
 shaped('tidal_reaver', [' T ', 'LGL', ' F '],
        {'T': own('tidal_edge'), 'L': own('collapsar_lamina'), 'G': s('gravity_field_stabilizer'), 'F': s('tidal_filament')}, own('tidal_edge'))
 # The hole in the middle, a collimator on the firing pole, and a confinement ring sealing the other.
-shaped('jet_lance', [' J ', 'LBL', ' R '],
-       {'J': own('jet_collimator'), 'L': own('collapsar_lamina'), 'B': s('micro_black_hole'), 'R': s('confinement_ring')}, own('jet_collimator'))
+# Keep the historical recipe/advancement identities: existing unlocks and pack overrides survive.
+shaped('jet_cannon', [' J ', 'LBL', ' R '],
+       {'J': own('jet_collimator'), 'L': own('collapsar_lamina'), 'B': s('micro_black_hole'), 'R': s('confinement_ring')}, own('jet_collimator'), recipe_name='jet_lance')
 
 # ---- Tools: each drawn the way it is held, working end in the top row ----------------------------------------------------
 
@@ -177,6 +183,14 @@ machine('overclock_module', ASSEMBLER, 3, 200, 400, [(s('precision_actuator'), 2
 machine('smelter_module', ASSEMBLER, 3, 200, 400, [(s('heat_exchange_core'), 2), (s('white_ceramic_composite'), 2), (s('steel_plate'), 2), (s('superconducting_wire'), 1)], s('heat_exchange_core'))
 machine('induction_module', ASSEMBLER, 3, 200, 400, [(s('superconducting_coil'), 4), (s('superconducting_wire'), 2), (s('ceramic_substrate'), 1), (s('nihonium_plate'), 1)], s('superconducting_coil'))
 machine('collector_module', ASSEMBLER, 3, 200, 400, [(s('superconducting_coil'), 3), (s('entangled_element'), 1), (s('steel_plate'), 2)], s('entangled_element'))
+# Nihonium gear uses the vanilla patterns, so it reads as the next metal after diamond.
+NIHONIUM = {'N': s('nihonium_ingot'), 'S': 'minecraft:stick'}
+for name, pattern in [('nihonium_sword', ['N', 'N', 'S']), ('nihonium_pickaxe', ['NNN', ' S ', ' S ']),
+                      ('nihonium_axe', ['NN', 'NS', ' S']), ('nihonium_shovel', ['N', 'S', 'S']),
+                      ('nihonium_helmet', ['NNN', 'N N']), ('nihonium_chestplate', ['N N', 'NNN', 'NNN']),
+                      ('nihonium_leggings', ['NNN', 'N N', 'N N']), ('nihonium_boots', ['N N', 'N N'])]:
+    # Keys follow NIHONIUM's order, not a set's, so regeneration is byte-identical.
+    shaped(name, pattern, {k: v for k, v in NIHONIUM.items() if k in ''.join(pattern)}, s('nihonium_ingot'))
 write(f'data/{MOD}/loot_table/blocks/module_integrator.json', {
     'type': 'minecraft:block',
     'pools': [{'rolls': 1, 'entries': [{'type': 'minecraft:item', 'name': own('module_integrator')}], 'conditions': [{'condition': 'minecraft:survives_explosion'}]}],
@@ -192,15 +206,17 @@ for name in DAMAGE:
     write(f'data/{MOD}/damage_type/{name}.json', {'message_id': f'{MOD}.{name}', 'scaling': 'never', 'exhaustion': 0.1, 'effects': 'hurt'})
 write('data/minecraft/tags/damage_type/bypasses_cooldown.json', {'replace': False, 'values': [own('jet'), own('shear'), own('bit')]})
 for tag, part in [('head_armor', 'helmet'), ('chest_armor', 'chestplate'), ('leg_armor', 'leggings'), ('foot_armor', 'boots')]:
-    write(f'data/minecraft/tags/item/{tag}.json', {'replace': False, 'values': [own(f'{t}_{part}') for t in SETS]})
-write('data/minecraft/tags/item/swords.json', {'replace': False, 'values': [own(w) for w in WEAPONS[:3]]})
+    write(f'data/minecraft/tags/item/{tag}.json', {'replace': False, 'values': [own(f'{t}_{part}') for t in SETS] + [own(f'nihonium_{part}')]})
+write('data/minecraft/tags/item/swords.json', {'replace': False, 'values': [own(w) for w in WEAPONS[:3]] + [own('nihonium_sword')]})
+# Only the plain set takes trims: the powered suits are drawn by SuitLayer, which has no trim pass.
+write('data/minecraft/tags/item/trimmable_armor.json', {'replace': False, 'values': [own(n) for n in NIHONIUM_ARMOR]})
 PICKAXE, AXE, SHOVEL, HOE = (f'#minecraft:mineable/{k}' for k in ('pickaxe', 'axe', 'shovel', 'hoe'))
 write(f'data/{MOD}/tags/block/mineable/breaker.json', {'replace': False, 'values': [PICKAXE, SHOVEL]})
 write(f'data/{MOD}/tags/block/mineable/drill.json', {'replace': False, 'values': [PICKAXE, AXE, SHOVEL, HOE]})
-write('data/minecraft/tags/item/pickaxes.json', {'replace': False, 'values': [own('squid_pick'), own('degeneracy_breaker'), own('accretion_drill')]})
-write('data/minecraft/tags/item/shovels.json', {'replace': False, 'values': [own('degeneracy_breaker'), own('accretion_drill')]})
-write('data/minecraft/tags/item/axes.json', {'replace': False, 'values': [own('shear_saw'), own('accretion_drill')]})
-write('data/minecraft/tags/item/enchantable/durability.json', {'replace': False, 'values': [own('jet_lance')]})
+write('data/minecraft/tags/item/pickaxes.json', {'replace': False, 'values': [own('squid_pick'), own('degeneracy_breaker'), own('accretion_drill'), own('nihonium_pickaxe')]})
+write('data/minecraft/tags/item/shovels.json', {'replace': False, 'values': [own('degeneracy_breaker'), own('accretion_drill'), own('nihonium_shovel')]})
+write('data/minecraft/tags/item/axes.json', {'replace': False, 'values': [own('shear_saw'), own('accretion_drill'), own('nihonium_axe')]})
+write('data/minecraft/tags/item/enchantable/durability.json', {'replace': False, 'values': [own('jet_cannon')]})
 
 # ---- Item models ---------------------------------------------------------------------------------------------------
 
@@ -216,8 +232,10 @@ SWORD_DISPLAY = {
     'thirdperson_lefthand': {'rotation': [0, 90, -10], 'translation': [0, 4, 0.5], 'scale': [0.85, 0.85, 0.85]},
 }
 # Carried at the ready in both hands: +Y to the muzzle, +Z up. The translation seats the pistol grip in the fist.
-LANCE_DISPLAY = {
-    'gui': {'rotation': [-74, 0, -90], 'translation': [-1.9, 0.2, 0], 'scale': [0.36, 0.36, 0.36]},
+CANNON_DISPLAY = {
+    # A true side view, so the gun keeps its proportions, laid on the slot diagonal like vanilla's handheld items: muzzle to the
+    # upper right, top of the gun to the upper left. Rotations apply Z first, then Y, then X, so the in-screen tilt is the Y angle.
+    'gui': {'rotation': [-90, -45, -90], 'translation': [-1.9, 0.2, 0], 'scale': [0.36, 0.36, 0.36]},
     'ground': {'rotation': [-90, 0, -90], 'translation': [0, 3, 0], 'scale': [0.3, 0.3, 0.3]},
     'fixed': {'rotation': [-90, 0, -90], 'scale': [0.5, 0.5, 0.5]},
     'firstperson_righthand': {'rotation': [-90, 0, 0], 'translation': [-1.6, -0.6, -2.1], 'scale': [1, 1, 1]},
@@ -240,7 +258,7 @@ GUI_FIT = {
     'quench_saber': (-0.72, -0.85, 0.913),
     'casimir_blade': (-0.72, -0.91, 0.808),
     'tidal_reaver': (-1.10, -0.90, 0.667),
-    'jet_lance': (-3.19, 0.45, 0.443),
+    'jet_cannon': (-2.34, -2.16, 0.526),
     'meissner_helmet': (-0.00, -1.01, 0.880),
     'meissner_chestplate': (-0.00, 0.89, 0.754),
     'meissner_leggings': (-0.00, -1.18, 1.225),
@@ -260,7 +278,24 @@ GUI_FIT = {
 }
 
 
+# Measured from emitted idle vertices after each FIXED rotation/scale, in model translation units.
+# Do not reuse GUI_FIT: frames and inventory use different rotations. Recheck via fixed-bounds.txt.
+FIXED_FIT = {
+    'quench_saber': (-0.804334, -0.804334),
+    'casimir_blade': (-0.989949, -0.989949),
+    'tidal_reaver': (-1.484924, -0.928077),
+    'jet_cannon': (-3.71875, 0.674877),
+    'squid_pick': (-1.423052, -1.423052),
+    'degeneracy_breaker': (-1.732411, -1.732412),
+    'shear_saw': (-1.175565, -1.175565),
+    'accretion_drill': (-1.020885, -1.020885),
+}
+
+
 def fitted(name, display):
+    if name in FIXED_FIT:
+        x, y = FIXED_FIT[name]
+        display = {**display, 'fixed': {**display['fixed'], 'translation': [x, y, 0]}}
     if name not in GUI_FIT:
         return display
     x, y, scale = GUI_FIT[name]
@@ -281,14 +316,20 @@ def tool_display(first, third):
             'thirdperson_lefthand': {**SWORD_DISPLAY['thirdperson_lefthand'], 'scale': [third] * 3}}
 
 
-DISPLAYS = {'jet_lance': LANCE_DISPLAY, 'tidal_reaver': REAVER_DISPLAY,
+DISPLAYS = {'jet_cannon': CANNON_DISPLAY, 'tidal_reaver': REAVER_DISPLAY,
             'squid_pick': tool_display(0.48, 0.62), 'degeneracy_breaker': tool_display(0.4, 0.55),
             'shear_saw': tool_display(0.46, 0.62), 'accretion_drill': tool_display(0.46, 0.62)}
 for name in WEAPONS + TOOLS:
     write(f'assets/{MOD}/models/item/{name}.json', {**BUILTIN, 'display': fitted(name, DISPLAYS.get(name, SWORD_DISPLAY))})
+# Armor items are flat sprites everywhere, inventory and hand alike, like vanilla armor. Worn armor is SuitLayer's
+# geometry and does not use these models. False restores the 3D item models fitted by GUI_FIT.
+FLAT_ARMOR_ICONS = True
 for t in SETS:
     for part in PARTS:
-        write(f'assets/{MOD}/models/item/{t}_{part}.json', {**BUILTIN, 'display': fitted(f'{t}_{part}', ARMOR_DISPLAY)})
+        name = f'{t}_{part}'
+        write(f'assets/{MOD}/models/item/{name}.json',
+              {'parent': 'minecraft:item/generated', 'textures': {'layer0': f'{MOD}:item/{name}'}} if FLAT_ARMOR_ICONS
+              else {**BUILTIN, 'display': fitted(name, ARMOR_DISPLAY)})
 write(f'assets/{MOD}/models/item/module_integrator.json', {**BUILTIN, 'display': {
     'gui': {'rotation': [28, 225, 0], 'scale': [0.56, 0.56, 0.56]},
     'ground': {'translation': [0, 3, 0], 'scale': [0.25, 0.25, 0.25]},
@@ -298,7 +339,9 @@ write(f'assets/{MOD}/models/item/module_integrator.json', {**BUILTIN, 'display':
     'thirdperson_righthand': {'rotation': [75, 45, 0], 'translation': [0, 2.5, 0], 'scale': [0.375, 0.375, 0.375]},
     'thirdperson_lefthand': {'rotation': [75, 45, 0], 'translation': [0, 2.5, 0], 'scale': [0.375, 0.375, 0.375]},
 }})
-for name in MATERIALS + MODULES + ['pellet_canister']:
+for name in NIHONIUM_TOOLS:
+    write(f'assets/{MOD}/models/item/{name}.json', {'parent': 'minecraft:item/handheld', 'textures': {'layer0': f'{MOD}:item/{name}'}})
+for name in MATERIALS + MODULES + ['pellet_canister'] + NIHONIUM_ARMOR:
     write(f'assets/{MOD}/models/item/{name}.json', {'parent': 'minecraft:item/generated', 'textures': {'layer0': f'{MOD}:item/{name}'}})
 
 # ---- Translations --------------------------------------------------------------------------------------------------
@@ -352,7 +395,7 @@ weapon_text = {
     'tidal_reaver': ('潮汐断裁刃', 'Tidal Reaver', '溜めて引き寄せ、離して断裁', 'Hold to drag in, release to shear',
                      ['攻撃22／攻撃速度1.0。命中で潮汐応力（最大5、被ダメージ+8%／層）。', '右クリック長押しで周囲の敵を引き寄せる（300k FE/秒）。', '離すと応力に応じて16〜66ダメージ。'],
                      ['22 damage, 1.0 speed. Hits add tidal stress (up to 5, +8% damage taken each).', 'Hold use to drag enemies in (300k FE/s).', 'Release for 16-66 damage by stress.']),
-    'jet_lance': ('降着ジェット砲', 'Accretion Jet Cannon', '左クリックでジェットを発射', 'Left click fires the jet',
+    'jet_cannon': ('降着ジェット砲', 'Accretion Jet Cannon', '左クリックでジェットを発射', 'Left click fires the jet',
                   ['チャージ1.4秒の後に発射し2秒照射。前方80ブロックを貫通、56 DPS（防具の6割を無視）。', '4発ごとにリロード（8秒）。1発 1M FE。', '右クリック：地形保護／地形破壊。破壊モードは発射の瞬間に20ブロック貫く。'],
                   ['Charges 1.4s, then burns 2s, piercing 80 blocks. 56 DPS, ignoring 60% of armor.', 'Reloads every 4 shots (8s). 1M FE per shot.', 'Right click: terrain protection or destruction. Destruction drills 20 blocks at the moment of firing.']),
 }
@@ -394,6 +437,14 @@ common = {
     'tooltip.singulo_arsenal.terrain_break': ('地形破壊', 'Terrain destruction'),
     'message.singulo_arsenal.scan': ('鉱石を %s 個検出', '%s ores found'),
     'item.singulo_arsenal.pellet_canister': ('質量ペレット缶', 'Pellet Canister'),
+    'item.singulo_arsenal.nihonium_sword': ('ニホニウムの剣', 'Nihonium Sword'),
+    'item.singulo_arsenal.nihonium_pickaxe': ('ニホニウムのツルハシ', 'Nihonium Pickaxe'),
+    'item.singulo_arsenal.nihonium_axe': ('ニホニウムの斧', 'Nihonium Axe'),
+    'item.singulo_arsenal.nihonium_shovel': ('ニホニウムのシャベル', 'Nihonium Shovel'),
+    'item.singulo_arsenal.nihonium_helmet': ('ニホニウムのヘルメット', 'Nihonium Helmet'),
+    'item.singulo_arsenal.nihonium_chestplate': ('ニホニウムのチェストプレート', 'Nihonium Chestplate'),
+    'item.singulo_arsenal.nihonium_leggings': ('ニホニウムのレギンス', 'Nihonium Leggings'),
+    'item.singulo_arsenal.nihonium_boots': ('ニホニウムのブーツ', 'Nihonium Boots'),
     'tooltip.singulo_arsenal.pellet_canister.summary': ('質量ペレットをまとめて保管', 'Holds mass pellets in bulk'),
     'tooltip.singulo_arsenal.pellet_canister.count': ('質量ペレット %s / %s', 'Mass pellets %s / %s'),
     'tooltip.singulo_arsenal.pellet_canister.1': ('右クリック：持ち物の質量ペレットをすべて収納。スニーク中は1スタック取り出す。',
@@ -457,6 +508,11 @@ common = {
 }
 for key, (j, e) in common.items():
     ja[key], en[key] = j, e
+# Saved text components may explicitly contain the historical translation key.
+for data in (ja, en):
+    for key, value in list(data.items()):
+        if '.jet_cannon' in key:
+            data[key.replace('.jet_cannon', '.jet_lance')] = value
 for locale, data in [('ja_jp', ja), ('en_us', en)]:
     write(f'assets/{MOD}/lang/{locale}.json', dict(sorted(data.items())))
 write('pack.mcmeta', {'pack': {'pack_format': 34, 'description': 'Singulo Arsenal equipment resources'}})
@@ -505,11 +561,34 @@ def shade_pixel(art, x, y, grain):
     return factor
 
 
-def sprite(name, art, palette):
+def edge(art, palette, x, y, close_gaps=False):
+    """Outline pixel for an empty cell: the colour of the part it borders, darker and more saturated, so every part keeps
+    its own edge instead of one black line. The side facing the light is a step lighter. Gaps one or two pixels wide
+    (between legs, between boots, under a halo) stay open, or the outline would close them; tools close them, so the
+    outline runs unbroken where a guard meets its blade or a head its haft, as on vanilla tools."""
+    def filled(px, py):
+        return 0 <= px < 16 and 0 <= py < 16 and art[py][px] != '.'
+    near = [(dx, dy) for dx, dy in ((0, 1), (1, 0), (0, -1), (-1, 0)) if filled(x + dx, y + dy)]
+    if not near or not close_gaps and any(filled(x - dx, y - dy) or filled(x - 2 * dx, y - 2 * dy) for dx, dy in near):
+        return (0, 0, 0, 0)
+    def luminance(c):
+        r, g, b, _ = rgb(palette[c])
+        return 0.3 * r + 0.59 * g + 0.11 * b
+    # Where two parts meet the edge, the darker one owns it, so seams between parts stay crisp.
+    dx, dy = min(near, key=lambda d: luminance(art[y + d[1]][x + d[0]]))
+    h, s, v = colorsys.rgb_to_hsv(*(v / 255 for v in rgb(palette[art[y + dy][x + dx]])[:3]))
+    lit = (dx, dy) in ((0, 1), (1, 0))
+    return (*[round(v * 255) for v in colorsys.hsv_to_rgb(h, min(1.0, s * 1.3 + 0.08), v * (0.52 if lit else 0.36))], 255)
+
+
+def sprite(name, art, palette, outlined=False, full=False, close_gaps=False):
     assert len(art) == 16 and all(len(row) == 16 for row in art), name
-    # Icons stay inside 14x14 so a one-pixel margin always separates them from the slot border.
-    assert set(art[0] + art[15] + ''.join(row[0] + row[15] for row in art)) == {'.'}, f'{name} touches the 16x16 border'
-    rng = random.Random(zlib.crc32(name.encode()))
+    # Icons stay inside 14x14 so a one-pixel margin always separates them from the slot border. Full-size art (the sword)
+    # may use the whole 16x16, as vanilla's swords do; its outline is simply cut off at the edge.
+    assert full or set(art[0] + art[15] + ''.join(row[0] + row[15] for row in art)) == {'.'}, f'{name} touches the 16x16 border'
+    # Outlined art normally keeps the same margin outside its outline; full-size art lets the outline reach the edge, as vanilla's does.
+    assert not outlined or full or set(art[1] + art[14] + ''.join(row[1] + row[14] for row in art)) == {'.'}, f'{name} leaves no room for its outline'
+    rng =random.Random(zlib.crc32(name.encode()))
     grain = [[rng.uniform(-0.07, 0.07) for _ in range(16)] for _ in range(16)]
     glow = GLOWS.get(name, '')
     frames = FRAMES if glow else 1
@@ -518,7 +597,7 @@ def sprite(name, art, palette):
         for y, row in enumerate(art):
             for x, c in enumerate(row):
                 if c == '.':
-                    pixels.append((0, 0, 0, 0))
+                    pixels.append(edge(art, palette, x, y, close_gaps) if outlined else (0, 0, 0, 0))
                 elif c in glow:
                     # Light runs diagonally across the lit parts, and they are not shaded like metal.
                     wave = math.sin((frame / FRAMES + (x + y) / 14) * math.tau)
@@ -873,6 +952,445 @@ sprite('meltdown_module', [
     '................',
     '................',
 ], {'I': 0xE7D8B0, 'V': 0x3A3648, 's': 0x7A3A1E, 'O': 0xFF8A3C, 'y': 0xFFD28A, 'W': 0xFFF8E8})
+# ---- Armor icons ---------------------------------------------------------------------------------------------------
+# Shaped like vanilla armor and coloured from the worn suits (client/art/SuitArt.java), each part outlined in its own
+# darker colour (see edge). The art leaves two pixels of margin so the outline keeps one.
+MEISSNER_ICON = {'W': 0xF4F6FA, 'S': 0xC2CDD9, 'd': 0x465365, 'c': 0x7CE8FF}
+DEGENERACY_ICON = {'P': 0x7A7065, 'L': 0x9C8F7E, 'D': 0x4A423B, 'R': 0xC2AE8C, 'h': 0xE08A2E}
+COLLAPSAR_ICON = {'V': 0x3A3648, 'E': 0x565068, 'I': 0xEFE0B6, 'k': 0x0E0D14, 'w': 0xFFF8EA, 'o': 0xFFB061}
+GLOWS.update({'meissner_helmet': 'c', 'meissner_chestplate': 'c', 'meissner_leggings': 'c', 'meissner_boots': 'c', 'degeneracy_helmet': 'h', 'degeneracy_chestplate': 'h', 'degeneracy_leggings': 'h', 'degeneracy_boots': 'h', 'collapsar_helmet': 'wo', 'collapsar_chestplate': 'wo', 'collapsar_leggings': 'wo', 'collapsar_boots': 'wo'})
+# White ceramic with a cold visor and ear coils, under its floating ring of current.
+sprite('meissner_helmet', [
+    '................',
+    '................',
+    '......cccc......',
+    '.....c....c.....',
+    '......cccc......',
+    '................',
+    '.....SSSSSS.....',
+    '....WWWWWWWW....',
+    '...WWWWWWWWWW...',
+    '...WddddddddW...',
+    '..SWdccccccdWS..',
+    '..cWd......dWc..',
+    '...WW......WW...',
+    '...SS......SS...',
+    '................',
+    '................',
+], MEISSNER_ICON, outlined=True)
+# Ceramic plates, the field coil over the sternum, cold rings round the arms.
+sprite('meissner_chestplate', [
+    '................',
+    '................',
+    '..WWW......WWW..',
+    '..WWWWWSSWWWWW..',
+    '..WWWddddddWWW..',
+    '..ddWdccccdWdd..',
+    '..WWSdcddcdSWW..',
+    '..WWSdcddcdSWW..',
+    '..ccSdccccdScc..',
+    '....SddddddS....',
+    '....WWWWWWWW....',
+    '....SddddddS....',
+    '.....SSSSSS.....',
+    '................',
+    '................',
+    '................',
+], MEISSNER_ICON, outlined=True)
+# A seam belt with a cold buckle, and a lit band round each knee.
+sprite('meissner_leggings', [
+    '................',
+    '................',
+    '...dddddddddd...',
+    '...dddSSSSddd...',
+    '...WWWWccWWWW...',
+    '...WWWW..WWWW...',
+    '...WWWW..WWWW...',
+    '...dddd..dddd...',
+    '...cccc..cccc...',
+    '...dddd..dddd...',
+    '...WWWW..WWWW...',
+    '...WWWW..WWWW...',
+    '...WWWW..WWWW...',
+    '................',
+    '................',
+    '................',
+], MEISSNER_ICON, outlined=True)
+# Ceramic boots on soles that shine cold.
+sprite('meissner_boots', [
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '....WWW..WWW....',
+    '....WWW..WWW....',
+    '....SSW..WSS....',
+    '....WWW..WWW....',
+    '...WWWW..WWWW...',
+    '..WWWWW..WWWWW..',
+    '..ddddd..ddddd..',
+    '..ccccc..ccccc..',
+    '................',
+    '................',
+    '................',
+], MEISSNER_ICON, outlined=True)
+# Stacked plates, a crest, and a dark visor hot along its slit.
+sprite('degeneracy_helmet', [
+    '................',
+    '................',
+    '................',
+    '.......LL.......',
+    '.......LL.......',
+    '.....PPPPPP.....',
+    '....PPPPPPPP....',
+    '...DDhhhhhhDD...',
+    '...LLLLLLLLLL...',
+    '..PDDDDDDDDDDP..',
+    '..PDhhhhhhhhDP..',
+    '..PD........DP..',
+    '...R........R...',
+    '................',
+    '................',
+    '................',
+], DEGENERACY_ICON, outlined=True)
+# Wide pauldrons and a torso of stacked plates glowing at every seam.
+sprite('degeneracy_chestplate', [
+    '................',
+    '................',
+    '..PPP......PPP..',
+    '..LLLPPPPPPLLL..',
+    '..hDPPPPPPPPDh..',
+    '..PPDhhhhhhDPP..',
+    '..DDLLLDDLLLDD..',
+    '..LLLLLDDLLLLL..',
+    '..LLDhhDDhhDLL..',
+    '....PPPDDPPP....',
+    '....DhhDDhhD....',
+    '....LLLDDLLL....',
+    '....DhhDDhhD....',
+    '....PPPPPPPP....',
+    '................',
+    '................',
+], DEGENERACY_ICON, outlined=True)
+# Riveted belt, plated legs and hot knee seams.
+sprite('degeneracy_leggings', [
+    '................',
+    '................',
+    '...DDDDDDDDDD...',
+    '...DRDDRRDDRD...',
+    '...PPPPPPPPPP...',
+    '...DhhD..DhhD...',
+    '...LLLL..LLLL...',
+    '...DDDD..DDDD...',
+    '...hhhh..hhhh...',
+    '...DDDD..DDDD...',
+    '...PPPP..PPPP...',
+    '...PPPP..PPPP...',
+    '...PPPP..PPPP...',
+    '................',
+    '................',
+    '................',
+], DEGENERACY_ICON, outlined=True)
+# Plated boots with a riveted toe, hot underneath.
+sprite('degeneracy_boots', [
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '....PPP..PPP....',
+    '....hhD..Dhh....',
+    '....LLL..LLL....',
+    '....LLL..LLL....',
+    '...PPPP..PPPP...',
+    '..PRPPP..PPPRP..',
+    '..DDDDD..DDDDD..',
+    '..Phhh....hhhP..',
+    '................',
+    '................',
+    '................',
+], DEGENERACY_ICON, outlined=True)
+# Dark metal and ivory under a floating ivory ring, the visor lit white-hot.
+sprite('collapsar_helmet', [
+    '................',
+    '................',
+    '......IIII......',
+    '.....I....I.....',
+    '......IIII......',
+    '................',
+    '.....EEEEEE.....',
+    '....VIVVVVIV....',
+    '...VVIVVVVIVV...',
+    '...IIIIIIIIII...',
+    '..IIkwwwwwwkII..',
+    '..IVE......EVI..',
+    '...VE......EV...',
+    '...EE......EE...',
+    '................',
+    '................',
+], COLLAPSAR_ICON, outlined=True)
+# The sternum hole framed in ivory above its pasta lining, between dark shoulders.
+sprite('collapsar_chestplate', [
+    '................',
+    '................',
+    '..VVV......VVV..',
+    '..VVVIIEEIIVVV..',
+    '..VVVIIIIIIVVV..',
+    '..VVIIIkkIIIVV..',
+    '..EEIIkookIIEE..',
+    '..VVIIIkkIIIVV..',
+    '..VVIVVVVVVIVV..',
+    '..oVIkokkokIVo..',
+    '....IVVVVVVI....',
+    '....IkokkokI....',
+    '....IIIIIIII....',
+    '.....EEEEEE.....',
+    '................',
+    '................',
+], COLLAPSAR_ICON, outlined=True)
+# Dark plate with ivory knee bands and glowing side vents.
+sprite('collapsar_leggings', [
+    '................',
+    '................',
+    '...EEEEEEEEEE...',
+    '...EEEIIIIEEE...',
+    '...VVVVooVVVV...',
+    '..oVVVV..VVVVo..',
+    '..oVVVV..VVVVo..',
+    '...EEEE..EEEE...',
+    '...IIII..IIII...',
+    '...EEEE..EEEE...',
+    '...VVVV..VVVV...',
+    '...VVVV..VVVV...',
+    '...EEEE..EEEE...',
+    '................',
+    '................',
+    '................',
+], COLLAPSAR_ICON, outlined=True)
+# Dark boots with ivory toes, lit underneath.
+sprite('collapsar_boots', [
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '....VVV..VVV....',
+    '....VVo..oVV....',
+    '....VVo..oVV....',
+    '....IIV..VII....',
+    '...VVVV..VVVV...',
+    '..EEEEE..EEEEE..',
+    '..IIIIE..EIIII..',
+    '..Iooo....oooI..',
+    '................',
+    '................',
+    '................',
+], COLLAPSAR_ICON, outlined=True)
+# ---- Nihonium gear -------------------------------------------------------------------------------------------------
+# Singulo's nihonium: blue-grey (150, 166, 176) metal with the faint teal (120, 236, 214) of a stable nucleus, on a
+# wooden haft. Armor keeps vanilla diamond armor's footprints: each sprite is the inside of that silhouette, and the
+# outline drawn round it lands where vanilla's does. The sword spans the diagonal; the other tools fill 14x14 with their
+# outline. K is the inside of the helmet seen through the face. Nothing glows, since the gear has no abilities.
+NIHONIUM_ICON = {'H': 0xE2ECEF, 'L': 0xBCCBD3, 'N': 0x96A6B0, 'M': 0x718395, 'D': 0x4D5B6E, 'T': 0x78ECD6, 't': 0x3FAE9A, 'w': 0x9C7448, 'v': 0x6A4A2C, 'K': 0x283240}
+sprite('nihonium_sword', [
+    '..............NK',
+    '.............LHN',
+    '............LHN.',
+    '...........LTN..',
+    '..........LTM...',
+    '.........LTM....',
+    '........LTM.....',
+    '..H....LTM......',
+    '..D...LTM.......',
+    '...DHLTM........',
+    '....DTM.........',
+    '....vDH.........',
+    '...v..D.........',
+    '..v....DH.......',
+    '.D..............',
+    'K...............',
+], NIHONIUM_ICON, outlined=True, full=True, close_gaps=True)
+sprite('nihonium_pickaxe', [
+    '................',
+    '................',
+    '.....DMNTTLL....',
+    '..........NNM...',
+    '...........wMN..',
+    '..........w.NN..',
+    '.........w...t..',
+    '........w....t..',
+    '.......w.....M..',
+    '......w......D..',
+    '.....v.......D..',
+    '....v...........',
+    '...v............',
+    '..v.............',
+    '................',
+    '................',
+], NIHONIUM_ICON, outlined=True, close_gaps=True)
+sprite('nihonium_axe', [
+    '................',
+    '................',
+    '......LLNNL.....',
+    '......LLLTNNv...',
+    '......LLTNNMN...',
+    '.......LNNMMtD..',
+    '........MMMtM...',
+    '........wNtM....',
+    '.......w..N.....',
+    '......w.........',
+    '.....v..........',
+    '....v...........',
+    '...v............',
+    '..v.............',
+    '................',
+    '................',
+], NIHONIUM_ICON, outlined=True, close_gaps=True)
+sprite('nihonium_shovel', [
+    '................',
+    '................',
+    '..........NNNN..',
+    '.........NNNTN..',
+    '........MDNTNN..',
+    '.........TMNNN..',
+    '.........wTDN...',
+    '........w..M....',
+    '.......w........',
+    '......w.........',
+    '.....v..........',
+    '....v...........',
+    '...v............',
+    '..v.............',
+    '................',
+    '................',
+], NIHONIUM_ICON, outlined=True, close_gaps=True)
+sprite('nihonium_helmet', [
+    '................',
+    '................',
+    '................',
+    '................',
+    '.....LHHHLN.....',
+    '....LHNNNNNM....',
+    '....TTTTTTTT....',
+    '....NNKKKKMM....',
+    '....NKKKKKKM....',
+    '....NKKKKKKM....',
+    '....MK....KD....',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+], NIHONIUM_ICON, outlined=True)
+sprite('nihonium_chestplate', [
+    '................',
+    '................',
+    '................',
+    '..HHL......LLM..',
+    '..HNNL....LNNM..',
+    '..LNNNLHHLNNNM..',
+    '..NNNNNHHNNNNM..',
+    '...MTTTTTTTTM...',
+    '....NNNNNNNM....',
+    '....LNNNNNNM....',
+    '....NNNTTNNM....',
+    '....NNNNNNNM....',
+    '....MMMMMMMD....',
+    '.....DDDDDD.....',
+    '................',
+    '................',
+], NIHONIUM_ICON, outlined=True)
+sprite('nihonium_leggings', [
+    '................',
+    '................',
+    '................',
+    '....LLLLLLLM....',
+    '....MMMTTMMD....',
+    '....HNNNNNNM....',
+    '....NNN..NNM....',
+    '....NN....NM....',
+    '....NN....NM....',
+    '....TT....TT....',
+    '....NN....NM....',
+    '....NN....NM....',
+    '....MM....MD....',
+    '................',
+    '................',
+    '................',
+], NIHONIUM_ICON, outlined=True)
+sprite('nihonium_boots', [
+    '................',
+    '................',
+    '................',
+    '................',
+    '....HL....HL....',
+    '....TT....TT....',
+    '....HN....LL....',
+    '....NN....LN....',
+    '....NM....NN....',
+    '...LNN....NNM...',
+    '..LNNM....MNMM..',
+    '..NMMD....DMMD..',
+    '................',
+    '................',
+    '................',
+    '................',
+], NIHONIUM_ICON, outlined=True)
+
+def box_faces(u, v, w, h, d):
+    """(face, x, y, width, height) of each side of a vanilla cube's texture net."""
+    return [('top', u + d, v, w, d), ('bottom', u + d + w, v, w, d), ('right', u, v + d, d, h),
+            ('front', u + d, v + d, w, h), ('left', u + d + w, v + d, d, h), ('back', u + 2 * d + w, v + d, w, h)]
+
+
+def armor_box(img, rng, u, v, w, h, d, rows, accent=lambda face, x, y: False, open_front=lambda x, y: False):
+    """Plates the rows [rows[0], rows[1]) of a cube's sides, and its top or bottom when the plate reaches them: a lit rim
+    at the top edge, a dark one at the bottom, darker side edges, and the teal accent where accent() says."""
+    r0, r1 = rows
+    tones = {'top': 'L', 'front': 'N', 'right': 'N', 'left': 'N', 'back': 'M', 'bottom': 'M'}
+    for face, x0, y0, fw, fh in box_faces(u, v, w, h, d):
+        if face == 'top' and r0 > 0 or face == 'bottom' and r1 < h:
+            continue
+        for y in range(fh):
+            for x in range(fw):
+                tone = tones[face]
+                if face in ('top', 'bottom'):
+                    if x in (0, fw - 1) or y in (0, fh - 1):
+                        tone = 'M'
+                elif not r0 <= y < r1 or face == 'front' and open_front(x, y):
+                    continue
+                elif y == r0:
+                    tone = 'H' if face == 'front' else 'L'
+                elif y == r1 - 1:
+                    tone = 'D'
+                elif x in (0, fw - 1):
+                    tone = 'D' if tone == 'M' else 'M'
+                if face not in ('top', 'bottom') and r0 < y < r1 - 1 and accent(face, x, y):
+                    tone = 'T'
+                img[y0 + y][x0 + x] = scale_rgb(rgb(NIHONIUM_ICON[tone]), 1 + rng.uniform(-0.04, 0.04))
+
+
+# The vanilla armor layer reads textures/models/armor/nihonium_layer_1.png (helmet, chestplate, boots) and _layer_2.png
+# (leggings), on the player model's own texture net.
+armor_rng = random.Random(113)
+layer_1 = [[(0, 0, 0, 0)] * 64 for _ in range(32)]
+layer_2 = [[(0, 0, 0, 0)] * 64 for _ in range(32)]
+# Helmet: the head, open at the face below a teal brow.
+armor_box(layer_1, armor_rng, 0, 0, 8, 8, 8, (0, 8), accent=lambda f, x, y: y == 2 and f != 'back',
+          open_front=lambda x, y: y >= 3 and 1 <= x <= 6)
+# Chestplate: the whole body, a teal line across the chest and a mark at the sternum; the arms down past the elbow.
+armor_box(layer_1, armor_rng, 16, 16, 8, 12, 4, (0, 12),
+          accent=lambda f, x, y: f == 'front' and (y == 3 and 1 <= x <= 6 or y == 8 and x in (3, 4)))
+armor_box(layer_1, armor_rng, 40, 16, 4, 12, 4, (0, 7), accent=lambda f, x, y: y == 4)
+# Boots: the foot of each leg, banded at the ankle.
+armor_box(layer_1, armor_rng, 0, 16, 4, 12, 4, (7, 12), accent=lambda f, x, y: y == 8)
+# Leggings: a belt with a teal buckle, then each leg down to the boots, banded at the knee.
+armor_box(layer_2, armor_rng, 16, 16, 8, 12, 4, (8, 12), accent=lambda f, x, y: y == 9 and f == 'front' and x in (3, 4))
+armor_box(layer_2, armor_rng, 0, 16, 4, 12, 4, (0, 9), accent=lambda f, x, y: y == 5)
+for n, layer in (('1', layer_1), ('2', layer_2)):
+    png(f'assets/{MOD}/textures/models/armor/nihonium_layer_{n}.png', 64, 32, [px for row in layer for px in row])
+
 png(f'assets/{MOD}/textures/misc/white.png', 1, 1, [(255, 255, 255, 255)])
 
 

@@ -2,6 +2,9 @@
 allprojects {
     afterEvaluate {
         sourceSets.main.java.srcDir(file('tools/review/gui-src'))
+        if (providers.gradleProperty('reviewShaders').isPresent()) {
+            dependencies { runtimeOnly fileTree(dir: 'build/review-deps', include: ['*.jar']) }
+        }
         neoForge.runs.client {
             gameDirectory = file('build/gui-review')
             programArgument '--quickPlaySingleplayer'

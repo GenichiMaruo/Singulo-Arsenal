@@ -114,7 +114,7 @@ public final class Weapons {
         if (stress > 0) event.setAmount(event.getAmount() * Rules.stressMultiplier(stress));
 
         if (event.getSource().is(ArsenalDamage.JET)) {
-            event.addReductionModifier(DamageContainer.Reduction.ARMOR, (container, reduction) -> reduction * Rules.LANCE_ARMOR_KEPT);
+            event.addReductionModifier(DamageContainer.Reduction.ARMOR, (container, reduction) -> reduction * Rules.CANNON_ARMOR_KEPT);
             return;
         }
         if (event.getSource().is(DamageTypes.PLAYER_ATTACK) && event.getSource().getDirectEntity() instanceof Player attacker
