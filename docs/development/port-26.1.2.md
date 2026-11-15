@@ -43,3 +43,5 @@ Second real run with the recipe-corrected Singulo artifact executed all 65 Arsen
 `real-singulo-gametest3.log`: all 66 required tests passed, 65 distinct Arsenal execution markers; Gradle BUILD SUCCESSFUL. `real-singulo-build.log`: build, 5,331 rule checks, deterministic resources, and JUnit passed with the same real Singulo dependency. No stub dependency was used. UI was not reopened after the user stopped it; visual/shader validation remains pending.
 
 Development JAR SHA-256: `75FF87102630690215441552CA318791EDB193997E3110FE4D1CED38F5CF4229`. Test classes, test instances, and the isolated drill arena are absent from this JAR.
+
+Final verification against Singulo SHA-256 `0B42F241C71ECF36C1DDEBD5D5303DCF79547522C5C2FC5166015A493A04AD25`: `final-singulo-integration.log` confirms all 65 Arsenal IDs, all 66 required tests, and Gradle `runGameTestServer build` succeeded. Arsenal JAR hash remains unchanged. No UI launched.
