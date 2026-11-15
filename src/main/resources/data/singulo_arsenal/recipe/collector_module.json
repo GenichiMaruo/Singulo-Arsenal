@@ -6,21 +6,15 @@
   "energy": 400,
   "ingredients": [
     {
-      "ingredient": {
-        "item": "singulo:superconducting_coil"
-      },
+      "ingredient": "singulo:superconducting_coil",
       "count": 3
     },
     {
-      "ingredient": {
-        "item": "singulo:entangled_element"
-      },
+      "ingredient": "singulo:entangled_element",
       "count": 1
     },
     {
-      "ingredient": {
-        "item": "singulo:steel_plate"
-      },
+      "ingredient": "singulo:steel_plate",
       "count": 2
     }
   ],

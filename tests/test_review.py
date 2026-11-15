@@ -12,12 +12,12 @@ class ReviewPreparationTests(unittest.TestCase):
         return subprocess.run([sys.executable, str(SCRIPT)], cwd=root, capture_output=True, text=True)
 
     def source(self, root):
-        world = pathlib.Path(root) / "build/gametest/world"
+        world = pathlib.Path(root) / "build/gametest/gametestserver/gametestworld"
         world.mkdir(parents=True)
         (world / "level.dat").write_bytes(b"synthetic saved-world fixture")
         return world
 
-    def test_copy_is_disposable_and_only_music_is_muted(self):
+    def test_copy_is_disposable_and_all_game_audio_is_muted(self):
         with tempfile.TemporaryDirectory() as root:
             source = self.source(root)
             result = self.run_prepare(root)
@@ -25,7 +25,7 @@ class ReviewPreparationTests(unittest.TestCase):
             game = pathlib.Path(root) / "build/gui-review"
             self.assertEqual((game / "saves/Review/level.dat").read_bytes(), (source / "level.dat").read_bytes())
             sound = [x for x in (game / "options.txt").read_text().splitlines() if x.startswith("soundCategory_")]
-            self.assertEqual(sound, ["soundCategory_music:0.0"])
+            self.assertEqual(sound, ["soundCategory_music:0.0", "soundCategory_master:0.0"])
 
     def test_existing_world_and_evidence_are_preserved(self):
         with tempfile.TemporaryDirectory() as root:

@@ -7,18 +7,10 @@
     " R "
   ],
   "key": {
-    "T": {
-      "item": "singulo_arsenal:tidal_edge"
-    },
-    "L": {
-      "item": "singulo_arsenal:collapsar_lamina"
-    },
-    "B": {
-      "item": "singulo:micro_black_hole"
-    },
-    "R": {
-      "item": "singulo:confinement_ring"
-    }
+    "T": "singulo_arsenal:tidal_edge",
+    "L": "singulo_arsenal:collapsar_lamina",
+    "B": "singulo:micro_black_hole",
+    "R": "singulo:confinement_ring"
   },
   "result": {
     "id": "singulo_arsenal:accretion_drill",

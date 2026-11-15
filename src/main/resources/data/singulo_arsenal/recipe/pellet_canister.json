@@ -7,15 +7,9 @@
     "PCP"
   ],
   "key": {
-    "P": {
-      "item": "singulo:steel_plate"
-    },
-    "S": {
-      "item": "singulo:superconducting_coil"
-    },
-    "C": {
-      "item": "singulo:white_ceramic_composite"
-    }
+    "P": "singulo:steel_plate",
+    "S": "singulo:superconducting_coil",
+    "C": "singulo:white_ceramic_composite"
   },
   "result": {
     "id": "singulo_arsenal:pellet_canister",

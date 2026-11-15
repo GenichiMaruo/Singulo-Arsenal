@@ -6,7 +6,7 @@ plugins {
 version = mod_version
 group = mod_group_id
 base { archivesName = mod_name }
-java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+java.toolchain.languageVersion = JavaLanguageVersion.of(25)
 
 repositories { mavenCentral() }
 dependencies {
@@ -21,6 +21,8 @@ tasks.named('jar', Jar) {
     exclude 'io/github/genichimaruo/singuloarsenal/gametest/**'
     exclude 'io/github/genichimaruo/singuloarsenal/review/**'
     exclude 'data/singulo_arsenal/structure/empty.nbt'
+    exclude 'data/singulo_arsenal/structure/drill_arena.nbt'
+    exclude 'data/singulo_arsenal/test_instance/**'
 }
 
 // 対応する本体 JAR を -PsinguloJar=/absolute/path/to.jar で指定する。
@@ -36,7 +38,7 @@ if (providers.gradleProperty('singuloJar').isPresent()) {
 def requireSingulo = tasks.register('requireSingulo') {
     doLast {
         if (!providers.gradleProperty('singuloJar').isPresent()) {
-            throw new GradleException('Starting the addon requires -PsinguloJar=/absolute/path/to/Singulo-0.19.0-1.21.1N.jar')
+            throw new GradleException('Starting the addon requires -PsinguloJar=/absolute/path/to/Singulo-0.19.0-26.1.2N.jar')
         }
     }
 }
@@ -97,7 +99,10 @@ tasks.named('runGameTestServer') {
     doFirst { delete layout.buildDirectory.file('gametest/logs/latest.log') }
     doLast {
         def log = layout.buildDirectory.file('gametest/logs/latest.log').get().asFile
-        if (!log.isFile() || !log.text.contains('All 65 required tests passed')) {
+        def text = log.isFile() ? log.text : ''
+        def executed = (text =~ /ARSENAL_TEST_EXECUTED=([a-z0-9_.]+)/).collect { it[1] }.toSet()
+        // MC26 also runs minecraft:always_pass. Check all custom IDs AND global success, not a bare total.
+        if (executed.size() != 65 || !(text =~ /All \d+ required tests passed/).find()) {
             throw new GradleException('Expected all 65 required Arsenal GameTests to pass. Inspect the GameTest server log.')
         }
     }

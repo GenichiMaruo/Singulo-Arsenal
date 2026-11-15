@@ -6,21 +6,15 @@
   "energy": 250000000,
   "ingredients": [
     {
-      "ingredient": {
-        "item": "singulo:collapsar_ingot"
-      },
+      "ingredient": "singulo:collapsar_ingot",
       "count": 1
     },
     {
-      "ingredient": {
-        "item": "singulo:nuclear_pasta"
-      },
+      "ingredient": "singulo:nuclear_pasta",
       "count": 1
     },
     {
-      "ingredient": {
-        "item": "singulo:mass_pellet"
-      },
+      "ingredient": "singulo:mass_pellet",
       "count": 32
     }
   ],

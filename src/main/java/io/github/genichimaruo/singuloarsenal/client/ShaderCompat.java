@@ -5,7 +5,7 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 
 /** Optional Iris public API. No hard loader or production dependency. */
-final class ShaderCompat {
+public final class ShaderCompat {
     private static MethodHandle active, shadow;
     static { discover(); }
     private ShaderCompat() {}
@@ -24,6 +24,23 @@ final class ShaderCompat {
         }
     }
 
+    /** Public Iris 26 pipeline API; preserve our additive blend and depth policy. */
+    public static void registerPositionColorPipeline(com.mojang.blaze3d.pipeline.RenderPipeline pipeline) {
+        try {
+            Class<?> api = Class.forName("net.irisshaders.iris.api.v0.IrisApi");
+            Object instance = api.getMethod("getInstance").invoke(null);
+            Class<?> program = Class.forName("net.irisshaders.iris.api.v0.IrisProgram");
+            Class<?> shadowProgram = Class.forName("net.irisshaders.iris.api.v0.IrisShadowProgram");
+            api.getMethod("assignPipeline", com.mojang.blaze3d.pipeline.RenderPipeline.class, program)
+                    .invoke(instance, pipeline, program.getField("BASIC").get(null));
+            api.getMethod("assignPipelineShadow", com.mojang.blaze3d.pipeline.RenderPipeline.class, shadowProgram)
+                    .invoke(instance, pipeline, shadowProgram.getField("SHADOW_LIGHTNING").get(null));
+        } catch (ClassNotFoundException absent) {
+            // Optional dependency: ordinary vanilla pipelines remain fully functional.
+        } catch (ReflectiveOperationException | LinkageError incompatible) {
+            LogUtils.getLogger().warn("Iris custom pipeline registration unavailable for {}", pipeline.getLocation(), incompatible);
+        }
+    }
     static boolean active() { return query(active); }
     static boolean shadowPass() { return query(shadow); }
 

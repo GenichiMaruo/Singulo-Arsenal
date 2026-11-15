@@ -16,7 +16,7 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 CF_VERSIONS = 'https://minecraft.curseforge.com/api/game/versions'
 CF_PROJECT_ID = '1793647'
-CF_VERSION_NAMES = ['1.21.1', 'NeoForge', 'Java 21', 'Client', 'Server']
+CF_VERSION_NAMES = ['26.1.2', 'NeoForge', 'Java 25', 'Client', 'Server']
 
 
 def prepare(root, jar_dir, release_type):
@@ -27,9 +27,9 @@ def prepare(root, jar_dir, release_type):
     version = properties['mod_version']
     if not re.fullmatch(r'\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?', version):
         raise ValueError('mod_version must be a version such as 0.2.0')
-    if (properties['mod_name'], properties['minecraft_version'], properties['mod_loader_suffix']) != ('Singulo-Arsenal', '1.21.1', 'N'):
-        raise ValueError('This publisher supports Singulo Arsenal for Minecraft 1.21.1 / NeoForge only')
-    name = f'Singulo-Arsenal-{version}-1.21.1N'
+    if (properties['mod_name'], properties['minecraft_version'], properties['mod_loader_suffix']) != ('Singulo-Arsenal', '26.1.2', 'N'):
+        raise ValueError('This publisher supports Singulo Arsenal for Minecraft 26.1.2 / NeoForge only')
+    name = f'Singulo-Arsenal-{version}-26.1.2N'
     jar = jar_dir / f'{name}.jar'
     changelog = root / 'docs' / 'curseforge' / f'changelog-{version}.md'
     if not changelog.is_file() or not changelog.read_text(encoding='utf-8').strip():
@@ -49,6 +49,8 @@ def prepare(root, jar_dir, release_type):
         if 'io/github/genichimaruo/singuloarsenal/SinguloArsenal.class' not in entries:
             raise ValueError('The JAR is missing the addon entry point')
         if any('/gametest/' in p or '/review/' in p or p.endswith('/structure/empty.nbt')
+               or '/test_instance/' in p or p.endswith('/structure/drill_arena.nbt')
+               or p == 'arsenal-review.mixins.json'
                or p.startswith('io/github/genichimaruo/singulo/') for p in entries):
             raise ValueError('The JAR contains test/review assets or bundled Singulo classes')
     return {'artifact_name': name, 'version': version, 'jar': str(jar), 'changelog': str(changelog),
@@ -166,8 +168,8 @@ def main():
             ids = check_api(os.environ.get('CURSEFORGE_PROJECT_ID', ''), os.environ.get('CURSEFORGE_TOKEN', ''))
             print('CurseForge version IDs: ' + ', '.join(f'{name}={value}' for name, value in zip(CF_VERSION_NAMES, ids)))
         elif args.upload:
-            if os.environ.get('GITHUB_REF') != 'refs/heads/1.21.1':
-                raise ValueError('Uploads require the 1.21.1 release branch')
+            if os.environ.get('GITHUB_REF') != 'refs/heads/26.1.2':
+                raise ValueError('Uploads require the 26.1.2 release branch')
             plan['file_url'] = upload(plan, os.environ.get('CURSEFORGE_PROJECT_ID', ''), os.environ.get('CURSEFORGE_TOKEN', ''))
     except (ValueError, KeyError, OSError, zipfile.BadZipFile) as error:
         print(f'Release validation failed: {error}', file=sys.stderr)
@@ -177,7 +179,7 @@ def main():
             for key, value in plan.items():
                 output.write(f'{key}={value}\n')
     summary = (f"JAR: `{Path(plan['jar']).name}`\n\nSHA-256: `{plan['sha256']}`\n\n"
-               f"Channel: {plan['release_type']}\n\nMinecraft 1.21.1 / NeoForge / Java 21; required dependency: Singulo.\n\n"
+               f"Channel: {plan['release_type']}\n\nMinecraft 26.1.2 / NeoForge / Java 25; required dependency: Singulo.\n\n"
                f"Changelog: `{Path(plan['changelog']).name}`\n")
     if os.environ.get('GITHUB_SHA'):
         summary += f"\nCommit: `{os.environ['GITHUB_SHA']}`\n"

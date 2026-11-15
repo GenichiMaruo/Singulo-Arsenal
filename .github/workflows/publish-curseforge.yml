@@ -27,7 +27,7 @@ jobs:
     steps:
       - name: Require the release branch for uploads
         if: ${{ !inputs.dry_run }}
-        run: test "$GITHUB_REF" = refs/heads/1.21.1
+        run: test "$GITHUB_REF" = refs/heads/26.1.2
 
   checks:
     needs: target

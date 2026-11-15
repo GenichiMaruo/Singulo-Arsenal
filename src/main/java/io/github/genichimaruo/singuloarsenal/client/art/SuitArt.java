@@ -4,7 +4,7 @@ import com.mojang.math.Axis;
 import io.github.genichimaruo.singuloarsenal.SinguloArsenal;
 import io.github.genichimaruo.singuloarsenal.armor.ArmorSet;
 import io.github.genichimaruo.singuloarsenal.core.Rules;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 /**
  * The three suits as geometry on the vanilla player model's pixel grid: every visible width and height is a whole number of
@@ -29,7 +29,7 @@ public final class SuitArt {
 
     private SuitArt() {}
 
-    public static ResourceLocation material(ArmorSet set) {
+    public static Identifier material(ArmorSet set) {
         return SinguloArsenal.id("textures/misc/material_" + set.id + ".png");
     }
 

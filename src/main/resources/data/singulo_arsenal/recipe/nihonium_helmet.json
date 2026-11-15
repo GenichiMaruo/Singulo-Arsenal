@@ -6,9 +6,7 @@
     "N N"
   ],
   "key": {
-    "N": {
-      "item": "singulo:nihonium_ingot"
-    }
+    "N": "singulo:nihonium_ingot"
   },
   "result": {
     "id": "singulo_arsenal:nihonium_helmet",

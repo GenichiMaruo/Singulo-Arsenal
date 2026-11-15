@@ -23,26 +23,72 @@ import io.github.genichimaruo.singuloarsenal.weapon.QuenchSaberItem;
 import io.github.genichimaruo.singuloarsenal.weapon.TidalReaverItem;
 import io.github.genichimaruo.singuloarsenal.weapon.Weapons;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
+import net.minecraft.client.renderer.special.SpecialModelRenderer;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import com.mojang.serialization.MapCodec;
+import org.joml.Vector3f;
+import org.joml.Vector3fc;
+import java.util.function.Consumer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ArmorItem;
+import net.minecraft.world.item.equipment.ArmorType;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 
 /** Renders gear as items, including inventory icons, from the same geometry that is worn, so an icon can never disagree with the model. */
-public final class GearRenderer extends BlockEntityWithoutLevelRenderer {
+public final class GearRenderer implements SpecialModelRenderer<GearRenderer.Frame> {
     private static final java.util.Map<Integer, Long> LAST_WORK = new java.util.HashMap<>();
 
-    public GearRenderer() {
-        super(Minecraft.getInstance().getBlockEntityRenderDispatcher(), Minecraft.getInstance().getEntityModels());
-    }
-
-    @Override
-    public void renderByItem(ItemStack stack, ItemDisplayContext context, PoseStack pose, MultiBufferSource buffers, int light, int overlay) {
+    private final ItemDisplayContext context;
+    public GearRenderer(ItemDisplayContext context) { this.context = context; }
+    record Owner(int id, boolean rightHanded, boolean mainCannon, boolean using, int ticks, boolean running,
+                 net.minecraft.world.phys.Vec3 aimTarget, net.minecraft.world.phys.Vec3 beamTarget,
+                 net.minecraft.world.phys.Vec3 camera, boolean worldView, FirstPersonHands.Hands hands) {}
+    public record Frame(ItemStack stack, long now, float partial, Owner owner) {}
+    @Override public Frame extractArgument(ItemStack stack) {
         var mc = Minecraft.getInstance();
-        float partial = mc.getTimer().getGameTimeDeltaPartialTick(true);
-        float t = mc.level == null ? 0 : mc.level.getGameTime() + partial;
+        float partial = mc.getDeltaTracker().getGameTimeDeltaPartialTick(true);
+        long now = mc.level == null ? 0 : mc.level.getGameTime();
+        Player player = owner(mc, stack, context);
+        Owner state = null;
+        if (player != null) {
+            boolean using = player.isUsingItem() && player.getUseItem().getItem() == stack.getItem();
+            boolean working = player.swinging || (player == mc.player && mc.gameMode != null && mc.gameMode.isDestroying());
+            if (working) LAST_WORK.put(player.getId(), now);
+            boolean running = Fe.stored(stack) > 0 && now - LAST_WORK.getOrDefault(player.getId(), Long.MIN_VALUE / 2) <= 8;
+            var eye = player.getEyePosition(partial);
+            var hit = FxClient.aim(player, partial).getLocation();
+            var camera = mc.gameRenderer.getMainCamera().position();
+            boolean firing = JetCannonItem.jetAge(stack, now, partial) >= 0;
+            double distance = firing ? Math.max(3, eye.distanceTo(hit)) : 40;
+            state = new Owner(player.getId(), player.getMainArm() == net.minecraft.world.entity.HumanoidArm.RIGHT,
+                    player.getMainHandItem().getItem() instanceof JetCannonItem, using, using ? player.getTicksUsingItem() : 0, running,
+                    eye.add(player.getViewVector(partial).scale(distance)).subtract(camera), hit.subtract(camera), camera,
+                    context.firstPerson() || !(mc.screen instanceof net.minecraft.client.gui.screens.inventory.InventoryScreen) && !(mc.screen instanceof net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen),
+                    context.firstPerson() && stack.getItem() instanceof JetCannonItem ? FirstPersonHands.capture(player) : null);
+        }
+        return new Frame(stack.copy(), now, partial, state);
+    }
+    @Override public void submit(Frame frame, PoseStack pose, SubmitNodeCollector collector,
+                                 int light, int overlay, boolean foil, int outline) {
+        if (frame == null) return;
+        // Final item transforms are available only at submission. Solve aim and hands here from extracted data,
+        // then freeze vertices before handing callbacks to the deferred geometry renderer.
+        GeometrySnapshot geometry = new GeometrySnapshot();
+        renderFrame(frame, context, pose, geometry, light, overlay);
+        geometry.submit(new PoseStack(), collector);
+    }    @Override public void getExtents(Consumer<Vector3fc> output) {
+        output.accept(new Vector3f(-1, -1, -1)); output.accept(new Vector3f(2, 2, 2));
+    }
+    public record Unbaked(ItemDisplayContext context) implements SpecialModelRenderer.Unbaked<GearRenderer.Frame> {
+        public static final MapCodec<Unbaked> CODEC = ItemDisplayContext.CODEC.fieldOf("context").xmap(Unbaked::new, Unbaked::context);
+        @Override public SpecialModelRenderer<GearRenderer.Frame> bake(SpecialModelRenderer.BakingContext context) { return new GearRenderer(this.context); }
+        @Override public MapCodec<Unbaked> type() { return CODEC; }
+    }
+    private void renderFrame(Frame frame, ItemDisplayContext context, PoseStack pose, MultiBufferSource buffers, int light, int overlay) {
+        ItemStack stack = frame.stack;
+        float partial = frame.partial;
+        float t = frame.now + partial;
         pose.pushPose();
         pose.translate(0.5, 0.5, 0.5);
         if (stack.getItem() instanceof SuitItem suit) {
@@ -52,8 +98,8 @@ public final class GearRenderer extends BlockEntityWithoutLevelRenderer {
             Canvas.drawFine(pose, buffers, t, light, overlay, context != ItemDisplayContext.GUI, c -> MachineArt.integrator(c, -1, t));
         } else {
             pose.scale(1F / 16, 1F / 16, 1F / 16);
-            Player owner = owner(mc, stack, context);
-            drawWeapon(pose, buffers, t, light, overlay, stack, owner, partial, context);
+            Owner owner = frame.owner;
+            drawWeapon(pose, buffers, t, light, overlay, stack, owner, frame.now, partial, context);
         }
         pose.popPose();
     }
@@ -74,12 +120,11 @@ public final class GearRenderer extends BlockEntityWithoutLevelRenderer {
         pose.translate(0, -(stack.getItem() instanceof TidalReaverItem ? 1.5F : stack.getItem() instanceof CasimirBladeItem ? 1.75F : 2.25F), 0);
     }
 
-    private static void drawWeapon(PoseStack pose, MultiBufferSource buffers, float t, int light, int overlay, ItemStack stack, Player owner, float partial, ItemDisplayContext context) {
-        boolean using = owner != null && owner.isUsingItem() && owner.getUseItem().getItem() == stack.getItem();
-        int ticks = using ? owner.getTicksUsingItem() : 0;
+    private static void drawWeapon(PoseStack pose, MultiBufferSource buffers, float t, int light, int overlay, ItemStack stack, Owner owner, long now, float partial, ItemDisplayContext context) {
+        boolean using = owner != null && owner.using;
+        int ticks = using ? owner.ticks : 0;
         boolean world = context != ItemDisplayContext.GUI;
         if (owner != null && !(stack.getItem() instanceof JetCannonItem)) seatInHand(pose, stack);
-        long now = Minecraft.getInstance().level == null ? 0 : Minecraft.getInstance().level.getGameTime();
         float reload = world ? Weapons.reloadProgress(stack, now, partial) : -1;
         if (stack.getItem() instanceof QuenchSaberItem) {
             float current = ArsenalData.get(stack, ArsenalData.CURRENT) / (float) (Rules.QUENCH_MAX_CURRENT - 1);
@@ -98,13 +143,9 @@ public final class GearRenderer extends BlockEntityWithoutLevelRenderer {
                 pose.mulPose(Axis.XP.rotationDegrees(-22 * use + 34 * strike));
             }
             Canvas.drawFine(pose, buffers, t, light, overlay, world, c -> WeaponArt.reaver(c, use, reload, t));
-            if (owner != null && world) FxClient.heldHole(pose, context, 0, 6, 0, (0.55F + use * 0.25F) * (reload >= 0 ? Math.min(1, reload * 1.15F) : 1));
+            if (owner != null && world) FxClient.heldHole(owner, pose, context, 0, 6, 0, (0.55F + use * 0.25F) * (reload >= 0 ? Math.min(1, reload * 1.15F) : 1));
         } else if (stack.getItem() instanceof PoweredTool) {
-            var mc = Minecraft.getInstance();
-            boolean working = owner != null && world && (owner.swinging || (owner == mc.player && mc.gameMode != null && mc.gameMode.isDestroying()));
-            if (working) LAST_WORK.put(owner.getId(), now);
-            // Swings come in pulses. Held on across the gaps, or the lights and the bit would blink with every one.
-            boolean running = owner != null && world && Fe.stored(stack) > 0 && now - LAST_WORK.getOrDefault(owner.getId(), Long.MIN_VALUE / 2) <= 8;
+            boolean running = owner != null && world && owner.running;
             Canvas.drawFine(pose, buffers, t, light, overlay, world, c -> {
                 if (stack.getItem() instanceof SquidPickItem) ToolArt.squidPick(c);
                 else if (stack.getItem() instanceof DegeneracyBreakerItem) ToolArt.degeneracyBreaker(c);
@@ -118,7 +159,7 @@ public final class GearRenderer extends BlockEntityWithoutLevelRenderer {
             boolean leftHanded = context == ItemDisplayContext.FIRST_PERSON_LEFT_HAND || context == ItemDisplayContext.THIRD_PERSON_LEFT_HAND;
             boolean mainHand = mainHand(owner, context);
             if (mainHand && world) {
-                FxClient.aimCannon(owner, pose, context, partial);
+                FxClient.aimCannon(owner, pose);
                 boolean firstPerson = context.firstPerson();
                 // Recoil runs straight back along the barrel, so the beam stays on its axis.
                 pose.translate(0, -(firstPerson ? 1.6F : 0.8F) * Rules.cannonKick(jet), 0);
@@ -130,30 +171,30 @@ public final class GearRenderer extends BlockEntityWithoutLevelRenderer {
                     // Muzzle up and rolled so the magazine well faces the support hand.
                     float tilt = Rules.reloadTilt(reload) * (firstPerson ? 1 : 0.55F);
                     pose.mulPose(Axis.XP.rotationDegrees(22 * tilt));
-                    pose.mulPose(Axis.YP.rotationDegrees((owner.getMainArm() == net.minecraft.world.entity.HumanoidArm.RIGHT ? 30 : -30) * tilt));
+                    pose.mulPose(Axis.YP.rotationDegrees((owner.rightHanded ? 30 : -30) * tilt));
                 }
             }
             Canvas.drawFine(pose, buffers, t, light, overlay, world, c -> WeaponArt.cannon(c, ignition, reload, t, leftHanded ? 1 : -1));
             if (mainHand) {
-                FxClient.cannonRendered(owner, pose, buffers, context, partial, jet);
-                FirstPersonHands.drawCannon(owner, pose, buffers, light, context, reload);
+                FxClient.cannonRendered(owner, pose, buffers, context, jet);
+                FirstPersonHands.drawCannon(owner.hands, pose, buffers, light, context, reload);
             }
         }
     }
 
     /** Display contexts describe the physical arm, not MAIN_HAND/OFF_HAND. */
-    private static boolean mainHand(Player owner, ItemDisplayContext context) {
-        if (owner == null || !(owner.getMainHandItem().getItem() instanceof JetCannonItem)) return false;
+    private static boolean mainHand(Owner owner, ItemDisplayContext context) {
+        if (owner == null || !owner.mainCannon) return false;
         boolean right = context == ItemDisplayContext.FIRST_PERSON_RIGHT_HAND
                 || context == ItemDisplayContext.THIRD_PERSON_RIGHT_HAND;
-        return right == (owner.getMainArm() == net.minecraft.world.entity.HumanoidArm.RIGHT);
+        return right == (owner.rightHanded);
     }
 
     private static void drawSuit(PoseStack pose, MultiBufferSource buffers, float t, int light, int overlay, SuitItem suit) {
-        ArmorItem.Type type = suit.getType();
+        ArmorType type = suit.getType();
         // Worn art is Y-down and faces -Z; flip it upright and toward the viewer.
         pose.mulPose(Axis.XP.rotationDegrees(180));
-        float fit = type == ArmorItem.Type.CHESTPLATE ? 0.044F : type == ArmorItem.Type.HELMET ? 0.062F : 0.056F;
+        float fit = type == ArmorType.CHESTPLATE ? 0.044F : type == ArmorType.HELMET ? 0.062F : 0.056F;
         pose.scale(fit, fit, fit);
         SuitArt.State idle = SuitArt.State.IDLE;
         switch (type) {

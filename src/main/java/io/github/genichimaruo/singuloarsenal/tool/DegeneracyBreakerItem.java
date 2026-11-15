@@ -16,8 +16,8 @@ import net.minecraft.world.level.block.state.BlockState;
 public final class DegeneracyBreakerItem extends PoweredTool {
     private static final TagKey<Block> MINEABLE = TagKey.create(Registries.BLOCK, SinguloArsenal.id("mineable/breaker"));
 
-    public DegeneracyBreakerItem() {
-        super(ToolTier.PRESSURE, MINEABLE, 9, -3.2F, Rules.TIER4_TOOL_CAPACITY, 4, Rules.BREAKER_FE, Rarity.RARE);
+    public DegeneracyBreakerItem(net.minecraft.world.item.Item.Properties properties) {
+        super(properties, ToolTier.PRESSURE, MINEABLE, 9, -3.2F, Rules.TIER4_TOOL_CAPACITY, 4, Rules.BREAKER_FE, Rarity.RARE);
     }
 
     @Override

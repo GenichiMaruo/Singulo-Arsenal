@@ -17,7 +17,7 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
-import net.minecraft.world.InteractionResultHolder;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
@@ -38,8 +38,8 @@ import net.minecraft.world.phys.Vec3;
  * barrel. One click spools the rings, then the jet goes off once at full length and burns for two seconds. A magazine holds four shots.
  */
 public final class JetCannonItem extends Item implements ArsenalWeapon {
-    public JetCannonItem() {
-        super(new Properties().stacksTo(1).rarity(Rarity.EPIC).fireResistant());
+    public JetCannonItem(net.minecraft.world.item.Item.Properties properties) {
+        super(properties.stacksTo(1).rarity(Rarity.EPIC).fireResistant());
     }
 
     @Override public int capacity() { return Rules.CANNON_CAPACITY; }
@@ -61,16 +61,16 @@ public final class JetCannonItem extends Item implements ArsenalWeapon {
 
     /** Right click switches between sparing and melting the terrain. */
     @Override
-    public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
+    public InteractionResult use(Level level, Player player, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
-        if (hand != InteractionHand.MAIN_HAND) return InteractionResultHolder.pass(stack);
-        if (!level.isClientSide) {
+        if (hand != InteractionHand.MAIN_HAND) return InteractionResult.PASS;
+        if (!level.isClientSide()) {
             boolean breaking = !breaksTerrain(stack);
             stack.set(ArsenalData.TERRAIN_MODE.get(), breaking ? 1 : 0);
-            player.displayClientMessage(Component.translatable(breaking ? "message.singulo_arsenal.terrain_break" : "message.singulo_arsenal.terrain_protect"), true);
+            player.sendOverlayMessage(Component.translatable(breaking ? "message.singulo_arsenal.terrain_break" : "message.singulo_arsenal.terrain_protect"));
             level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.DISPENSER_DISPENSE, SoundSource.PLAYERS, 0.6F, breaking ? 0.7F : 1.4F);
         }
-        return InteractionResultHolder.consume(stack);
+        return InteractionResult.CONSUME;
     }
 
     /** Spool-up from 0 to 1, or -1 when the gun is not charging. */
@@ -87,7 +87,7 @@ public final class JetCannonItem extends Item implements ArsenalWeapon {
 
     /** Whether the gun could start a shot right now. Run on the client as well, to avoid sending clicks the server would refuse. */
     public static boolean ready(ItemStack stack, long now) {
-        return shotsLeft(stack) > 0 && now >= ArsenalData.time(stack, ArsenalData.JET_UNTIL) + Rules.CANNON_SHOT_GAP
+        return shotsLeft(stack) > 0 && (ArsenalData.time(stack, ArsenalData.JET_UNTIL) == 0 || now >= ArsenalData.time(stack, ArsenalData.JET_UNTIL) + Rules.CANNON_SHOT_GAP)
                 && ArsenalData.time(stack, ArsenalData.CHARGE_UNTIL) <= now && Weapons.reloadProgress(stack, now, 0) < 0;
     }
 
@@ -95,10 +95,10 @@ public final class JetCannonItem extends Item implements ArsenalWeapon {
     public static boolean tryFire(ServerPlayer player) {
         ItemStack stack = player.getMainHandItem();
         if (!(stack.getItem() instanceof JetCannonItem item) || !player.isAlive() || player.isSpectator()) return false;
-        long now = player.serverLevel().getGameTime();
-        if (!ready(stack, now) || player.getCooldowns().isOnCooldown(item)) return false;
+        long now = player.level().getGameTime();
+        if (!ready(stack, now) || player.getCooldowns().isOnCooldown(stack)) return false;
         if (Fe.stored(stack) < Rules.CANNON_SHOT_FE) {
-            player.displayClientMessage(Component.translatable("message.singulo_arsenal.no_energy"), true);
+            player.sendOverlayMessage(Component.translatable("message.singulo_arsenal.no_energy"));
             return false;
         }
         stack.set(ArsenalData.CHARGE_UNTIL.get(), now + Rules.CANNON_CHARGE_TICKS);
@@ -106,8 +106,9 @@ public final class JetCannonItem extends Item implements ArsenalWeapon {
     }
 
     @Override
-    public void inventoryTick(ItemStack stack, Level level, Entity entity, int slot, boolean selected) {
-        if (!(level instanceof ServerLevel server) || !(entity instanceof ServerPlayer player)) return;
+    public void inventoryTick(ItemStack stack, net.minecraft.server.level.ServerLevel level, Entity entity, net.minecraft.world.entity.EquipmentSlot slot) {
+        ServerLevel server = level;
+        if (!(entity instanceof ServerPlayer player)) return;
         if (player.getMainHandItem() != stack) {
             // Switching away cuts the jet and drops the charge.
             stack.remove(ArsenalData.CHARGE_UNTIL.get());
@@ -145,7 +146,7 @@ public final class JetCannonItem extends Item implements ArsenalWeapon {
      */
     private static void ignite(ItemStack stack, ServerPlayer player, ServerLevel level) {
         if (!Fe.spend(stack, Rules.CANNON_SHOT_FE)) {
-            player.displayClientMessage(Component.translatable("message.singulo_arsenal.no_energy"), true);
+            player.sendOverlayMessage(Component.translatable("message.singulo_arsenal.no_energy"));
             return;
         }
         stack.set(ArsenalData.JET_UNTIL.get(), level.getGameTime() + Rules.CANNON_SHOT_TICKS);
@@ -169,7 +170,7 @@ public final class JetCannonItem extends Item implements ArsenalWeapon {
         if (ArsenalData.get(stack, ArsenalData.SHOTS) < Rules.CANNON_MAGAZINE) return;
         int ticks = Weapons.cooled(stack, Rules.CANNON_COOLDOWN);
         stack.remove(ArsenalData.SHOTS.get());
-        player.getCooldowns().addCooldown(stack.getItem(), ticks);
+        player.getCooldowns().addCooldown(stack, ticks);
         Weapons.beginReload(stack, level.getGameTime(), ticks);
         Weapons.sound(player, "jet_forge.cool", 0.7F, 1.3F);
     }
@@ -223,7 +224,7 @@ public final class JetCannonItem extends Item implements ArsenalWeapon {
         float damage = Weapons.amplified(stack, Rules.CANNON_BLAST_DAMAGE);
         for (LivingEntity target : ArsenalDamage.around(player, at, radius)) {
             double distance = Math.sqrt(target.getBoundingBox().distanceToSqr(at));
-            if (target.hurt(source, damage * Rules.blastFalloff(distance, radius))) target.setRemainingFireTicks(Math.max(target.getRemainingFireTicks(), 100));
+            if (target.hurtServer((net.minecraft.server.level.ServerLevel) target.level(), source, damage * Rules.blastFalloff(distance, radius))) target.setRemainingFireTicks(Math.max(target.getRemainingFireTicks(), 100));
         }
         if (breaksTerrain(stack)) Terrain.crater(player, level, at, radius);
         FxPayload.send(level, FxPayload.MELTDOWN, at, Vec3.ZERO, (float) radius);
@@ -231,11 +232,16 @@ public final class JetCannonItem extends Item implements ArsenalWeapon {
     }
 
     private static void burn(LivingEntity target, net.minecraft.world.damagesource.DamageSource source, float damage) {
-        if (target.hurt(source, damage)) target.setRemainingFireTicks(Math.max(target.getRemainingFireTicks(), 40));
+        if (target.hurtServer((net.minecraft.server.level.ServerLevel) target.level(), source, damage)) target.setRemainingFireTicks(Math.max(target.getRemainingFireTicks(), 40));
     }
 
     @Override
-    public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> lines, TooltipFlag flag) {
+    public void appendHoverText(ItemStack stack, TooltipContext context, net.minecraft.world.item.component.TooltipDisplay display, java.util.function.Consumer<Component> output, TooltipFlag flag) {
+        List<Component> lines = new java.util.ArrayList<>();
+        describeHoverText(stack, context, lines, flag);
+        lines.forEach(output);
+    }
+    protected void describeHoverText(ItemStack stack, TooltipContext context, List<Component> lines, TooltipFlag flag) {
         lines.add(Component.translatable(breaksTerrain(stack) ? "tooltip.singulo_arsenal.terrain_break" : "tooltip.singulo_arsenal.terrain_protect").withStyle(ChatFormatting.YELLOW));
         Weapons.describe(BuiltInRegistries.ITEM.getKey(this).getPath(), stack, stage(), lines);
     }

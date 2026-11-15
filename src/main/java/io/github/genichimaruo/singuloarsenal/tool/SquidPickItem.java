@@ -11,7 +11,7 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
@@ -19,7 +19,7 @@ import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
-import net.minecraft.world.InteractionResultHolder;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.CraftingContainer;
 import net.minecraft.world.inventory.Slot;
@@ -40,15 +40,15 @@ import net.neoforged.neoforge.network.PacketDistributor;
  * pick in the other hand. A pick made from an already tuned scanner keeps that scanner's sensitivity.
  */
 public final class SquidPickItem extends PoweredTool {
-    private static final TagKey<Block> TIER_2 = BlockTags.create(ResourceLocation.fromNamespaceAndPath("singulo", "scanner_tier_2"));
-    private static final TagKey<Block> TIER_3 = BlockTags.create(ResourceLocation.fromNamespaceAndPath("singulo", "scanner_tier_3"));
-    private static final ResourceLocation SCANNER_TIER = ResourceLocation.fromNamespaceAndPath("singulo", "scanner_tier");
+    private static final TagKey<Block> TIER_2 = BlockTags.create(Identifier.fromNamespaceAndPath("singulo", "scanner_tier_2"));
+    private static final TagKey<Block> TIER_3 = BlockTags.create(Identifier.fromNamespaceAndPath("singulo", "scanner_tier_3"));
+    private static final Identifier SCANNER_TIER = Identifier.fromNamespaceAndPath("singulo", "scanner_tier");
 
     /** What a scan found. {@code hidden} counts the ores there that the pick is not yet sensitive enough to show. */
     public record Scan(List<BlockPos> ores, int hidden) {}
 
-    public SquidPickItem() {
-        super(ToolTier.SQUID, BlockTags.MINEABLE_WITH_PICKAXE, 5, -2.8F, Rules.PICK_CAPACITY, 2, Rules.PICK_FE, Rarity.UNCOMMON);
+    public SquidPickItem(net.minecraft.world.item.Item.Properties properties) {
+        super(properties, ToolTier.SQUID, BlockTags.MINEABLE_WITH_PICKAXE, 5, -2.8F, Rules.PICK_CAPACITY, 2, Rules.PICK_FE, Rarity.UNCOMMON);
     }
 
     public static void register() {
@@ -66,23 +66,23 @@ public final class SquidPickItem extends PoweredTool {
     }
 
     @Override
-    public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
+    public InteractionResult use(Level level, Player player, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
-        if (hand != InteractionHand.MAIN_HAND || player.getCooldowns().isOnCooldown(this)) return InteractionResultHolder.pass(stack);
+        if (hand != InteractionHand.MAIN_HAND || player.getCooldowns().isOnCooldown(stack)) return InteractionResult.PASS;
         if (player instanceof ServerPlayer server) {
             if (!Fe.spend(stack, Rules.SCAN_FE)) {
-                player.displayClientMessage(Component.translatable("message.singulo_arsenal.no_energy"), true);
-                return InteractionResultHolder.fail(stack);
+                player.sendOverlayMessage(Component.translatable("message.singulo_arsenal.no_energy"));
+                return InteractionResult.FAIL;
             }
             Scan found = scan(server, tier(stack));
-            player.getCooldowns().addCooldown(this, Rules.SCAN_COOLDOWN);
+            player.getCooldowns().addCooldown(player.getMainHandItem(), Rules.SCAN_COOLDOWN);
             var message = Component.translatable("message.singulo_arsenal.scan", found.ores().size());
             if (found.hidden() > 0) message.append(Component.translatable("message.singulo_arsenal.scan_hidden", found.hidden()));
-            player.displayClientMessage(message, true);
+            player.sendOverlayMessage(message);
             level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.SCULK_CLICKING, SoundSource.PLAYERS, 1, 0.7F);
             if (server.connection.hasChannel(ScanPayload.TYPE)) PacketDistributor.sendToPlayer(server, new ScanPayload(found.ores()));
         }
-        return InteractionResultHolder.consume(stack);
+        return InteractionResult.CONSUME;
     }
 
     /** Public so GameTests exercise the real search. The nearest ores come first and the list is capped. */
@@ -118,21 +118,21 @@ public final class SquidPickItem extends PoweredTool {
         event.setCanceled(true);
         int now = tier(pick);
         if (now >= tier) {
-            if (!level.isClientSide) player.displayClientMessage(Component.translatable("message.singulo.scanner_module.already", now), true);
+            if (!level.isClientSide()) player.sendOverlayMessage(Component.translatable("message.singulo.scanner_module.already", now));
             event.setCancellationResult(InteractionResult.FAIL);
             return;
         }
-        event.setCancellationResult(InteractionResult.sidedSuccess(level.isClientSide));
-        if (level.isClientSide) return;
+        event.setCancellationResult(InteractionResult.SUCCESS);
+        if (level.isClientSide()) return;
         pick.set(ArsenalData.SCAN_TIER.get(), tier);
         if (!player.getAbilities().instabuild) module.shrink(1);
-        player.displayClientMessage(Component.translatable("message.singulo.scanner_module.done", tier), true);
+        player.sendOverlayMessage(Component.translatable("message.singulo.scanner_module.done", tier));
         level.playSound(null, player.blockPosition(), SoundEvents.AMETHYST_BLOCK_RESONATE, SoundSource.PLAYERS, 1, 1.2F);
     }
 
     /** 2 or 3 for Singulo's Mk2 and Mk3 sensitivity modules, 0 for anything else. */
     public static int moduleTier(ItemStack stack) {
-        ResourceLocation id = BuiltInRegistries.ITEM.getKey(stack.getItem());
+        Identifier id = BuiltInRegistries.ITEM.getKey(stack.getItem());
         if (!id.getNamespace().equals("singulo")) return 0;
         return switch (id.getPath()) {
             case "scanner_module_2" -> 2;
@@ -146,8 +146,8 @@ public final class SquidPickItem extends PoweredTool {
      * head passes its sensitivity on.
      */
     @Override
-    public void onCraftedBy(ItemStack stack, Level level, Player player) {
-        var type = BuiltInRegistries.DATA_COMPONENT_TYPE.get(SCANNER_TIER);
+    public void onCraftedBy(ItemStack stack, Player player) {
+        var type = BuiltInRegistries.DATA_COMPONENT_TYPE.getValue(SCANNER_TIER);
         if (type == null) return;
         for (Slot slot : player.containerMenu.slots) {
             if (!(slot.container instanceof CraftingContainer)) continue;
@@ -159,8 +159,13 @@ public final class SquidPickItem extends PoweredTool {
     }
 
     @Override
-    public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> lines, TooltipFlag flag) {
-        super.appendHoverText(stack, context, lines, flag);
+    public void appendHoverText(ItemStack stack, TooltipContext context, net.minecraft.world.item.component.TooltipDisplay display, java.util.function.Consumer<Component> output, TooltipFlag flag) {
+        List<Component> lines = new java.util.ArrayList<>();
+        describeHoverText(stack, context, lines, flag);
+        lines.forEach(output);
+    }
+    protected void describeHoverText(ItemStack stack, TooltipContext context, List<Component> lines, TooltipFlag flag) {
+        super.describeHoverText(stack, context, lines, flag);
         lines.add(1, Component.translatable("tooltip.singulo_arsenal.scan_tier", tier(stack), Rules.SCAN_MAX_TIER).withStyle(ChatFormatting.GRAY));
     }
 }

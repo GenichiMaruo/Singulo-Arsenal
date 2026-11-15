@@ -1,0 +1,7 @@
+{
+  "type": "minecraft:function",
+  "structure": "singulo_arsenal:drill_arena",
+  "function": "singulo_arsenal:arsenalgametests.drillinggivesoutatitsdepth",
+  "max_ticks": 100,
+  "environment": "minecraft:default"
+}

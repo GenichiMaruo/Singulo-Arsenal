@@ -2,8 +2,18 @@
 allprojects {
     afterEvaluate {
         sourceSets.main.java.srcDir(file('tools/review/gui-src'))
+        sourceSets.main.resources.srcDir(file('tools/review/gui-resources'))
         if (providers.gradleProperty('reviewShaders').isPresent()) {
             dependencies { runtimeOnly fileTree(dir: 'build/review-deps', include: ['*.jar']) }
+        }
+        tasks.named('processResources') {
+            inputs.property('arsenalReviewMixin', true)
+            doLast {
+                def metadata = file("${destinationDir}/META-INF/neoforge.mods.toml")
+                if (!metadata.text.contains('arsenal-review.mixins.json')) {
+                    metadata.append('\n[[mixins]]\nconfig="arsenal-review.mixins.json"\n')
+                }
+            }
         }
         neoForge.runs.client {
             gameDirectory = file('build/gui-review')

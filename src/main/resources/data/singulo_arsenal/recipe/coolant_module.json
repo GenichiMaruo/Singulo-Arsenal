@@ -6,21 +6,15 @@
   "energy": 400,
   "ingredients": [
     {
-      "ingredient": {
-        "item": "singulo:coolant_cartridge"
-      },
+      "ingredient": "singulo:coolant_cartridge",
       "count": 2
     },
     {
-      "ingredient": {
-        "item": "singulo:heat_exchange_core"
-      },
+      "ingredient": "singulo:heat_exchange_core",
       "count": 1
     },
     {
-      "ingredient": {
-        "item": "singulo:superconducting_wire"
-      },
+      "ingredient": "singulo:superconducting_wire",
       "count": 2
     }
   ],

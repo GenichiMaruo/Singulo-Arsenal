@@ -18,7 +18,7 @@ import java.util.Map;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.decoration.ArmorStand;
@@ -68,8 +68,9 @@ final class FxClient {
         });
         NeoForge.EVENT_BUS.addListener(FxClient::tick);
         NeoForge.EVENT_BUS.addListener(FxClient::world);
+        NeoForge.EVENT_BUS.addListener(FxClient::submitWorld);
         // Ahead of Singulo's own handler, which draws every lens registered so far and then forgets them.
-        NeoForge.EVENT_BUS.addListener(EventPriority.HIGHEST, FxClient::lenses);
+
         // Lowest priority: if anyone cancels the render, the matching Post never fires and neither must the push.
         NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, FxClient::stretchBegin);
         NeoForge.EVENT_BUS.addListener(FxClient::stretchEnd);
@@ -131,36 +132,33 @@ final class FxClient {
 
     // ---- spaghettification ---------------------------------------------------------------------------------------
 
-    private static void stretchBegin(RenderLivingEvent.Pre<?, ?> event) {
-        Stretch stretch = STRETCHES.get(event.getEntity().getId());
-        PoseStack pose = event.getPoseStack();
-        pose.pushPose();
-        if (stretch == null || scene == null) return;
-        float time = scene.getGameTime() + event.getPartialTick();
-        // Both kinds of stretch let go gradually: a body does not snap back to its own shape.
+    static float stretch(int entityId, float time) {
+        Stretch stretch = STRETCHES.get(entityId);
+        if (stretch == null) return 1;
         float fade = stretch.shearBorn == 0 ? 0 : Rules.relaxing(time - stretch.shearBorn, Rules.STRETCH_RELAX_TICKS);
         float stress = stretch.held * Rules.relaxing(time - stretch.heldUntil, Rules.STRETCH_RELAX_TICKS);
-        float length = Rules.stretchFor(stress, fade * (0.6F + 0.1F * stretch.shear));
+        return Rules.stretchFor(stress, fade * (0.6F + 0.1F * stretch.shear));
+    }
+    private static void stretchBegin(RenderLivingEvent.Pre<?, ?, ?> event) {
+        PoseStack pose = event.getPoseStack(); pose.pushPose();
+        var state = event.getRenderState().getRenderData(ArsenalRenderState.DATA);
+        float length = state == null ? 1 : state.stretch();
         float width = 1 / (float) Math.sqrt(length);
         pose.scale(width, length, width);
     }
-
-    private static void stretchEnd(RenderLivingEvent.Post<?, ?> event) {
-        event.getPoseStack().popPose();
-    }
-
+    private static void stretchEnd(RenderLivingEvent.Post<?, ?, ?> event) { event.getPoseStack().popPose(); }
     // ---- gravitational lensing -----------------------------------------------------------------------------------------
 
     /** True while the world is being drawn: the paper doll in the inventory also draws held weapons, but not anywhere in the world. */
     private static boolean inLevel;
 
-    private static void lenses(RenderLevelStageEvent event) {
-        if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_SKY) inLevel = true;
-        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_LEVEL) return;
+    private static void lenses(net.neoforged.neoforge.client.event.ExtractLevelRenderStateEvent event) {
+
+
         inLevel = false;
         var mc = Minecraft.getInstance();
         if (mc.level == null) return;
-        float partial = event.getPartialTick().getGameTimeDeltaPartialTick(true);
+        float partial = event.getDeltaTracker().getGameTimeDeltaPartialTick(true);
         for (Player player : mc.level.players()) {
             float use = focusOf(player, partial);
             if (use < 0) continue;
@@ -175,28 +173,28 @@ final class FxClient {
     }
 
     /** A small bend of the view round the hole sealed inside a weapon someone else is holding. The pose and point are the art's own, in model pixels. */
-    static void heldHole(PoseStack pose, ItemDisplayContext context, float x, float y, float z, float pixels) {
-        if (context.firstPerson() || !inLevel) return;
+    static void heldHole(GearRenderer.Owner owner, PoseStack pose, ItemDisplayContext context, float x, float y, float z, float pixels) {
+        if (context.firstPerson() || !owner.worldView()) return;
         Vector3f at = pose.last().pose().transformPosition(x, y, z, new Vector3f());
         float orb = pixels * pose.last().pose().getScale(new Vector3f()).y;
-        Vec3 camera = Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
+        Vec3 camera = owner.camera();
         Lensing.distortion(camera.add(at.x, at.y, at.z), orb * 1.4F, 0.8F, orb * 4.3F);
     }
 
     // ---- world pass ----------------------------------------------------------------------------------------------
 
-    private static void world(RenderLevelStageEvent event) {
-        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_LEVEL) return;
+    private static void world(net.neoforged.neoforge.client.event.ExtractLevelRenderStateEvent event) {
+
         var mc = Minecraft.getInstance();
         if (mc.level == null || mc.player == null) return;
-        float partial = event.getPartialTick().getGameTimeDeltaPartialTick(true);
-        PoseStack pose = event.getPoseStack();
-        Vec3 camera = event.getCamera().getPosition();
+        float partial = event.getDeltaTracker().getGameTimeDeltaPartialTick(true);
+        PoseStack pose = new PoseStack();
+        Vec3 camera = event.getCamera().position();
         pose.pushPose();
         // AFTER_LEVEL supplies an identity pose; the terrain renderer has already restored its view stack.
-        pose.mulPose(event.getModelViewMatrix());
+
         pose.translate(-camera.x, -camera.y, -camera.z);
-        MultiBufferSource.BufferSource buffers = mc.renderBuffers().bufferSource();
+        GeometrySnapshot buffers = new GeometrySnapshot();
 
         drawHoles(pose, buffers, mc, partial);
         drawBits(pose, buffers, mc, partial);
@@ -213,14 +211,22 @@ final class FxClient {
             if (jet >= 0) drawImpact(pose, glow, player, partial, jet, camera);
             if (focusOf(player, partial) >= 0) drawThreads(pose, glow, mc.level, player, partial, now);
         }
-        buffers.endBatch(ArsenalRenderTypes.GLOW);
+
         drawWorldJets(pose, buffers, mc, partial, camera);
         drawSquid(pose, buffers, mc, partial);
         drawScan(pose, buffers, mc, partial);
         pose.popPose();
+        event.getRenderState().setRenderData(WORLD_GEOMETRY, buffers);
+        lenses(event);
         frame++;
     }
 
+    private static final net.minecraft.util.context.ContextKey<GeometrySnapshot> WORLD_GEOMETRY =
+            new net.minecraft.util.context.ContextKey<>(net.minecraft.resources.Identifier.fromNamespaceAndPath("singulo_arsenal", "world_geometry"));
+    private static void submitWorld(net.neoforged.neoforge.client.event.SubmitCustomGeometryEvent event) {
+        GeometrySnapshot geometry = event.getLevelRenderState().getRenderData(WORLD_GEOMETRY);
+        if (geometry != null) geometry.submit(event.getPoseStack(), event.getSubmitNodeCollector());
+    }
     private static void debris(PoseStack pose, VertexConsumer glow, Vec3 at, int count, double speed, float age, float fade, int rgb, double half) {
         java.util.Random random = new java.util.Random(Double.doubleToLongBits(at.x * 31 + at.y * 17 + at.z));
         for (int i = 0; i < count; i++) {
@@ -264,7 +270,7 @@ final class FxClient {
                 if (Minecraft.getInstance().level.getEntity(fx.entity()) instanceof Player owner) {
                     int count = bitCount(owner);
                     if (count > 0) {
-                        Vec3 from = bitPosition(owner, (int) fx.value(), count, Minecraft.getInstance().getTimer().getGameTimeDeltaPartialTick(true));
+                        Vec3 from = bitPosition(owner, (int) fx.value(), count, Minecraft.getInstance().getDeltaTracker().getGameTimeDeltaPartialTick(true));
                         Canvas.tube(pose, glow, from, at, 0.05 * fade, 0x7CE8FF, strength * 0.6F);
                         Canvas.tube(pose, glow, from, at, 0.02 * fade, 0xFFFFFF, strength);
                         Canvas.glowBall(pose, glow, at, 0.14 + age * 0.05, 0x7CE8FF, strength, camera);
@@ -336,20 +342,9 @@ final class FxClient {
      * Turns the cannon on its grip so the barrel points exactly at what the player is aiming at. The beam then leaves the muzzle
      * along the barrel's own axis, instead of merely starting at the muzzle. Run before anything else moves the art.
      */
-    static void aimCannon(Player owner, PoseStack pose, ItemDisplayContext context, float partial) {
-        // A shadow pass uses the light camera, not the main view used by this aim conversion.
-        if (ShaderCompat.shadowPass()) return;
-        var mc = Minecraft.getInstance();
-        // The inventory's paper doll is drawn in GUI space, where world directions mean nothing.
-        if (!context.firstPerson() && mc.screen instanceof net.minecraft.client.gui.screens.inventory.EffectRenderingInventoryScreen) return;
-        Vec3 eye = owner.getEyePosition(partial);
-        Vec3 look = owner.getViewVector(partial);
-        boolean firing = JetCannonItem.jetAge(owner.getMainHandItem(), owner.level().getGameTime(), partial) >= 0;
-        // Never closer than a few blocks, or a wall at arm's length would wrench the gun sideways.
-        double distance = firing ? Math.max(3, eye.distanceTo(aim(owner, partial).getLocation())) : 40;
-        Vec3 camera = mc.gameRenderer.getMainCamera().getPosition();
-        Vec3 target = eye.add(look.scale(distance)).subtract(camera);
-        Matrix4f matrix = pose.last().pose();
+    static void aimCannon(GearRenderer.Owner owner, PoseStack pose) {
+        if (ShaderCompat.shadowPass() || !owner.worldView()) return;
+        Vec3 target = owner.aimTarget();        Matrix4f matrix = pose.last().pose();
         Vector3f origin = matrix.transformPosition(0, 0, 0, new Vector3f());
         Vector3f direction = RenderSpace.worldToPose().transformPosition(
                 (float) target.x, (float) target.y, (float) target.z, new Vector3f()).sub(origin).normalize();
@@ -361,15 +356,15 @@ final class FxClient {
      * Called from the item renderer with the pose of the cannon actually on screen. In third person the muzzle is remembered for the
      * world pass. First-person hands are drawn later with their own projection and a cleared depth buffer, so the jet is drawn here.
      */
-    static void cannonRendered(Player owner, PoseStack pose, MultiBufferSource buffers, ItemDisplayContext context, float partial, float age) {
+    static void cannonRendered(GearRenderer.Owner owner, PoseStack pose, MultiBufferSource buffers, ItemDisplayContext context, float age) {
         // Never let a light-space muzzle overwrite the world-pass cache.
         if (ShaderCompat.shadowPass()) return;
         Vector3f tip = new Matrix4f(pose.last().pose()).transformPosition(0, (float) WeaponArt.CANNON_MUZZLE, 0, new Vector3f());
-        var mc = Minecraft.getInstance();
+
         if (!context.firstPerson()) {
-            Vec3 camera = mc.gameRenderer.getMainCamera().getPosition();
+            Vec3 camera = owner.camera();
             RenderSpace.worldToPose().invert().transformPosition(tip);
-            MUZZLES.put(owner.getId(), new Muzzle(camera.add(tip.x, tip.y, tip.z), frame));
+            MUZZLES.put(owner.id(), new Muzzle(camera.add(tip.x, tip.y, tip.z), frame));
             return;
         }
         if (age < 0) return;
@@ -379,7 +374,7 @@ final class FxClient {
         new Matrix4f(worldToPose).invert().transformPosition(tip);
         PoseStack beam = new PoseStack();
         beam.mulPose(worldToPose);
-        Vec3 target = aim(owner, partial).getLocation().subtract(mc.gameRenderer.getMainCamera().getPosition());
+        Vec3 target = owner.beamTarget();
         drawJet(beam, buffers, Vec3.ZERO, new Vec3(tip.x, tip.y, tip.z), target, age, 0.55F);
     }
 
@@ -390,13 +385,13 @@ final class FxClient {
     }
 
     /** Jets of everyone drawn in the world. The local first-person jet is drawn with the hand instead. */
-    private static void drawWorldJets(PoseStack pose, MultiBufferSource.BufferSource buffers, Minecraft mc, float partial, Vec3 camera) {
+    private static void drawWorldJets(PoseStack pose, MultiBufferSource buffers, Minecraft mc, float partial, Vec3 camera) {
         for (Player player : mc.level.players()) {
             float age = JetCannonItem.jetAge(player.getMainHandItem(), mc.level.getGameTime(), partial);
             if (age < 0 || (firstPerson(player) && !mc.options.hideGui)) continue;
             Muzzle known = MUZZLES.get(player.getId());
             Vec3 from;
-            if (known != null && known.frame == frame) {
+            if (known != null && known.frame >= frame - 1) {
                 from = known.position;
             } else {
                 Vec3 look = player.getViewVector(partial);
@@ -411,7 +406,7 @@ final class FxClient {
             if (age < 0 || fade <= 0) continue;
             JetTube.draw(pose, buffers, camera, fx.data.a(), fx.data.a().lerp(fx.data.b(), Math.min(1, age / 3)), 0.5F * fade, 0.2F, fade, 0.4F);
         }
-        buffers.endBatch(JetTube.type());
+
     }
 
     private static void drawImpact(PoseStack pose, VertexConsumer glow, Player player, float partial, float held, Vec3 camera) {
@@ -424,7 +419,7 @@ final class FxClient {
         Canvas.glowBall(pose, glow, at, 0.45 * pulse, 0xFFFFFF, tail, camera);
         // Sparks restart a few times a second, thrown off the surface.
         float cycle = held % 6;
-        Vec3 normal = Vec3.atLowerCornerOf(hit.getDirection().getNormal());
+        Vec3 normal = Vec3.atLowerCornerOf(hit.getDirection().getUnitVec3i());
         debris(pose, glow, at.add(normal.scale(0.2)).add(normal.scale(0.01 * (int) (held / 6))), 8, 0.14, cycle, tail * (1 - cycle / 6), 0xFFE2A0, 0.05);
     }
 
@@ -482,7 +477,7 @@ final class FxClient {
         return player.getPosition(partial).add(bitGoal(player, index, count, player.getPreciseBodyRotation(partial), player.tickCount + partial));
     }
 
-    private static void drawBits(PoseStack pose, MultiBufferSource.BufferSource buffers, Minecraft mc, float partial) {
+    private static void drawBits(PoseStack pose, MultiBufferSource buffers, Minecraft mc, float partial) {
         boolean any = false;
         float t = mc.level.getGameTime() + partial;
         for (Player player : mc.level.players()) {
@@ -500,15 +495,15 @@ final class FxClient {
                 pose.mulPose(com.mojang.math.Axis.YP.rotationDegrees(180 - yaw));
                 pose.mulPose(com.mojang.math.Axis.XP.rotationDegrees(25));
                 pose.scale(1F / 16, 1F / 16, 1F / 16);
-                int light = net.minecraft.client.renderer.LevelRenderer.getLightColor(mc.level, net.minecraft.core.BlockPos.containing(at));
+                int light = net.minecraft.client.renderer.LevelRenderer.getLightCoords(mc.level, net.minecraft.core.BlockPos.containing(at));
                 Canvas.drawFine(pose, buffers, t, light, Canvas.noOverlay(), true, c -> MachineArt.bit(c, false));
                 pose.popPose();
             }
         }
-        if (any) buffers.endBatch();
+
     }
 
-    private static void drawHoles(PoseStack pose, MultiBufferSource.BufferSource buffers, Minecraft mc, float partial) {
+    private static void drawHoles(PoseStack pose, MultiBufferSource buffers, Minecraft mc, float partial) {
         boolean any = false;
         for (Player player : mc.level.players()) any |= focusOf(player, partial) >= 0;
         if (!any) return;
@@ -528,8 +523,8 @@ final class FxClient {
             });
             pose.popPose();
         }
-        buffers.endBatch(RenderType.entityCutoutNoCull(Canvas.WHITE));
-        buffers.endBatch(RenderType.entityTranslucentEmissive(Canvas.WHITE));
+
+
     }
 
     private static void drawThreads(PoseStack pose, VertexConsumer glow, ClientLevel level, Player player, float partial, long now) {
@@ -554,7 +549,7 @@ final class FxClient {
     private static long scannedUntil;
 
     /** What the SQUID pick found: a block of light on each ore, seen through the rock, fading as the reading goes stale. */
-    private static void drawScan(PoseStack pose, MultiBufferSource.BufferSource buffers, Minecraft mc, float partial) {
+    private static void drawScan(PoseStack pose, MultiBufferSource buffers, Minecraft mc, float partial) {
         float left = scannedUntil - mc.level.getGameTime() - partial;
         if (left <= 0 || scanned.isEmpty()) return;
         float alpha = 0.1F * Math.min(1, left / 40);
@@ -562,7 +557,7 @@ final class FxClient {
         for (var pos : scanned) {
             if (!mc.level.getBlockState(pos).isAir()) Canvas.glowCube(pose, xray, Vec3.atCenterOf(pos), 0.5, 0x7CE8FF, alpha);
         }
-        buffers.endBatch(ArsenalRenderTypes.XRAY);
+
     }
 
     /** SQUID magnetometer: thin brackets on hostile things through walls, only for the wearer. */
@@ -574,7 +569,7 @@ final class FxClient {
         for (double x : xs) for (double y : ys) Canvas.tube(pose, out, new Vec3(x, y, zs[0]), new Vec3(x, y, zs[1]), 0.018, 0x7CE8FF, alpha);
     }
 
-    private static void drawSquid(PoseStack pose, MultiBufferSource.BufferSource buffers, Minecraft mc, float partial) {
+    private static void drawSquid(PoseStack pose, MultiBufferSource buffers, Minecraft mc, float partial) {
         if (!SuitEvents.wearing(mc.player, EquipmentSlot.HEAD, ArmorSet.MEISSNER)) return;
         VertexConsumer xray = buffers.getBuffer(ArsenalRenderTypes.XRAY);
         Vec3 eye = mc.player.getEyePosition(partial);
@@ -586,6 +581,6 @@ final class FxClient {
             float alpha = (float) (0.75 * (1 - distance / Rules.SQUID_RANGE) + 0.2);
             bracket(pose, xray, target.getBoundingBox().move(target.getPosition(partial).subtract(target.position())).inflate(0.1), alpha);
         }
-        buffers.endBatch(ArsenalRenderTypes.XRAY);
+
     }
 }

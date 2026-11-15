@@ -6,7 +6,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResultHolder;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.SlotAccess;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.ClickAction;
@@ -22,8 +22,8 @@ import net.minecraft.world.level.Level;
  * filling the inventory. Accretion takes from canisters before loose pellets.
  */
 public final class PelletCanisterItem extends Item {
-    public PelletCanisterItem() {
-        super(new Properties().stacksTo(1).rarity(Rarity.UNCOMMON).fireResistant());
+    public PelletCanisterItem(Properties properties) {
+        super(properties.stacksTo(1).rarity(Rarity.UNCOMMON).fireResistant());
     }
 
     public static int stored(ItemStack canister) {
@@ -55,7 +55,7 @@ public final class PelletCanisterItem extends Item {
     /** Takes one pellet from the first canister the player carries that has any. */
     public static boolean draw(Player player) {
         var inventory = player.getInventory();
-        for (var list : List.of(inventory.items, inventory.offhand)) {
+        for (var list : List.of(inventory.getNonEquipmentItems(), List.of(player.getOffhandItem()))) {
             for (ItemStack stack : list) {
                 if (stack.getItem() instanceof PelletCanisterItem && stored(stack) > 0) {
                     setStored(stack, stored(stack) - 1);
@@ -68,24 +68,24 @@ public final class PelletCanisterItem extends Item {
 
     /** Right click gathers every loose pellet carried; sneaking, it hands one stack back. */
     @Override
-    public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
+    public InteractionResult use(Level level, Player player, InteractionHand hand) {
         ItemStack canister = player.getItemInHand(hand);
-        if (level.isClientSide) return InteractionResultHolder.success(canister);
+        if (level.isClientSide()) return InteractionResult.SUCCESS;
         if (player.isShiftKeyDown()) {
             ItemStack out = extract(canister);
-            if (out.isEmpty()) return InteractionResultHolder.fail(canister);
+            if (out.isEmpty()) return InteractionResult.FAIL;
             if (!player.getInventory().add(out)) player.drop(out, false);
         } else {
             int moved = 0;
             var inventory = player.getInventory();
-            for (var list : List.of(inventory.items, inventory.offhand)) {
+            for (var list : List.of(inventory.getNonEquipmentItems(), List.of(player.getOffhandItem()))) {
                 for (ItemStack stack : list) moved += insert(canister, stack);
             }
-            if (moved == 0) return InteractionResultHolder.fail(canister);
+            if (moved == 0) return InteractionResult.FAIL;
         }
-        player.displayClientMessage(Component.translatable("message.singulo_arsenal.canister", stored(canister), Rules.CANISTER_CAPACITY), true);
+        player.sendOverlayMessage(Component.translatable("message.singulo_arsenal.canister", stored(canister), Rules.CANISTER_CAPACITY));
         level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.BUNDLE_INSERT, SoundSource.PLAYERS, 0.8F, 0.8F);
-        return InteractionResultHolder.consume(canister);
+        return InteractionResult.CONSUME;
     }
 
     /** In a menu, like a bundle: pellets dropped on the canister go in, and a right click with an empty cursor takes a stack out. */
@@ -121,6 +121,12 @@ public final class PelletCanisterItem extends Item {
     @Override public int getBarColor(ItemStack stack) { return 0xB89CFF; }
 
     @Override
+    public void appendHoverText(ItemStack stack, TooltipContext context, net.minecraft.world.item.component.TooltipDisplay display, java.util.function.Consumer<Component> builder, TooltipFlag flag) {
+        List<Component> lines = new java.util.ArrayList<>();
+        appendHoverText(stack, context, lines, flag);
+        lines.forEach(builder);
+    }
+
     public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> lines, TooltipFlag flag) {
         lines.add(Component.translatable("tooltip.singulo_arsenal.pellet_canister.summary").withStyle(ChatFormatting.GRAY));
         lines.add(Component.translatable("tooltip.singulo_arsenal.pellet_canister.count", stored(stack), Rules.CANISTER_CAPACITY).withStyle(ChatFormatting.GRAY));

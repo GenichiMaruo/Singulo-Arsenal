@@ -21,10 +21,10 @@ spec.loader.exec_module(release)
 
 PROPERTIES = '''mod_name=Singulo-Arsenal
 mod_version=0.3.0
-minecraft_version=1.21.1
-minecraft_version_range=[1.21.1]
+minecraft_version=26.1.2
+minecraft_version_range=[26.1.2]
 mod_loader_suffix=N
-neo_version=21.1.256
+neo_version=26.1.2.126
 singulo_version_range=[0.19.0,)
 '''
 METADATA = '''[[mods]]
@@ -34,12 +34,12 @@ version="0.3.0"
 modId="minecraft"
 type="required"
 side="BOTH"
-versionRange="[1.21.1]"
+versionRange="[26.1.2]"
 [[dependencies.singulo_arsenal]]
 modId="neoforge"
 type="required"
 side="BOTH"
-versionRange="[21.1.256,)"
+versionRange="[26.1.2.126,)"
 [[dependencies.singulo_arsenal]]
 modId="singulo"
 type="required"
@@ -49,7 +49,7 @@ versionRange="[0.19.0,)"
 ENTRY_POINT = 'io/github/genichimaruo/singuloarsenal/SinguloArsenal.class'
 VERSION_TYPES = [{'id': i, 'slug': slug} for i, slug in [(1, 'minecraft-1-21'), (2, 'modloader'), (3, 'java'), (4, 'bukkit'), (5, 'environment')]]
 VERSIONS = [{'id': i, 'name': name, 'gameVersionTypeID': group} for i, name, group in
-            [(100, '1.21.1', 1), (200, 'NeoForge', 2), (300, 'Java 21', 3), (400, '1.21.1', 4), (500, 'Client', 5), (501, 'Server', 5)]]
+            [(100, '26.1.2', 1), (200, 'NeoForge', 2), (300, 'Java 25', 3), (400, '26.1.2', 4), (500, 'Client', 5), (501, 'Server', 5)]]
 
 
 class ArtifactTests(unittest.TestCase):
@@ -63,7 +63,7 @@ class ArtifactTests(unittest.TestCase):
         self.changelog.write_text('Release notes', encoding='utf-8')
         self.jars = self.root / 'build' / 'libs'
         self.jars.mkdir(parents=True)
-        self.jar = self.jars / 'Singulo-Arsenal-0.3.0-1.21.1N.jar'
+        self.jar = self.jars / 'Singulo-Arsenal-0.3.0-26.1.2N.jar'
         self.write_jar()
 
     def write_jar(self, metadata=METADATA, extra=None, entry_point=True):
@@ -79,8 +79,8 @@ class ArtifactTests(unittest.TestCase):
 
     def test_selects_exact_current_jar_and_hash(self):
         # A stale JAR and a sources JAR must never enter the published file list.
-        (self.jars / 'Singulo-Arsenal-0.1.0-1.21.1N.jar').write_bytes(b'stale')
-        (self.jars / 'Singulo-Arsenal-0.3.0-1.21.1N-sources.jar').write_bytes(b'sources')
+        (self.jars / 'Singulo-Arsenal-0.1.0-26.1.2N.jar').write_bytes(b'stale')
+        (self.jars / 'Singulo-Arsenal-0.3.0-26.1.2N-sources.jar').write_bytes(b'sources')
         plan = self.prepare()
         self.assertEqual(Path(plan['jar']), self.jar)
         self.assertEqual(Path(plan['changelog']), self.changelog)
@@ -104,7 +104,7 @@ class ArtifactTests(unittest.TestCase):
             self.prepare()
 
     def test_old_jar_cannot_replace_missing_current_jar(self):
-        self.jar.rename(self.jars / 'Singulo-Arsenal-0.1.0-1.21.1N.jar')
+        self.jar.rename(self.jars / 'Singulo-Arsenal-0.1.0-26.1.2N.jar')
         with self.assertRaises(FileNotFoundError):
             self.prepare()
 
@@ -117,7 +117,7 @@ class ArtifactTests(unittest.TestCase):
 
     def test_rejects_incorrect_dependency_requirements(self):
         for old, new in [('type="required"', 'type="optional"'), ('side="BOTH"', 'side="CLIENT"'),
-                         ('[1.21.1]', '[1.20.1]'), ('[21.1.256,)', '[21.1,)'), ('[0.19.0,)', '[0.15.0,)')]:
+                         ('[26.1.2]', '[1.20.1]'), ('[26.1.2.126,)', '[21.1,)'), ('[0.19.0,)', '[0.15.0,)')]:
             with self.subTest(new=new):
                 self.write_jar(METADATA.replace(old, new))
                 with self.assertRaisesRegex(ValueError, 'dependency metadata'):
@@ -132,6 +132,9 @@ class ArtifactTests(unittest.TestCase):
         for entry in ['io/github/genichimaruo/singuloarsenal/gametest/Tests.class',
                       'io/github/genichimaruo/singuloarsenal/review/Review.class',
                       'data/singulo_arsenal/structure/empty.nbt',
+                      'data/singulo_arsenal/structure/drill_arena.nbt',
+                      'data/singulo_arsenal/test_instance/test.json',
+                      'arsenal-review.mixins.json',
                       'io/github/genichimaruo/singulo/Singulo.class']:
             with self.subTest(entry=entry):
                 self.write_jar(extra=entry)
@@ -152,7 +155,7 @@ class ArtifactTests(unittest.TestCase):
             self.prepare()
 
     def test_rejects_unsupported_platform_and_version_paths(self):
-        for old, new in [('1.21.1', '1.20.1'), ('mod_loader_suffix=N', 'mod_loader_suffix=F'),
+        for old, new in [('26.1.2', '1.20.1'), ('mod_loader_suffix=N', 'mod_loader_suffix=F'),
                          ('mod_version=0.3.0', 'mod_version=../../0.3.0')]:
             with self.subTest(new=new):
                 (self.root / 'gradle.properties').write_text(PROPERTIES.replace(old, new), encoding='utf-8')
@@ -183,7 +186,7 @@ class ApiTests(unittest.TestCase):
             opener.assert_not_called()
 
     def test_missing_versions_and_malformed_responses_fail(self):
-        for response in [b'not json', b'{}', b'[{"name":"1.21.1"}]', b'[{"name":[]}]']:
+        for response in [b'not json', b'{}', b'[{"name":"26.1.2"}]', b'[{"name":[]}]']:
             with self.subTest(response=response), patch.object(release.urllib.request, 'build_opener') as opener:
                 opener.return_value.open.return_value = io.BytesIO(response)
                 with self.assertRaises(ValueError):
@@ -202,7 +205,7 @@ class ApiTests(unittest.TestCase):
         self.assertIsNone(release.NoRedirect().redirect_request(request, None, 302, '', {}, 'https://example.com'))
 
     def test_ambiguous_minecraft_versions_are_rejected(self):
-        duplicate = {'id': 101, 'name': '1.21.1', 'gameVersionTypeID': 1}
+        duplicate = {'id': 101, 'name': '26.1.2', 'gameVersionTypeID': 1}
         with patch.object(release, 'api_json', side_effect=[VERSIONS + [duplicate], VERSION_TYPES]):
             with self.assertRaisesRegex(ValueError, 'no unique minecraft version'):
                 release.check_api('1793647', 'test-token')
@@ -213,7 +216,7 @@ class UploadTests(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         root = Path(temporary.name)
-        self.jar = root / 'Singulo-Arsenal-0.3.0-1.21.1N.jar'
+        self.jar = root / 'Singulo-Arsenal-0.3.0-26.1.2N.jar'
         self.jar.write_bytes(b'jar fixture\x00\xff')
         self.changelog = root / 'changelog-0.3.0.md'
         self.changelog.write_text('# 0.3.0\n日本語の変更履歴', encoding='utf-8')
@@ -302,7 +305,7 @@ class UploadTests(unittest.TestCase):
                 upload.assert_not_called()
 
     def test_cli_blocks_uploads_from_other_branches_and_tags(self):
-        for ref in ['', 'refs/heads/feature/0.3.0', 'refs/tags/v0.3.0']:
+        for ref in ['', 'refs/heads/1.21.1', 'refs/heads/1.20.1', 'refs/heads/feature/0.3.0', 'refs/tags/v0.3.0']:
             with self.subTest(ref=ref), patch.object(release.sys, 'argv', ['prepare_release.py', '--upload']), \
                  patch.object(release, 'prepare', return_value=self.plan), patch.object(release, 'upload') as upload, \
                  patch.dict(release.os.environ, {'GITHUB_REF': ref}, clear=True), redirect_stderr(io.StringIO()):

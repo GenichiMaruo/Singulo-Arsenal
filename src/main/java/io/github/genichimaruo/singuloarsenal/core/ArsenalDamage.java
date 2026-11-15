@@ -30,7 +30,7 @@ public final class ArsenalDamage {
     }
 
     public static DamageSource source(ServerLevel level, ResourceKey<DamageType> type, Entity attacker) {
-        return new DamageSource(level.registryAccess().registryOrThrow(Registries.DAMAGE_TYPE).getHolderOrThrow(type), attacker);
+        return new DamageSource(level.registryAccess().lookupOrThrow(Registries.DAMAGE_TYPE).getOrThrow(type), attacker);
     }
 
     /** The only definition of "may this player's gear hurt that": never themselves, allies, creative or PvP-protected players. */

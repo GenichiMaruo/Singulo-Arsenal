@@ -26,7 +26,7 @@ public final class Modules {
 
     public static List<ItemStack> installed(ItemStack gear) {
         List<ItemStack> out = new ArrayList<>();
-        gear.getOrDefault(ArsenalData.MODULES.get(), ItemContainerContents.EMPTY).nonEmptyStream().forEach(out::add);
+        gear.getOrDefault(ArsenalData.MODULES.get(), ItemContainerContents.EMPTY).nonEmptyItemCopyStream().forEach(out::add);
         return out;
     }
 

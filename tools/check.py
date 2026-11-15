@@ -27,9 +27,9 @@ ITEMS = GEAR + MATERIALS + MODULES + CONTAINERS + NIHONIUM
 
 javac = str(Path(os.environ['JAVA_HOME']) / 'bin/javac') if os.environ.get('JAVA_HOME') else shutil.which('javac')
 java = str(Path(os.environ['JAVA_HOME']) / 'bin/java') if os.environ.get('JAVA_HOME') else shutil.which('java')
-assert javac and java, 'A JDK 21 is required'
+assert javac and java, 'A JDK 25 is required'
 with tempfile.TemporaryDirectory(prefix='arsenal-tests-') as directory:
-    subprocess.run([javac, '--release', '21', '-d', directory,
+    subprocess.run([javac, '--release', '25', '-d', directory,
                     str(ROOT / 'src/main/java/io/github/genichimaruo/singuloarsenal/core/Rules.java'),
                     str(ROOT / 'tests/RulesTest.java')], check=True)
     subprocess.run([java, '-cp', directory, 'RulesTest'], check=True)
@@ -55,7 +55,9 @@ for item in ITEMS:
     model = json.loads((RES / f'assets/singulo_arsenal/models/item/{item}.json').read_text(encoding='utf-8'))
     # Armor items are flat icons like vanilla armor; worn armor is drawn by SuitLayer, not by these models.
     if item in GEAR and item not in ARMOR:
-        assert model['parent'] == 'minecraft:builtin/entity', f'{item} must use the gear renderer'
+        assert 'parent' not in model, f'{item} special model must not inherit removed builtin/entity'
+        definition = json.loads((RES / f'assets/singulo_arsenal/items/{item}.json').read_text(encoding='utf-8'))
+        assert definition['model']['type'] == 'minecraft:select', f'{item} must dispatch special rendering by display context'
         assert all(context in model['display'] for context in ['gui', 'ground', 'fixed', 'firstperson_righthand', 'firstperson_lefthand',
                                                                 'thirdperson_righthand', 'thirdperson_lefthand']), item
     else:
@@ -123,17 +125,21 @@ assert 'singulo_arsenal:collapsar_lamina' in (recipes / 'jet_lance.json').read_t
 # With a Singulo checkout, every ingredient is checked against the real generated recipe/item data.
 if os.environ.get('SINGULO_SOURCE'):
     singulo = Path(os.environ['SINGULO_SOURCE']) / 'src/generated/resources'
-    known = {p.stem for p in (singulo / 'assets/singulo/models/item').glob('*.json')}
+    known = {p.stem for p in (singulo / 'assets/singulo/items').glob('*.json')}
+    assert known, 'Singulo checkout has no 26.x item definitions'
     fluids = {m for p in (singulo / 'data/singulo/recipe').rglob('*.json')
               for m in re.findall(r'"fluid": "singulo:([a-z0-9_]+)"', p.read_text(encoding='utf-8'))}
     used = 0
     for path in recipes.glob('*.json'):
         text = path.read_text(encoding='utf-8')
-        for ref in re.findall(r'"item": "singulo:([a-z0-9_]+)"', text):
+        recipe = json.loads(text)
+        ingredient_data = recipe.get('key', {}) if recipe['type'] == 'minecraft:crafting_shaped' else recipe.get('ingredients', [])
+        for ref in re.findall(r'"singulo:([a-z0-9_]+)"', json.dumps(ingredient_data)):
             assert ref in known, f'unknown Singulo item {ref} in {path.name}'
             used += 1
         for ref in re.findall(r'"fluid": "singulo:([a-z0-9_]+)"', text):
             assert ref in fluids, f'unknown Singulo fluid {ref} in {path.name}'
+    assert used > 0, 'No Singulo ingredient references were checked'
     print(f'{used} Singulo ingredient references resolved against the checkout')
 
 

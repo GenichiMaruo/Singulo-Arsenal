@@ -36,7 +36,7 @@ final class Terrain {
         if (hardness < 0 || hardness > HARDEST) return false;
         if (BuiltInRegistries.BLOCK.getKey(state.getBlock()).getNamespace().startsWith("singulo")) return false;
         if (!player.mayBuild() || !level.mayInteract(player, pos)) return false;
-        return !NeoForge.EVENT_BUS.post(new BlockEvent.BreakEvent(level, pos, state, player)).isCanceled();
+        return !NeoForge.EVENT_BUS.post(new net.neoforged.neoforge.event.level.block.BreakBlockEvent(level, pos, state, player)).isCanceled();
     }
 
     private static boolean isStone(BlockState state) {
@@ -91,13 +91,13 @@ final class Terrain {
             BlockState state = level.getBlockState(pos);
             if (state.isAir()) continue;
             double distance = Math.sqrt(pos.distSqr(center));
-            double edge = radius * (0.82 + 0.18 * level.random.nextDouble());
+            double edge = radius * (0.82 + 0.18 * level.getRandom().nextDouble());
             if (distance <= edge) {
                 if (!canBreak(player, level, pos, state)) continue;
-                if (!isStone(state) && level.random.nextDouble() < 1 / radius) Block.dropResources(state, level, pos, null, player, ItemStack.EMPTY);
+                if (!isStone(state) && level.getRandom().nextDouble() < 1 / radius) Block.dropResources(state, level, pos, null, player, ItemStack.EMPTY);
                 level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
-            } else if (distance <= edge + 1.5 && isStone(state) && level.random.nextFloat() < 0.45F && canBreak(player, level, pos, state)) {
-                boolean pool = pos.getY() < center.getY() && level.random.nextFloat() < 0.15F;
+            } else if (distance <= edge + 1.5 && isStone(state) && level.getRandom().nextFloat() < 0.45F && canBreak(player, level, pos, state)) {
+                boolean pool = pos.getY() < center.getY() && level.getRandom().nextFloat() < 0.15F;
                 level.setBlock(pos, pool ? Blocks.LAVA.defaultBlockState() : Blocks.MAGMA_BLOCK.defaultBlockState(), 3);
             }
         }

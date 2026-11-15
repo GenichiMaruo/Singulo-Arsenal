@@ -7,12 +7,8 @@
     "N N"
   ],
   "key": {
-    "G": {
-      "item": "singulo_arsenal:pressure_lattice"
-    },
-    "N": {
-      "item": "singulo:nihonium_plate"
-    }
+    "G": "singulo_arsenal:pressure_lattice",
+    "N": "singulo:nihonium_plate"
   },
   "result": {
     "id": "singulo_arsenal:degeneracy_leggings",

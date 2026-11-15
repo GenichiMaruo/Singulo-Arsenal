@@ -6,6 +6,8 @@ import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
@@ -21,7 +23,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.neoforged.neoforge.energy.EnergyStorage;
+import net.neoforged.neoforge.transfer.energy.SimpleEnergyHandler;
 import net.neoforged.neoforge.items.ItemStackHandler;
 
 /**
@@ -36,10 +38,19 @@ public final class IntegratorBlockEntity extends BlockEntity implements MenuProv
         @Override
         protected void onContentsChanged(int slot) {
             setChanged();
-            if (level != null && !level.isClientSide) {
+            if (level != null && !level.isClientSide()) {
                 if (slot == GEAR) gearChanged();
                 level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
             }
+        }
+
+        @Override
+        public void deserialize(ValueInput input) {
+            // Historical saves have fewer sockets. Ignore their Size, but retain every valid slot.
+            setSize(SLOTS);
+            input.listOrEmpty("Items", net.minecraft.world.ItemStackWithSlot.CODEC).forEach(slot -> {
+                if (slot.isValidInContainer(SLOTS)) stacks.set(slot.slot(), slot.stack());
+            });
         }
 
         @Override
@@ -52,18 +63,13 @@ public final class IntegratorBlockEntity extends BlockEntity implements MenuProv
     private boolean working;
     private ItemStack seen = ItemStack.EMPTY;
 
-    private final class Energy extends EnergyStorage {
+    private final class Energy extends SimpleEnergyHandler {
         Energy() {
             super(Rules.INTEGRATOR_CAPACITY, Rules.INTEGRATOR_CAPACITY, 0);
         }
 
         @Override
-        public int receiveEnergy(int amount, boolean simulate) {
-            int received = super.receiveEnergy(amount, simulate);
-            if (!simulate && received > 0) setChanged();
-            return received;
-        }
-
+        protected void onEnergyChanged(int previous) { setChanged(); }
         boolean take(int amount) {
             if (energy < amount) return false;
             energy -= amount;
@@ -76,7 +82,7 @@ public final class IntegratorBlockEntity extends BlockEntity implements MenuProv
     }
 
     public ItemStackHandler items() { return items; }
-    public EnergyStorage energy() { return energy; }
+    public SimpleEnergyHandler energy() { return energy; }
     public boolean working() { return working; }
     public float progress(float partial) { return Math.min(1, (progress + (working ? partial : 0)) / (float) Rules.INTEGRATE_TICKS); }
 
@@ -85,8 +91,8 @@ public final class IntegratorBlockEntity extends BlockEntity implements MenuProv
             return switch (index) {
                 case DATA_PROGRESS -> progress * 100 / Rules.INTEGRATE_TICKS;
                 // Container data travels as shorts.
-                case DATA_ENERGY_LOW -> energy.getEnergyStored() & 0xFFFF;
-                case DATA_ENERGY_HIGH -> energy.getEnergyStored() >>> 16;
+                case DATA_ENERGY_LOW -> energy.getAmountAsInt() & 0xFFFF;
+                case DATA_ENERGY_HIGH -> energy.getAmountAsInt() >>> 16;
                 default -> working ? 1 : 0;
             };
         }
@@ -144,7 +150,7 @@ public final class IntegratorBlockEntity extends BlockEntity implements MenuProv
     }
 
     public static void tick(Level level, BlockPos pos, BlockState state, IntegratorBlockEntity entity) {
-        if (level.isClientSide) {
+        if (level.isClientSide()) {
             if (entity.working && entity.progress < Rules.INTEGRATE_TICKS) entity.progress++;
             return;
         }
@@ -187,27 +193,23 @@ public final class IntegratorBlockEntity extends BlockEntity implements MenuProv
     }
 
     @Override
-    protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
-        super.saveAdditional(tag, registries);
-        tag.put("items", items.serializeNBT(registries));
-        tag.put("energy", energy.serializeNBT(registries));
-        tag.putInt("progress", progress);
-        tag.putBoolean("working", working);
+    protected void saveAdditional(ValueOutput output) {
+        super.saveAdditional(output);
+        items.serialize(output.child("items"));
+        output.putInt("energy", energy.getAmountAsInt());
+        output.putInt("progress", progress);
+        output.putBoolean("working", working);
     }
 
     @Override
-    protected void loadAdditional(CompoundTag tag, HolderLookup.Provider registries) {
-        super.loadAdditional(tag, registries);
-        // Machines saved when there were fewer sockets must not shrink the inventory.
-        CompoundTag saved = tag.getCompound("items").copy();
-        saved.putInt("Size", SLOTS);
-        items.deserializeNBT(registries, saved);
-        if (tag.contains("energy")) energy.deserializeNBT(registries, tag.get("energy"));
-        progress = tag.getInt("progress");
-        working = tag.getBoolean("working");
+    protected void loadAdditional(ValueInput input) {
+        super.loadAdditional(input);
+        items.deserialize(input.childOrEmpty("items"));
+        energy.set(input.getIntOr("energy", 0));
+        progress = input.getIntOr("progress", 0);
+        working = input.getBooleanOr("working", false);
         seen = items.getStackInSlot(GEAR).copy();
     }
-
     @Override public CompoundTag getUpdateTag(HolderLookup.Provider registries) { return saveWithoutMetadata(registries); }
     @Override public Packet<ClientGamePacketListener> getUpdatePacket() { return ClientboundBlockEntityDataPacket.create(this); }
 
@@ -216,5 +218,14 @@ public final class IntegratorBlockEntity extends BlockEntity implements MenuProv
     @Override
     public AbstractContainerMenu createMenu(int id, Inventory inventory, Player player) {
         return new IntegratorMenu(id, inventory, this);
+    }
+    @Override
+    public void preRemoveSideEffects(BlockPos pos, BlockState state) {
+        super.preRemoveSideEffects(pos, state);
+        if (level != null && !level.isClientSide()) {
+            for (int i = 0; i < items.getSlots(); i++) {
+                net.minecraft.world.Containers.dropItemStack(level, pos.getX(), pos.getY(), pos.getZ(), items.getStackInSlot(i));
+            }
+        }
     }
 }

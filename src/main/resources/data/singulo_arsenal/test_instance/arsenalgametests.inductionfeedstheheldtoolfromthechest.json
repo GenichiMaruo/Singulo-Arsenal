@@ -1,0 +1,7 @@
+{
+  "type": "minecraft:function",
+  "structure": "singulo_arsenal:empty",
+  "function": "singulo_arsenal:arsenalgametests.inductionfeedstheheldtoolfromthechest",
+  "max_ticks": 100,
+  "environment": "minecraft:default"
+}

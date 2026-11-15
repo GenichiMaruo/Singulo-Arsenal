@@ -4,11 +4,12 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import io.github.genichimaruo.singuloarsenal.SinguloArsenal;
 import java.util.function.Consumer;
-import net.minecraft.client.renderer.LightTexture;
+import net.minecraft.util.LightCoordsUtil;
 import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.rendertype.RenderType;
+import net.minecraft.client.renderer.rendertype.RenderTypes;
 import net.minecraft.client.renderer.texture.OverlayTexture;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
@@ -21,14 +22,14 @@ import org.joml.Vector3f;
  * in its own pass. That keeps art readable and never interleaves render types, which would invalidate the shared buffer.
  */
 public final class Canvas {
-    public static final ResourceLocation WHITE = SinguloArsenal.id("textures/misc/white.png");
-    private static final RenderType SOLID = RenderType.entityCutoutNoCull(WHITE);
-    private static final RenderType LIT = RenderType.entityTranslucentEmissive(WHITE);
+    public static final Identifier WHITE = SinguloArsenal.id("textures/misc/white.png");
+    private static final RenderType SOLID = RenderTypes.entityCutout(WHITE);
+    private static final RenderType LIT = RenderTypes.entityTranslucentEmissive(WHITE);
     private static final int SOLID_PASS = 0, LIT_PASS = 1, GLOW_PASS = 2;
     /** Width of the tiling material PNGs, in texels. One texel covers one model pixel. */
     private static final int MATERIAL_SIZE = 32;
     private static final int FINE_SIZE = 64;
-    private static final ResourceLocation FINE = SinguloArsenal.id("textures/misc/material_fine.png");
+    private static final Identifier FINE = SinguloArsenal.id("textures/misc/material_fine.png");
 
     public final PoseStack pose;
     /** Game time in ticks, for animation. */
@@ -71,13 +72,13 @@ public final class Canvas {
     }
 
     /** Suits: one texel per model pixel and a one-pixel bevel. All plate edges must lie on the model's pixel grid. */
-    public static void drawMaterial(PoseStack pose, MultiBufferSource buffers, float t, int light, int overlay, ResourceLocation material, boolean billboard, Consumer<Canvas> art) {
-        run(new Canvas(pose, t, light, overlay, true, 1, 1, MATERIAL_SIZE, false, billboard), buffers, RenderType.entityCutoutNoCull(material), art);
+    public static void drawMaterial(PoseStack pose, MultiBufferSource buffers, float t, int light, int overlay, Identifier material, boolean billboard, Consumer<Canvas> art) {
+        run(new Canvas(pose, t, light, overlay, true, 1, 1, MATERIAL_SIZE, false, billboard), buffers, RenderTypes.entityCutout(material), art);
     }
 
     /** Weapons: two texels per model pixel, a half-pixel bevel and a vertical gradient, because weapons are seen up close. */
     public static void drawFine(PoseStack pose, MultiBufferSource buffers, float t, int light, int overlay, boolean billboard, Consumer<Canvas> art) {
-        run(new Canvas(pose, t, light, overlay, true, 0.5F, 2, FINE_SIZE, true, billboard), buffers, RenderType.entityCutoutNoCull(FINE), art);
+        run(new Canvas(pose, t, light, overlay, true, 0.5F, 2, FINE_SIZE, true, billboard), buffers, RenderTypes.entityCutout(FINE), art);
     }
 
     private static void run(Canvas canvas, MultiBufferSource buffers, RenderType solid, Consumer<Canvas> art) {
@@ -199,7 +200,7 @@ public final class Canvas {
 
     /** A self-lit strip: same geometry as a plate, ignoring world light. */
     public void lit(double x0, double y0, double z0, double x1, double y1, double z1, int rgb) {
-        if (pass == LIT_PASS) cuboid(x0, y0, z0, x1, y1, z1, rgb, LightTexture.FULL_BRIGHT);
+        if (pass == LIT_PASS) cuboid(x0, y0, z0, x1, y1, z1, rgb, LightCoordsUtil.FULL_BRIGHT);
     }
 
     private void cuboid(double ax, double ay, double az, double bx, double by, double bz, int rgb, int lightmap) {
@@ -252,12 +253,12 @@ public final class Canvas {
     public void glass(double x0, double y0, double z0, double x1, double y1, double z1, int rgb, float alpha) {
         if (pass != LIT_PASS) return;
         vertexAlpha = Math.round(alpha * 255);
-        cuboid(x0, y0, z0, x1, y1, z1, rgb, LightTexture.FULL_BRIGHT);
+        cuboid(x0, y0, z0, x1, y1, z1, rgb, LightCoordsUtil.FULL_BRIGHT);
         vertexAlpha = 255;
     }
 
     public void litHoop(double cx, double cy, double cz, int axis, double radius, double half, int rgb) {
-        if (pass == LIT_PASS) torus(cx, cy, cz, axis, radius, half, rgb, LightTexture.FULL_BRIGHT);
+        if (pass == LIT_PASS) torus(cx, cy, cz, axis, radius, half, rgb, LightCoordsUtil.FULL_BRIGHT);
     }
 
     private void torus(double cx, double cy, double cz, int axis, double radius, double half, int rgb, int lightmap) {

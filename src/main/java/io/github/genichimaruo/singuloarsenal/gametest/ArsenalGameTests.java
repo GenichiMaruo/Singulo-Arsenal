@@ -16,35 +16,44 @@ import io.github.genichimaruo.singuloarsenal.weapon.TidalReaverItem;
 import io.github.genichimaruo.singuloarsenal.weapon.Weapons;
 import java.util.List;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraft.world.entity.monster.Zombie;
-import net.minecraft.world.entity.projectile.Arrow;
-import net.minecraft.world.item.ArmorItem;
+import net.minecraft.world.entity.monster.zombie.Zombie;
+import net.minecraft.world.entity.projectile.arrow.Arrow;
+import net.minecraft.world.item.equipment.ArmorType;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.capabilities.Capabilities;
-import net.neoforged.neoforge.gametest.GameTestHolder;
-import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /** Integration tests that run with the real Singulo JAR. Excluded from the distributed JAR. */
-@GameTestHolder(SinguloArsenal.MOD_ID)
-@PrefixGameTestTemplate(false)
 public final class ArsenalGameTests {
     private static final String ARENA = "empty";
     private static final EquipmentSlot[] ARMOR_SLOTS = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET};
-    private static final List<ArmorItem.Type> TYPES = ArsenalItems.PIECES;
+    private static final List<ArmorType> TYPES = ArsenalItems.PIECES;
 
     private ArsenalGameTests() {}
+    private static int charge(net.neoforged.neoforge.transfer.energy.EnergyHandler handler, int amount, boolean simulate) {
+        try (var transaction = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            int accepted = handler.insert(amount, transaction);
+            if (!simulate) transaction.commit();
+            return accepted;
+        }
+    }
+    private static int extract(net.neoforged.neoforge.transfer.energy.EnergyHandler handler, int amount) {
+        try (var transaction = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            int extracted = handler.extract(amount, transaction);
+            transaction.commit();
+            return extracted;
+        }
+    }
 
-    private static ItemStack charged(ArmorSet set, ArmorItem.Type type) {
+    private static ItemStack charged(ArmorSet set, ArmorType type) {
         ItemStack stack = new ItemStack(ArsenalItems.SUITS.get(set).get(type).get());
         Fe.set(stack, Fe.capacity(stack));
         return stack;
@@ -55,21 +64,15 @@ public final class ArsenalGameTests {
         player.setGameMode(GameType.SURVIVAL);
         Vec3 at = h.absoluteVec(new Vec3(x, 1, z));
         h.assertTrue(h.getBounds().contains(at), "player must stay inside the loaded test structure");
-        player.moveTo(at.x, at.y, at.z, 0, 0);
+        player.snapTo(at.x, at.y, at.z, 0, 0);
         player.setHealth(player.getMaxHealth());
         clearSpawnProtection(player);
         return player;
     }
 
-    /** Freshly placed players get vanilla's three seconds of immunity, which would swallow every damage assertion. */
+    /** MC26 keeps players immune until the login/load handshake completes; mock clients must acknowledge it. */
     private static void clearSpawnProtection(ServerPlayer player) {
-        try {
-            var field = ServerPlayer.class.getDeclaredField("spawnInvulnerableTime");
-            field.setAccessible(true);
-            field.setInt(player, 0);
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException(e);
-        }
+        player.connection.markClientLoaded();
     }
 
     private static void dress(ServerPlayer player, ArmorSet set) {
@@ -77,10 +80,10 @@ public final class ArsenalGameTests {
     }
 
     private static Zombie target(GameTestHelper h, double x, double z) {
-        Zombie mob = EntityType.ZOMBIE.create(h.getLevel());
+        Zombie mob = EntityType.ZOMBIE.create(h.getLevel(), net.minecraft.world.entity.EntitySpawnReason.LOAD);
         Vec3 at = h.absoluteVec(new Vec3(x, 1, z));
         h.assertTrue(h.getBounds().contains(at), "target must stay inside the loaded test structure");
-        mob.moveTo(at.x, at.y, at.z, 0, 0);
+        mob.snapTo(at.x, at.y, at.z, 0, 0);
         mob.setNoAi(true);
         mob.setNoGravity(true);
         mob.getAttribute(Attributes.MAX_HEALTH).setBaseValue(100);
@@ -102,55 +105,54 @@ public final class ArsenalGameTests {
 
     // ---- Energy and data ---------------------------------------------------------------------------------------
 
-    @GameTest(template = ARENA)
     public static void gearOnlyAcceptsEnergy(GameTestHelper h) {
-        ItemStack chest = new ItemStack(ArsenalItems.SUITS.get(ArmorSet.COLLAPSAR).get(ArmorItem.Type.CHESTPLATE).get());
-        var energy = chest.getCapability(Capabilities.EnergyStorage.ITEM);
+        ItemStack chest = new ItemStack(ArsenalItems.SUITS.get(ArmorSet.COLLAPSAR).get(ArmorType.CHESTPLATE).get());
+        var energy = chest.getCapability(Capabilities.Energy.ITEM, net.neoforged.neoforge.transfer.access.ItemAccess.forStack(chest));
         h.assertTrue(energy != null, "FE capability missing");
-        h.assertTrue(energy.receiveEnergy(500, true) == 500 && energy.getEnergyStored() == 0, "simulation changed energy");
-        h.assertTrue(energy.receiveEnergy(Integer.MAX_VALUE, false) == Rules.COLLAPSAR_CAPACITY, "overfill");
-        h.assertTrue(!energy.canExtract() && energy.extractEnergy(1000, false) == 0, "gear must not work as a battery for machines");
+        h.assertTrue(charge(energy, 500, true) == 500 && energy.getAmountAsInt() == 0, "simulation changed energy");
+        h.assertTrue(charge(energy, Integer.MAX_VALUE, false) == Rules.COLLAPSAR_CAPACITY, "overfill");
+        h.assertTrue(extract(energy, 1000) == 0, "gear must not work as a battery for machines");
         h.succeed();
     }
 
     /** Exercises the real 0.18 SMES charging slots without a production dependency on its classes. */
-    @GameTest(template = ARENA)
+
     public static void singuloSmesChargesArsenalAndPreservesModules(GameTestHelper h) {
         try {
             var at = new net.minecraft.core.BlockPos(2, 1, 2);
-            var block = BuiltInRegistries.BLOCK.get(ResourceLocation.fromNamespaceAndPath("singulo", "smes_cell"));
+            var block = BuiltInRegistries.BLOCK.getValue(Identifier.fromNamespaceAndPath("singulo", "smes_cell"));
             h.assertTrue(block != Blocks.AIR, "Singulo SMES missing");
             h.setBlock(at, block);
             var be = h.getLevel().getBlockEntity(h.absolutePos(at));
             Class<?> smes = Class.forName("io.github.genichimaruo.singulo.machine.SmesCellBlockEntity");
             h.assertTrue(smes.isInstance(be), "Unexpected SMES block entity");
-            var energy = (net.neoforged.neoforge.energy.IEnergyStorage) smes.getMethod("energy").invoke(be);
+            var energy = (net.neoforged.neoforge.transfer.energy.EnergyHandler) smes.getMethod("energy").invoke(be);
             var slots = (net.neoforged.neoforge.items.IItemHandlerModifiable) smes.getMethod("chargeSlots").invoke(be);
             var tick = smes.getMethod("serverTick", net.minecraft.world.level.Level.class,
                     net.minecraft.core.BlockPos.class, net.minecraft.world.level.block.state.BlockState.class, smes);
 
-            ItemStack gear = charged(ArmorSet.COLLAPSAR, ArmorItem.Type.CHESTPLATE);
+            ItemStack gear = charged(ArmorSet.COLLAPSAR, ArmorType.CHESTPLATE);
             Modules.install(gear, List.of(module(ModuleType.CAPACITOR)));
             int capacity = Fe.capacity(gear);
             Fe.set(gear, 0);
             h.assertTrue(slots.isItemValid(0, gear) && slots.insertItem(0, gear, false).isEmpty(),
                     "Arsenal gear rejected by SMES charge input");
-            h.assertTrue(energy.receiveEnergy(5_000, false) == 5_000, "SMES fixture could not receive energy");
+            h.assertTrue(charge(energy, 5_000, false) == 5_000, "SMES fixture could not receive energy");
             tick.invoke(null, h.getLevel(), be.getBlockPos(), be.getBlockState(), be);
-            h.assertTrue(Fe.stored(slots.getStackInSlot(0)) == 5_000 && energy.getEnergyStored() == 0,
+            h.assertTrue(Fe.stored(slots.getStackInSlot(0)) == 5_000 && energy.getAmountAsInt() == 0,
                     "SMES must transfer exactly the available FE to Arsenal gear");
             h.assertTrue(slots.getStackInSlot(1).isEmpty(), "Partially charged gear moved to output");
 
             Fe.set(slots.getStackInSlot(0), capacity - 700);
-            h.assertTrue(energy.receiveEnergy(5_000, false) == 5_000, "SMES fixture could not refill");
+            h.assertTrue(charge(energy, 5_000, false) == 5_000, "SMES fixture could not refill");
             tick.invoke(null, h.getLevel(), be.getBlockPos(), be.getBlockState(), be);
-            h.assertTrue(Fe.stored(slots.getStackInSlot(0)) == capacity && energy.getEnergyStored() == 4_300,
+            h.assertTrue(Fe.stored(slots.getStackInSlot(0)) == capacity && energy.getAmountAsInt() == 4_300,
                     "SMES must pay only the FE accepted before the capacity limit");
             ItemStack blocker = new ItemStack(net.minecraft.world.item.Items.STONE);
             slots.setStackInSlot(1, blocker);
             tick.invoke(null, h.getLevel(), be.getBlockPos(), be.getBlockState(), be);
             h.assertTrue(!slots.getStackInSlot(0).isEmpty() && slots.getStackInSlot(1) == blocker
-                    && energy.getEnergyStored() == 4_300, "Blocked output must not lose gear or consume energy");
+                    && energy.getAmountAsInt() == 4_300, "Blocked output must not lose gear or consume energy");
 
             slots.setStackInSlot(1, ItemStack.EMPTY);
             tick.invoke(null, h.getLevel(), be.getBlockPos(), be.getBlockState(), be);
@@ -159,35 +161,34 @@ public final class ArsenalGameTests {
             h.assertTrue(Fe.stored(out) == capacity && Fe.capacity(out) == capacity, "Output charge or capacity changed");
             h.assertTrue(Modules.installed(out).size() == 1 && Modules.count(out, ModuleType.CAPACITOR) == 1,
                     "SMES charging lost the installed capacitor module");
-            h.assertTrue(energy.getEnergyStored() == 4_300, "Output transfer consumed more energy");
+            h.assertTrue(energy.getAmountAsInt() == 4_300, "Output transfer consumed more energy");
             h.succeed();
         } catch (ReflectiveOperationException e) {
             throw new IllegalStateException("Singulo 0.18 charging API unavailable", e);
         }
     }
 
-    @GameTest(template = ARENA)
     public static void stateSurvivesSaveAndLoad(GameTestHelper h) {
-        ItemStack chest = charged(ArmorSet.COLLAPSAR, ArmorItem.Type.CHESTPLATE);
+        ItemStack chest = charged(ArmorSet.COLLAPSAR, ArmorType.CHESTPLATE);
         chest.set(ArsenalData.LOAD.get(), 42);
         chest.set(ArsenalData.HORIZON_READY.get(), 98_765L);
-        var restored = ItemStack.parse(h.getLevel().registryAccess(), chest.save(h.getLevel().registryAccess())).orElseThrow();
+        var ops = h.getLevel().registryAccess().createSerializationContext(net.minecraft.nbt.NbtOps.INSTANCE);
+        var restored = ItemStack.CODEC.parse(ops, ItemStack.CODEC.encodeStart(ops, chest).getOrThrow()).getOrThrow();
         h.assertTrue(Fe.stored(restored) == Rules.COLLAPSAR_CAPACITY && ArsenalData.get(restored, ArsenalData.LOAD) == 42
                 && ArsenalData.time(restored, ArsenalData.HORIZON_READY) == 98_765L, "state lost on save/load");
         h.succeed();
     }
 
-    @GameTest(template = ARENA)
     public static void accretionConsumesPelletsOnlyWhenTheyFit(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 2.5);
-        ItemStack chest = new ItemStack(ArsenalItems.SUITS.get(ArmorSet.COLLAPSAR).get(ArmorItem.Type.CHESTPLATE).get());
+        ItemStack chest = new ItemStack(ArsenalItems.SUITS.get(ArmorSet.COLLAPSAR).get(ArmorType.CHESTPLATE).get());
         p.setItemSlot(EquipmentSlot.CHEST, chest);
         ItemStack pellets = new ItemStack(Fe.MASS_PELLET.get(), 3);
         p.getInventory().add(pellets);
         h.assertTrue(Fe.accrete(p, chest) && Fe.stored(chest) == Rules.PELLET_FE && p.getInventory().countItem(Fe.MASS_PELLET.get()) == 2, "accretion");
         Fe.set(chest, Rules.COLLAPSAR_CAPACITY);
         h.assertTrue(!Fe.accrete(p, chest) && p.getInventory().countItem(Fe.MASS_PELLET.get()) == 2, "pellet burned with no room");
-        ItemStack meissner = charged(ArmorSet.MEISSNER, ArmorItem.Type.CHESTPLATE);
+        ItemStack meissner = charged(ArmorSet.MEISSNER, ArmorType.CHESTPLATE);
         Fe.set(meissner, 0);
         h.assertTrue(!Fe.accrete(p, meissner), "only collapsar-class gear accretes");
         h.succeed();
@@ -195,14 +196,13 @@ public final class ArsenalGameTests {
 
     // ---- Meissner --------------------------------------------------------------------------------------------------
 
-    @GameTest(template = ARENA)
     public static void meissnerExpelsProjectiles(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 2.5);
-        ItemStack chest = charged(ArmorSet.MEISSNER, ArmorItem.Type.CHESTPLATE);
+        ItemStack chest = charged(ArmorSet.MEISSNER, ArmorType.CHESTPLATE);
         p.setItemSlot(EquipmentSlot.CHEST, chest);
         Arrow arrow = new Arrow(EntityType.ARROW, h.getLevel());
         Vec3 from = p.getBoundingBox().getCenter().add(0, 0, -2);
-        arrow.moveTo(from.x, from.y, from.z);
+        arrow.snapTo(from.x, from.y, from.z);
         arrow.setDeltaMovement(0, 0, 1.2);
         h.getLevel().addFreshEntity(arrow);
         // Far-away GameTest chunks do not step arrows, so post the exact event vanilla's arrow tick posts on impact.
@@ -214,7 +214,6 @@ public final class ArsenalGameTests {
         h.succeed();
     }
 
-    @GameTest(template = ARENA)
     public static void persistentCurrentBalancesWithoutLoss(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 2.5);
         dress(p, ArmorSet.MEISSNER);
@@ -237,7 +236,6 @@ public final class ArsenalGameTests {
 
     // ---- Degeneracy ------------------------------------------------------------------------------------------------
 
-    @GameTest(template = ARENA)
     public static void chandrasekharLimitCapsAHitAndCharges(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 2.5);
         dress(p, ArmorSet.DEGENERACY);
@@ -251,7 +249,6 @@ public final class ArsenalGameTests {
         h.succeed();
     }
 
-    @GameTest(template = ARENA)
     public static void collapseAtTheLimitLocksTheSuit(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 2.5);
         dress(p, ArmorSet.DEGENERACY);
@@ -268,7 +265,6 @@ public final class ArsenalGameTests {
         h.succeed();
     }
 
-    @GameTest(template = ARENA)
     public static void ventRequiresMinimumPressure(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 2.5);
         dress(p, ArmorSet.DEGENERACY);
@@ -285,7 +281,6 @@ public final class ArsenalGameTests {
 
     // ---- Collapsar ---------------------------------------------------------------------------------------------------
 
-    @GameTest(template = ARENA)
     public static void pastaPhaseDrivesAttributes(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 2.5);
         dress(p, ArmorSet.COLLAPSAR);
@@ -310,7 +305,6 @@ public final class ArsenalGameTests {
         h.succeed();
     }
 
-    @GameTest(template = ARENA)
     public static void eventHorizonCatchesLethalHitOnce(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 2.5);
         dress(p, ArmorSet.COLLAPSAR);
@@ -334,7 +328,6 @@ public final class ArsenalGameTests {
         h.succeed();
     }
 
-    @GameTest(template = ARENA)
     public static void collapsarSuitPaysForDamageInEnergy(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 2.5);
         dress(p, ArmorSet.COLLAPSAR);
@@ -350,11 +343,10 @@ public final class ArsenalGameTests {
         h.succeed();
     }
 
-    @GameTest(template = ARENA)
     public static void metricDriveFliesOnEnergyAlone(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 2.5);
         var flight = p.getAttribute(net.neoforged.neoforge.common.NeoForgeMod.CREATIVE_FLIGHT);
-        ItemStack chest = charged(ArmorSet.MEISSNER, ArmorItem.Type.CHESTPLATE);
+        ItemStack chest = charged(ArmorSet.MEISSNER, ArmorType.CHESTPLATE);
         Modules.install(chest, List.of(module(ModuleType.METRIC_DRIVE)));
         Fe.set(chest, Rules.METRIC_FE_PER_10_TICKS * 2);
         p.setItemSlot(EquipmentSlot.CHEST, chest);
@@ -371,7 +363,6 @@ public final class ArsenalGameTests {
         h.succeed();
     }
 
-    @GameTest(template = ARENA)
     public static void jetBurstRequiresBootsAndBurnsBehind(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 4.5);
         dress(p, ArmorSet.COLLAPSAR);
@@ -392,16 +383,15 @@ public final class ArsenalGameTests {
         h.succeed();
     }
 
-    @GameTest(template = ARENA)
     public static void noHairClearsHarmfulEffects(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 2.5);
         dress(p, ArmorSet.COLLAPSAR);
         ItemStack helmet = p.getItemBySlot(EquipmentSlot.HEAD);
         p.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.POISON, 200));
-        p.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.DAMAGE_BOOST, 200));
+        p.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.STRENGTH, 200));
         SuitEvents.upkeep(p);
         h.assertTrue(!p.hasEffect(net.minecraft.world.effect.MobEffects.POISON), "poison survived");
-        h.assertTrue(p.hasEffect(net.minecraft.world.effect.MobEffects.DAMAGE_BOOST), "beneficial effect removed");
+        h.assertTrue(p.hasEffect(net.minecraft.world.effect.MobEffects.STRENGTH), "beneficial effect removed");
         h.assertTrue(Fe.stored(helmet) == Rules.COLLAPSAR_CAPACITY - Rules.CLEANSE_FE, "cleanse cost");
         h.succeed();
     }
@@ -414,7 +404,6 @@ public final class ArsenalGameTests {
         return p.getMainHandItem();
     }
 
-    @GameTest(template = ARENA)
     public static void quenchOnFifthHit(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 2.5);
         ItemStack saber = hold(p, new ItemStack(ArsenalItems.QUENCH_SABER.get()));
@@ -426,11 +415,10 @@ public final class ArsenalGameTests {
         h.assertTrue(second.getHealth() < 100, "quench missed bystander");
         h.assertTrue(ArsenalData.get(saber, ArsenalData.CURRENT) == 0, "current not reset");
         h.assertTrue(Fe.stored(saber) == Rules.QUENCH_CAPACITY - Rules.QUENCH_FE, "quench cost");
-        h.assertTrue(p.getCooldowns().isOnCooldown(saber.getItem()), "no cooldown");
+        h.assertTrue(p.getCooldowns().isOnCooldown(saber), "no cooldown");
         h.succeed();
     }
 
-    @GameTest(template = ARENA)
     public static void casimirIgnoresArmorWhenArmed(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 2.5);
         ItemStack blade = hold(p, new ItemStack(ArsenalItems.CASIMIR_BLADE.get()));
@@ -453,7 +441,6 @@ public final class ArsenalGameTests {
         h.succeed();
     }
 
-    @GameTest(template = ARENA)
     public static void tidalStressStacksAndShears(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 2.5);
         ItemStack reaver = hold(p, new ItemStack(ArsenalItems.TIDAL_REAVER.get()));
@@ -476,7 +463,6 @@ public final class ArsenalGameTests {
         h.succeed();
     }
 
-    @GameTest(template = ARENA)
     public static void cannonFiresForwardOnlyAndStopsAtWalls(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 2.5);
         hold(p, new ItemStack(ArsenalItems.JET_CANNON.get()));
@@ -497,7 +483,6 @@ public final class ArsenalGameTests {
         h.succeed();
     }
 
-    @GameTest(template = ARENA)
     public static void cannonHitsTargetsContainingTheRayOrigin(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 2.5);
         hold(p, new ItemStack(ArsenalItems.JET_CANNON.get()));
@@ -508,7 +493,6 @@ public final class ArsenalGameTests {
         h.succeed();
     }
 
-    @GameTest(template = ARENA)
     public static void cannonNeverHurtsTheWielder(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 4.5);
         hold(p, new ItemStack(ArsenalItems.JET_CANNON.get()));
@@ -532,7 +516,6 @@ public final class ArsenalGameTests {
         JetCannonItem.tickShot(cannon, p, h.getLevel());
     }
 
-    @GameTest(template = ARENA)
     public static void cannonFiresAMagazineThenReloads(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 2.5);
         ItemStack cannon = hold(p, new ItemStack(ArsenalItems.JET_CANNON.get()));
@@ -557,21 +540,19 @@ public final class ArsenalGameTests {
         h.succeed();
     }
 
-    @GameTest(template = ARENA)
     public static void switchingAwayCannotSkipAnEmptyMagazinesReload(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 2.5);
         ItemStack cannon = hold(p, new ItemStack(ArsenalItems.JET_CANNON.get()));
         cannon.set(ArsenalData.SHOTS.get(), Rules.CANNON_MAGAZINE - 1);
         ignite(h, p, cannon);
         p.setItemSlot(EquipmentSlot.MAINHAND, ItemStack.EMPTY);
-        cannon.getItem().inventoryTick(cannon, h.getLevel(), p, 1, false);
+        cannon.getItem().inventoryTick(cannon, h.getLevel(), p, null);
         p.setItemSlot(EquipmentSlot.MAINHAND, cannon);
         h.assertTrue(!JetCannonItem.tryFire(p), "switching away allowed a fifth shot without reloading");
         h.assertTrue(Weapons.reloadProgress(cannon, h.getLevel().getGameTime(), 0) >= 0, "putting an empty cannon away must start its reload");
         h.succeed();
     }
 
-    @GameTest(template = ARENA)
     public static void expiredShotsStillReloadAnEmptyMagazine(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 2.5);
         ItemStack cannon = hold(p, new ItemStack(ArsenalItems.JET_CANNON.get()));
@@ -583,7 +564,6 @@ public final class ArsenalGameTests {
         h.succeed();
     }
 
-    @GameTest(template = ARENA)
     public static void onlyTheFirstInstantOfAShotDrillsTerrain(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 0.5);
         ItemStack cannon = hold(p, new ItemStack(ArsenalItems.JET_CANNON.get()));
@@ -609,7 +589,6 @@ public final class ArsenalGameTests {
         h.succeed();
     }
 
-    @GameTest(template = ARENA)
     public static void reaverFocusIsCarriedOnTheStack(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 2.5);
         ItemStack reaver = hold(p, new ItemStack(ArsenalItems.TIDAL_REAVER.get()));
@@ -618,13 +597,14 @@ public final class ArsenalGameTests {
         reaver.getItem().use(h.getLevel(), p, net.minecraft.world.InteractionHand.MAIN_HAND);
         h.assertTrue(TidalReaverItem.focusProgress(reaver, now, 0) == 0, "other clients need the focus on the stack");
         p.stopUsingItem();
-        reaver.getItem().inventoryTick(reaver, h.getLevel(), p, 0, true);
+        reaver.getItem().inventoryTick(reaver, h.getLevel(), p, EquipmentSlot.MAINHAND);
         h.assertTrue(TidalReaverItem.focusProgress(reaver, now, 0) < 0, "focus stayed open after the hold ended");
         h.succeed();
     }
 
     /** In a batch of its own: its line of fire is longer than the gap to the next test's structure, and machines stop the drill. */
-    @GameTest(template = ARENA, batch = "drilling_alone")
+
+    // Dedicated 32-block-deep structure keeps this 24-block ray away from neighboring test barriers.
     public static void drillingGivesOutAtItsDepth(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 0.5);
         ItemStack cannon = hold(p, new ItemStack(ArsenalItems.JET_CANNON.get()));
@@ -642,12 +622,12 @@ public final class ArsenalGameTests {
         h.setBlock(first.south(3), Blocks.AIR);
         // GameTests only keep their own structure's chunks loaded, and the drill stops at unloaded ground.
         var level = h.getLevel();
-        net.minecraft.world.level.ChunkPos start = new net.minecraft.world.level.ChunkPos(h.absolutePos(first)), stop = new net.minecraft.world.level.ChunkPos(h.absolutePos(beyond));
-        int low = Math.min(start.z, stop.z), high = Math.max(start.z, stop.z);
-        for (int z = low; z <= high; z++) for (int x = start.x - 1; x <= start.x + 1; x++) level.setChunkForced(x, z, true);
+        net.minecraft.world.level.ChunkPos start = net.minecraft.world.level.ChunkPos.containing(h.absolutePos(first)), stop = net.minecraft.world.level.ChunkPos.containing(h.absolutePos(beyond));
+        int low = Math.min(start.z(), stop.z()), high = Math.max(start.z(), stop.z());
+        for (int z = low; z <= high; z++) for (int x = start.x() - 1; x <= start.x() + 1; x++) level.setChunkForced(x, z, true);
         h.runAfterDelay(10, () -> {
             ignite(h, p, cannon);
-            for (int z = low; z <= high; z++) for (int x = start.x - 1; x <= start.x + 1; x++) level.setChunkForced(x, z, false);
+            for (int z = low; z <= high; z++) for (int x = start.x() - 1; x <= start.x() + 1; x++) level.setChunkForced(x, z, false);
             h.assertBlockPresent(Blocks.AIR, first);
             h.assertBlockPresent(Blocks.AIR, inside);
             h.assertBlockPresent(Blocks.STONE, beyond);
@@ -655,7 +635,6 @@ public final class ArsenalGameTests {
         });
     }
 
-    @GameTest(template = ARENA)
     public static void meltdownGoesOffTheInstantTheShotLands(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 1.5);
         ItemStack cannon = hold(p, new ItemStack(ArsenalItems.JET_CANNON.get()));
@@ -672,9 +651,8 @@ public final class ArsenalGameTests {
         h.succeed();
     }
 
-    @GameTest(template = ARENA)
     public static void platingMergesIntoTheArmorValue(GameTestHelper h) {
-        ItemStack chest = charged(ArmorSet.COLLAPSAR, ArmorItem.Type.CHESTPLATE);
+        ItemStack chest = charged(ArmorSet.COLLAPSAR, ArmorType.CHESTPLATE);
         Modules.install(chest, List.of(module(ModuleType.PLATING), module(ModuleType.PLATING)));
         int armorLines = 0, toughnessLines = 0;
         double armor = 0, toughness = 0;
@@ -695,8 +673,8 @@ public final class ArsenalGameTests {
 
     private static IntegratorBlockEntity integrator(GameTestHelper h) {
         h.setBlock(2, 2, 2, ModuleContent.INTEGRATOR.get());
-        IntegratorBlockEntity entity = h.getBlockEntity(new net.minecraft.core.BlockPos(2, 2, 2));
-        entity.energy().receiveEnergy(Rules.INTEGRATOR_CAPACITY, false);
+        IntegratorBlockEntity entity = h.getBlockEntity(new net.minecraft.core.BlockPos(2, 2, 2), IntegratorBlockEntity.class);
+        charge(entity.energy(), Rules.INTEGRATOR_CAPACITY, false);
         return entity;
     }
 
@@ -705,11 +683,10 @@ public final class ArsenalGameTests {
         for (int i = 0; i < Rules.INTEGRATE_TICKS; i++) entity.serverTick();
     }
 
-    @GameTest(template = ARENA)
     public static void integrationInstallsAndPaysForModules(GameTestHelper h) {
         IntegratorBlockEntity entity = integrator(h);
         var items = entity.items();
-        items.setStackInSlot(IntegratorBlockEntity.GEAR, new ItemStack(ArsenalItems.SUITS.get(ArmorSet.COLLAPSAR).get(ArmorItem.Type.CHESTPLATE).get()));
+        items.setStackInSlot(IntegratorBlockEntity.GEAR, new ItemStack(ArsenalItems.SUITS.get(ArmorSet.COLLAPSAR).get(ArmorType.CHESTPLATE).get()));
         items.setStackInSlot(IntegratorBlockEntity.FIRST_SOCKET, module(ModuleType.CAPACITOR));
         items.setStackInSlot(IntegratorBlockEntity.FIRST_SOCKET + 1, module(ModuleType.BIT_DRONE));
         run(entity);
@@ -717,15 +694,14 @@ public final class ArsenalGameTests {
         h.assertTrue(Modules.count(gear, ModuleType.CAPACITOR) == 1 && Modules.count(gear, ModuleType.BIT_DRONE) == 1, "modules not installed");
         h.assertTrue(items.getStackInSlot(IntegratorBlockEntity.FIRST_SOCKET).isEmpty(), "module duplicated into the gear");
         h.assertTrue(Fe.capacity(gear) == Rules.capacityWith(Rules.COLLAPSAR_CAPACITY, 1), "capacitor did not raise capacity");
-        h.assertTrue(entity.energy().getEnergyStored() == Rules.INTEGRATOR_CAPACITY - Rules.INTEGRATE_TICKS * Rules.INTEGRATE_FE_PER_TICK, "wrong energy cost");
+        h.assertTrue(entity.energy().getAmountAsInt() == Rules.INTEGRATOR_CAPACITY - Rules.INTEGRATE_TICKS * Rules.INTEGRATE_FE_PER_TICK, "wrong energy cost");
         h.succeed();
     }
 
-    @GameTest(template = ARENA)
     public static void placingGearUnpacksItsModulesExactlyOnce(GameTestHelper h) {
         IntegratorBlockEntity entity = integrator(h);
         var items = entity.items();
-        ItemStack gear = new ItemStack(ArsenalItems.SUITS.get(ArmorSet.COLLAPSAR).get(ArmorItem.Type.CHESTPLATE).get());
+        ItemStack gear = new ItemStack(ArsenalItems.SUITS.get(ArmorSet.COLLAPSAR).get(ArmorType.CHESTPLATE).get());
         Modules.install(gear, java.util.List.of(module(ModuleType.PLATING), module(ModuleType.CAPACITOR)));
         items.setStackInSlot(IntegratorBlockEntity.GEAR, gear);
         ItemStack held = items.getStackInSlot(IntegratorBlockEntity.GEAR);
@@ -736,14 +712,13 @@ public final class ArsenalGameTests {
         h.succeed();
     }
 
-    @GameTest(template = ARENA)
     public static void legacyIntegratorSaveGainsFiveSocketsWithoutLosingModules(GameTestHelper h) {
         IntegratorBlockEntity entity = integrator(h);
-        entity.items().setStackInSlot(0, charged(ArmorSet.COLLAPSAR, ArmorItem.Type.CHESTPLATE));
+        entity.items().setStackInSlot(0, charged(ArmorSet.COLLAPSAR, ArmorType.CHESTPLATE));
         for (int slot = 1; slot <= 3; slot++) entity.items().setStackInSlot(slot, module(ModuleType.CAPACITOR));
         var saved = entity.saveWithoutMetadata(h.getLevel().registryAccess());
-        saved.getCompound("items").putInt("Size", 4);
-        entity.loadWithComponents(saved, h.getLevel().registryAccess());
+        saved.getCompoundOrEmpty("items").putInt("Size", 4);
+        entity.loadWithComponents(net.minecraft.world.level.storage.TagValueInput.create(net.minecraft.util.ProblemReporter.DISCARDING, h.getLevel().registryAccess(), saved));
         h.assertTrue(entity.items().getSlots() == 6, "a 0.1.0 save must expand to five sockets");
         for (int slot = 1; slot <= 3; slot++) h.assertTrue(entity.items().getStackInSlot(slot).is(module(ModuleType.CAPACITOR).getItem()), "old socket lost its module");
         entity.items().setStackInSlot(4, module(ModuleType.INDUCTION));
@@ -754,7 +729,6 @@ public final class ArsenalGameTests {
         h.succeed();
     }
 
-    @GameTest(template = ARENA)
     public static void integrationRefusesWrongOrExcessModules(GameTestHelper h) {
         IntegratorBlockEntity entity = integrator(h);
         var items = entity.items();
@@ -770,10 +744,9 @@ public final class ArsenalGameTests {
         h.succeed();
     }
 
-    @GameTest(template = ARENA)
     public static void bitsPayEnergyAndHitHostiles(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 2.5);
-        ItemStack chest = charged(ArmorSet.COLLAPSAR, ArmorItem.Type.CHESTPLATE);
+        ItemStack chest = charged(ArmorSet.COLLAPSAR, ArmorType.CHESTPLATE);
         Modules.install(chest, java.util.List.of(module(ModuleType.BIT_DRONE)));
         Fe.set(chest, Rules.BIT_FE * 10);
         p.setItemSlot(EquipmentSlot.CHEST, chest);
@@ -784,10 +757,9 @@ public final class ArsenalGameTests {
         h.succeed();
     }
 
-    @GameTest(template = ARENA)
     public static void fluxPinConsumesTheLastPartialCharge(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 2.5);
-        ItemStack boots = charged(ArmorSet.MEISSNER, ArmorItem.Type.BOOTS);
+        ItemStack boots = charged(ArmorSet.MEISSNER, ArmorType.BOOTS);
         Fe.set(boots, 1);
         p.setItemSlot(EquipmentSlot.FEET, boots);
         p.setOnGround(false);
@@ -799,13 +771,12 @@ public final class ArsenalGameTests {
         h.succeed();
     }
 
-    @GameTest(template = ARENA)
     public static void balancingDifferentCapacitiesConservesEnergy(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 2.5);
-        ItemStack head = charged(ArmorSet.MEISSNER, ArmorItem.Type.HELMET);
+        ItemStack head = charged(ArmorSet.MEISSNER, ArmorType.HELMET);
         Modules.install(head, List.of(module(ModuleType.CAPACITOR)));
         Fe.set(head, Fe.capacity(head));
-        ItemStack legs = charged(ArmorSet.MEISSNER, ArmorItem.Type.LEGGINGS);
+        ItemStack legs = charged(ArmorSet.MEISSNER, ArmorType.LEGGINGS);
         p.setItemSlot(EquipmentSlot.HEAD, head);
         p.setItemSlot(EquipmentSlot.LEGS, legs);
         int before = Fe.stored(head) + Fe.stored(legs);
@@ -818,27 +789,25 @@ public final class ArsenalGameTests {
         h.succeed();
     }
 
-    @GameTest(template = ARENA)
     public static void integratorChargingMarksTheChunkForSaving(GameTestHelper h) {
         IntegratorBlockEntity entity = integrator(h);
         var chunk = h.getLevel().getChunkAt(entity.getBlockPos());
-        entity.energy().deserializeNBT(h.getLevel().registryAccess(), net.minecraft.nbt.IntTag.valueOf(0));
-        chunk.setUnsaved(false);
-        entity.energy().receiveEnergy(1000, true);
+        entity.energy().set(0);
+        chunk.tryMarkSaved();
+        charge(entity.energy(), 1000, true);
         h.assertTrue(!chunk.isUnsaved(), "simulated charging dirtied the chunk");
-        entity.energy().receiveEnergy(1000, false);
+        charge(entity.energy(), 1000, false);
         h.assertTrue(chunk.isUnsaved(), "received FE may disappear after a chunk reload");
         h.succeed();
     }
 
-    @GameTest(template = ARENA)
     public static void holdingArmedBladeDoesNotModifyDroneDamage(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 2.5);
         ItemStack blade = hold(p, new ItemStack(ArsenalItems.CASIMIR_BLADE.get()));
         Modules.install(blade, List.of(module(ModuleType.AMPLIFIER)));
         long armedUntil = h.getLevel().getGameTime() + 100;
         blade.set(ArsenalData.ARMED_UNTIL.get(), armedUntil);
-        ItemStack chest = charged(ArmorSet.COLLAPSAR, ArmorItem.Type.CHESTPLATE);
+        ItemStack chest = charged(ArmorSet.COLLAPSAR, ArmorType.CHESTPLATE);
         Modules.install(chest, List.of(module(ModuleType.BIT_DRONE)));
         p.setItemSlot(EquipmentSlot.CHEST, chest);
         Zombie mob = target(h, 2.5, 4.5);
@@ -852,7 +821,6 @@ public final class ArsenalGameTests {
         h.succeed();
     }
 
-    @GameTest(template = ARENA)
     public static void cannonPulseUsesItsAmplifier(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 2.5);
         ItemStack cannon = hold(p, new ItemStack(ArsenalItems.JET_CANNON.get()));
@@ -882,7 +850,6 @@ public final class ArsenalGameTests {
         p.gameMode.destroyBlock(abs(h, 2, 2, 3));
     }
 
-    @GameTest(template = ARENA)
     public static void breakerTakesThreeByThreeUnlessSneaking(GameTestHelper h) {
         ServerPlayer p = facingWall(h, Blocks.STONE);
         ItemStack breaker = hold(p, new ItemStack(ArsenalItems.DEGENERACY_BREAKER.get()));
@@ -900,7 +867,6 @@ public final class ArsenalGameTests {
         h.succeed();
     }
 
-    @GameTest(template = ARENA)
     public static void breakerLeavesContainersAlone(GameTestHelper h) {
         ServerPlayer p = facingWall(h, Blocks.STONE);
         hold(p, new ItemStack(ArsenalItems.DEGENERACY_BREAKER.get()));
@@ -911,12 +877,11 @@ public final class ArsenalGameTests {
         h.succeed();
     }
 
-    @GameTest(template = ARENA)
     public static void canceledMiningDoesNotBreakNeighborsOrSpendEnergy(GameTestHelper h) {
         ServerPlayer p = facingWall(h, Blocks.STONE);
         ItemStack breaker = hold(p, new ItemStack(ArsenalItems.DEGENERACY_BREAKER.get()));
         int before = Fe.stored(breaker);
-        java.util.function.Consumer<net.neoforged.neoforge.event.level.BlockEvent.BreakEvent> protect = event -> {
+        java.util.function.Consumer<net.neoforged.neoforge.event.level.block.BreakBlockEvent> protect = event -> {
             if (event.getPlayer() == p && event.getPos().equals(abs(h, 2, 2, 3))) event.setCanceled(true);
         };
         var bus = net.neoforged.neoforge.common.NeoForge.EVENT_BUS;
@@ -932,12 +897,11 @@ public final class ArsenalGameTests {
         h.succeed();
     }
 
-    @GameTest(template = ARENA)
     public static void protectedNeighborsDoNotCostMiningEnergy(GameTestHelper h) {
         ServerPlayer p = facingWall(h, Blocks.STONE);
         ItemStack breaker = hold(p, new ItemStack(ArsenalItems.DEGENERACY_BREAKER.get()));
         int before = Fe.stored(breaker);
-        java.util.function.Consumer<net.neoforged.neoforge.event.level.BlockEvent.BreakEvent> protect = event -> {
+        java.util.function.Consumer<net.neoforged.neoforge.event.level.block.BreakBlockEvent> protect = event -> {
             if (event.getPlayer() == p && !event.getPos().equals(abs(h, 2, 2, 3))) event.setCanceled(true);
         };
         var bus = net.neoforged.neoforge.common.NeoForge.EVENT_BUS;
@@ -953,7 +917,6 @@ public final class ArsenalGameTests {
         h.succeed();
     }
 
-    @GameTest(template = ARENA)
     public static void sawFellsLivingTreesButNotLogWalls(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 1.5);
         hold(p, new ItemStack(ArsenalItems.SHEAR_SAW.get()));
@@ -967,7 +930,6 @@ public final class ArsenalGameTests {
         h.succeed();
     }
 
-    @GameTest(template = ARENA)
     public static void drillFollowsVeinsIntoThePack(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 1.5);
         ItemStack drill = hold(p, new ItemStack(ArsenalItems.ACCRETION_DRILL.get()));
@@ -981,7 +943,6 @@ public final class ArsenalGameTests {
         h.succeed();
     }
 
-    @GameTest(template = ARENA)
     public static void toolsWithoutPowerDigAtHandSpeed(GameTestHelper h) {
         ItemStack pick = new ItemStack(ArsenalItems.SQUID_PICK.get());
         h.assertTrue(pick.getDestroySpeed(Blocks.STONE.defaultBlockState()) == 1, "an empty tool must not dig at full speed");
@@ -990,7 +951,6 @@ public final class ArsenalGameTests {
         h.succeed();
     }
 
-    @GameTest(template = ARENA)
     public static void squidPickFindsOresNearestFirst(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 2.5);
         h.setBlock(4, 2, 4, Blocks.COAL_ORE);
@@ -1007,10 +967,9 @@ public final class ArsenalGameTests {
     }
 
     private static ItemStack singulo(String path) {
-        return new ItemStack(BuiltInRegistries.ITEM.get(ResourceLocation.fromNamespaceAndPath("singulo", path)));
+        return new ItemStack(BuiltInRegistries.ITEM.getValue(Identifier.fromNamespaceAndPath("singulo", path)));
     }
 
-    @GameTest(template = ARENA)
     public static void sensitivityModulesTuneThePickInTheOtherHand(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 2.5);
         ItemStack pick = new ItemStack(ArsenalItems.SQUID_PICK.get());
@@ -1027,29 +986,29 @@ public final class ArsenalGameTests {
     }
 
     @SuppressWarnings("unchecked")
-    @GameTest(template = ARENA)
+
     public static void pickKeepsTheScannersSensitivity(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 2.5);
         ItemStack scanner = singulo("neutrino_scanner");
-        var type = (net.minecraft.core.component.DataComponentType<Integer>) BuiltInRegistries.DATA_COMPONENT_TYPE.get(
-                ResourceLocation.fromNamespaceAndPath("singulo", "scanner_tier"));
+        var type = (net.minecraft.core.component.DataComponentType<Integer>) BuiltInRegistries.DATA_COMPONENT_TYPE.getValue(
+                Identifier.fromNamespaceAndPath("singulo", "scanner_tier"));
         h.assertTrue(type != null, "Singulo's scanner_tier component is gone");
         scanner.set(type, 2);
         p.containerMenu = p.inventoryMenu;
         p.inventoryMenu.getSlot(1).set(scanner);
         ItemStack pick = new ItemStack(ArsenalItems.SQUID_PICK.get());
-        pick.onCraftedBy(h.getLevel(), p, 1);
+        pick.onCraftedBy(p, 1);
         h.assertTrue(io.github.genichimaruo.singuloarsenal.tool.SquidPickItem.tier(pick) == 2, "the scanner's sensitivity must carry over");
         p.inventoryMenu.getSlot(1).set(ItemStack.EMPTY);
         h.succeed();
     }
 
     @SuppressWarnings("unchecked")
-    @GameTest(template = ARENA)
+
     public static void craftingPickPreservesSensitivityForClickAndShiftClick(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 2.5);
-        var tier = (net.minecraft.core.component.DataComponentType<Integer>) BuiltInRegistries.DATA_COMPONENT_TYPE.get(
-                ResourceLocation.fromNamespaceAndPath("singulo", "scanner_tier"));
+        var tier = (net.minecraft.core.component.DataComponentType<Integer>) BuiltInRegistries.DATA_COMPONENT_TYPE.getValue(
+                Identifier.fromNamespaceAndPath("singulo", "scanner_tier"));
         for (boolean shift : new boolean[]{false, true}) {
             p.getInventory().clearContent();
             var menu = new net.minecraft.world.inventory.CraftingMenu(1, p.getInventory(),
@@ -1063,8 +1022,8 @@ public final class ArsenalGameTests {
             menu.getSlot(5).set(singulo("superconducting_coil"));
             menu.getSlot(8).set(singulo("white_ceramic_composite"));
             h.assertTrue(menu.getSlot(0).getItem().is(ArsenalItems.SQUID_PICK.get()), "the real recipe must match");
-            menu.clicked(0, 0, shift ? net.minecraft.world.inventory.ClickType.QUICK_MOVE : net.minecraft.world.inventory.ClickType.PICKUP, p);
-            ItemStack crafted = shift ? p.getInventory().items.stream().filter(s -> s.is(ArsenalItems.SQUID_PICK.get())).findFirst().orElse(ItemStack.EMPTY) : menu.getCarried();
+            menu.clicked(0, 0, shift ? net.minecraft.world.inventory.ContainerInput.QUICK_MOVE : net.minecraft.world.inventory.ContainerInput.PICKUP, p);
+            ItemStack crafted = shift ? p.getInventory().getNonEquipmentItems().stream().filter(s -> s.is(ArsenalItems.SQUID_PICK.get())).findFirst().orElse(ItemStack.EMPTY) : menu.getCarried();
             h.assertTrue(crafted.is(ArsenalItems.SQUID_PICK.get()) && io.github.genichimaruo.singuloarsenal.tool.SquidPickItem.tier(crafted) == 3,
                     "crafted pick lost sensitivity; shift=" + shift);
             h.assertTrue(menu.getSlot(2).getItem().isEmpty() && menu.getSlot(0).getItem().isEmpty(), "crafting must consume the scanner exactly once");
@@ -1073,7 +1032,6 @@ public final class ArsenalGameTests {
         h.succeed();
     }
 
-    @GameTest(template = ARENA)
     public static void canisterStoresPelletsAndFeedsGearFirst(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 2.5);
         ItemStack canister = new ItemStack(ArsenalItems.PELLET_CANISTER.get());
@@ -1084,7 +1042,7 @@ public final class ArsenalGameTests {
         h.assertTrue(io.github.genichimaruo.singuloarsenal.core.PelletCanisterItem.stored(p.getMainHandItem()) == 100, "all pellets go in");
         h.assertTrue(p.getInventory().countItem(Fe.MASS_PELLET.get()) == 0, "none left loose");
         p.getInventory().add(new ItemStack(Fe.MASS_PELLET.get(), 5));
-        ItemStack chest = new ItemStack(ArsenalItems.SUITS.get(ArmorSet.COLLAPSAR).get(ArmorItem.Type.CHESTPLATE).get());
+        ItemStack chest = new ItemStack(ArsenalItems.SUITS.get(ArmorSet.COLLAPSAR).get(ArmorType.CHESTPLATE).get());
         h.assertTrue(Fe.accrete(p, chest) && Fe.stored(chest) == Rules.PELLET_FE, "accretion must still work");
         h.assertTrue(io.github.genichimaruo.singuloarsenal.core.PelletCanisterItem.stored(p.getMainHandItem()) == 99
                 && p.getInventory().countItem(Fe.MASS_PELLET.get()) == 5, "the canister pays before loose pellets");
@@ -1097,7 +1055,6 @@ public final class ArsenalGameTests {
 
     // ---- Utility modules ----------------------------------------------------------------------------------------------
 
-    @GameTest(template = ARENA)
     public static void smelterCooksOresButNotStone(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 1.5);
         ItemStack pick = new ItemStack(ArsenalItems.SQUID_PICK.get());
@@ -1116,20 +1073,23 @@ public final class ArsenalGameTests {
         h.succeed();
     }
 
-    @GameTest(template = ARENA)
-    public static void smeltingKeepsOutputsThatExceedOneStack(GameTestHelper h) {
+    public static void smeltingKeepsOutputsThatExceedOneStack(GameTestHelper h) throws ReflectiveOperationException {
         ServerPlayer p = player(h, 2.5, 2.5);
         ItemStack pick = hold(p, new ItemStack(ArsenalItems.SQUID_PICK.get()));
         Modules.install(pick, List.of(module(ModuleType.SMELTER)));
         ItemStack input = new ItemStack(net.minecraft.world.item.Items.RAW_IRON, 40);
-        var recipe = h.getLevel().getRecipeManager().getRecipeFor(net.minecraft.world.item.crafting.RecipeType.SMELTING,
+        var recipe = h.getLevel().getServer().getRecipeManager().getRecipeFor(net.minecraft.world.item.crafting.RecipeType.SMELTING,
                 new net.minecraft.world.item.crafting.SingleRecipeInput(input), h.getLevel()).orElseThrow();
         // Model a data pack recipe that yields two ingots per raw item, restoring it before any other test runs.
-        ItemStack result = recipe.value().getResultItem(h.getLevel().registryAccess());
+        var resultField = net.minecraft.world.item.crafting.SingleItemRecipe.class.getDeclaredField("result");
+        resultField.setAccessible(true);
+        var originalTemplate = resultField.get(recipe.value());
+        ItemStack result = recipe.value().assemble(new net.minecraft.world.item.crafting.SingleRecipeInput(input));
         int original = result.getCount();
         int before = Fe.stored(pick);
         try {
             result.setCount(2);
+            resultField.set(recipe.value(), net.minecraft.world.item.ItemStackTemplate.fromNonEmptyStack(result));
             Vec3 at = h.absoluteVec(new Vec3(2.5, 2, 3.5));
             var drops = new java.util.ArrayList<net.minecraft.world.entity.item.ItemEntity>();
             drops.add(new net.minecraft.world.entity.item.ItemEntity(h.getLevel(), at.x, at.y, at.z, input));
@@ -1140,15 +1100,14 @@ public final class ArsenalGameTests {
             h.assertTrue(drops.stream().mapToInt(d -> d.getItem().getCount()).sum() == 80, "smelting discarded output above the stack limit");
             h.assertTrue(before - Fe.stored(pick) == 40 * Rules.SMELT_FE, "smelting must charge for inputs, not output stacks");
         } finally {
-            result.setCount(original);
+            resultField.set(recipe.value(), originalTemplate);
         }
         h.succeed();
     }
 
-    @GameTest(template = ARENA)
     public static void inductionFeedsTheHeldToolFromTheChest(GameTestHelper h) {
         ServerPlayer p = player(h, 2.5, 2.5);
-        ItemStack chest = charged(ArmorSet.COLLAPSAR, ArmorItem.Type.CHESTPLATE);
+        ItemStack chest = charged(ArmorSet.COLLAPSAR, ArmorType.CHESTPLATE);
         Modules.install(chest, List.of(module(ModuleType.INDUCTION)));
         Fe.set(chest, Fe.capacity(chest));
         p.setItemSlot(EquipmentSlot.CHEST, chest);
@@ -1161,10 +1120,9 @@ public final class ArsenalGameTests {
         h.succeed();
     }
 
-    @GameTest(template = ARENA)
     public static void collectorPullsLooseItemsButNotThrownOnes(GameTestHelper h) {
         ServerPlayer p = player(h, 1.5, 1.5);
-        ItemStack boots = charged(ArmorSet.MEISSNER, ArmorItem.Type.BOOTS);
+        ItemStack boots = charged(ArmorSet.MEISSNER, ArmorType.BOOTS);
         Modules.install(boots, List.of(module(ModuleType.COLLECTOR)));
         Fe.set(boots, Fe.capacity(boots));
         p.setItemSlot(EquipmentSlot.FEET, boots);
@@ -1189,21 +1147,20 @@ public final class ArsenalGameTests {
 
     // ---- Recipes against the real base mod ---------------------------------------------------------------------------
 
-    @GameTest(template = ARENA)
     public static void everyRecipeLoadsAgainstRealSingulo(GameTestHelper h) {
-        var recipes = h.getLevel().getRecipeManager();
+        var recipes = h.getLevel().getServer().getRecipeManager();
         int found = 0;
         for (var entry : ArsenalItems.ITEMS.getEntries()) {
             // Recipe/advancement identity is stable even though the cannon item ID migrated.
-            ResourceLocation id = entry == ArsenalItems.JET_CANNON ? SinguloArsenal.id("jet_lance") : entry.getId();
-            var recipe = recipes.byKey(id);
+            Identifier id = entry == ArsenalItems.JET_CANNON ? SinguloArsenal.id("jet_lance") : entry.getId();
+            var recipe = recipes.byKey(net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.RECIPE, id));
             h.assertTrue(recipe.isPresent(), "recipe failed to load: " + id);
-            h.assertTrue(recipe.orElseThrow().value().getResultItem(h.getLevel().registryAccess()).is(entry.get()),
+            h.assertTrue(net.minecraft.world.item.crafting.Recipe.CODEC.encodeStart(h.getLevel().registryAccess().createSerializationContext(com.mojang.serialization.JsonOps.INSTANCE), recipe.orElseThrow().value()).getOrThrow().getAsJsonObject().getAsJsonObject("result").get("id").getAsString().equals(entry.getId().toString()),
                     "recipe result does not match registered item: " + id);
             found++;
         }
         h.assertTrue(found == 47, "unexpected item count " + found);
-        var lamina = recipes.byKey(SinguloArsenal.id("collapsar_lamina")).orElseThrow().value();
+        var lamina = recipes.byKey(net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.RECIPE, SinguloArsenal.id("collapsar_lamina"))).orElseThrow().value();
         h.assertTrue(BuiltInRegistries.RECIPE_SERIALIZER.getKey(lamina.getSerializer()).toString().equals("singulo:machine"), "lamina must be a Singulo machine recipe");
         h.succeed();
     }

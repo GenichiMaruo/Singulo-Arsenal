@@ -37,8 +37,8 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.decoration.ArmorStand;
-import net.minecraft.world.entity.monster.Husk;
-import net.minecraft.world.item.ArmorItem;
+import net.minecraft.world.entity.monster.zombie.Husk;
+import net.minecraft.world.item.equipment.ArmorType;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.GameType;
@@ -66,6 +66,7 @@ public final class ArsenalReview {
     private static Husk dummy;
     private static String capture;
     private static boolean done;
+    private static final java.util.concurrent.atomic.AtomicInteger pendingCaptures = new java.util.concurrent.atomic.AtomicInteger();
     private static ItemStack tip;
     private static boolean bare;
     private static java.util.function.BooleanSupplier ready;
@@ -84,13 +85,13 @@ public final class ArsenalReview {
         int serial = ++requested;
         mc.options.mainHand().set(arm); mc.options.broadcastOptions();
         mc.options.setCameraType(CameraType.FIRST_PERSON);
-        mc.player.getInventory().selected = 0;
+        mc.player.getInventory().setSelectedSlot(0);
         local(mc, p -> {
-            p.stopUsingItem(); p.getInventory().clearContent(); p.getInventory().selected = 0;
+            p.stopUsingItem(); p.getInventory().clearContent(); p.getInventory().setSelectedSlot(0);
             p.setMainArm(arm);
             p.setItemSlot(EquipmentSlot.MAINHAND, mainEmpty ? ItemStack.EMPTY : charged(main));
             p.setItemSlot(EquipmentSlot.OFFHAND, offEmpty ? ItemStack.EMPTY : off == net.minecraft.world.item.Items.FILLED_MAP
-                    ? net.minecraft.world.item.MapItem.create(p.serverLevel(), 0, 0, (byte) 0, true, false) : charged(off));
+                    ? net.minecraft.world.item.MapItem.create(p.level(), 0, 0, (byte) 0, true, false) : charged(off));
             expectedMain = p.getMainHandItem().copy(); expectedOff = p.getOffhandItem().copy();
             p.connection.teleport(OX, 81, OZ - 4, yaw, pitch);
             p.inventoryMenu.broadcastChanges(); completed = serial;
@@ -109,7 +110,7 @@ public final class ArsenalReview {
         int serial = ++requested;
         float pitch = facing == net.minecraft.core.Direction.UP ? 90 : facing == net.minecraft.core.Direction.DOWN ? -90 : 0;
         local(mc, p -> {
-            var level = p.serverLevel();
+            var level = p.level();
             if (frameId >= 0 && level.getEntity(frameId) != null) level.getEntity(frameId).discard();
             p.getInventory().clearContent();
             BlockPos pos = new BlockPos(10, pitch == 90 ? 81 : pitch == -90 ? 85 : 83, 10);
@@ -206,12 +207,12 @@ public final class ArsenalReview {
 
     private static void dress(LivingEntity who, ArmorSet set, int load) {
         var pieces = ArsenalItems.SUITS.get(set);
-        who.setItemSlot(EquipmentSlot.HEAD, charged(pieces.get(ArmorItem.Type.HELMET).get()));
-        ItemStack chest = charged(pieces.get(ArmorItem.Type.CHESTPLATE).get());
+        who.setItemSlot(EquipmentSlot.HEAD, charged(pieces.get(ArmorType.HELMET).get()));
+        ItemStack chest = charged(pieces.get(ArmorType.CHESTPLATE).get());
         chest.set(ArsenalData.LOAD.get(), load);
         who.setItemSlot(EquipmentSlot.CHEST, chest);
-        who.setItemSlot(EquipmentSlot.LEGS, charged(pieces.get(ArmorItem.Type.LEGGINGS).get()));
-        who.setItemSlot(EquipmentSlot.FEET, charged(pieces.get(ArmorItem.Type.BOOTS).get()));
+        who.setItemSlot(EquipmentSlot.LEGS, charged(pieces.get(ArmorType.LEGGINGS).get()));
+        who.setItemSlot(EquipmentSlot.FEET, charged(pieces.get(ArmorType.BOOTS).get()));
     }
 
     private static void verifySinguloClientLink() {
@@ -234,21 +235,22 @@ public final class ArsenalReview {
     private static void prepare(Minecraft mc) {
         var server = mc.getSingleplayerServer();
         ServerPlayer p = server.getPlayerList().getPlayer(mc.player.getUUID());
-        ServerLevel level = p.serverLevel();
-        level.setDayTime(6000);
-        level.setWeatherParameters(6000, 0, false, false);
+        ServerLevel level = p.level();
+        server.getCommands().performPrefixedCommand(server.createCommandSourceStack(), "time set 6000");
+        server.setWeatherParameters(6000, 0, false, false);
+        level.getGameRules().set(net.minecraft.world.level.gamerules.GameRules.ADVANCE_WEATHER, false, server);
         for (int x = -22; x <= 22; x++) for (int z = -22; z <= 40; z++) {
             level.setBlock(new BlockPos(x, 80, z), Blocks.SMOOTH_STONE.defaultBlockState(), 3);
             for (int y = 81; y <= 95; y++) level.setBlock(new BlockPos(x, y, z), Blocks.AIR.defaultBlockState(), 3);
         }
         for (int x = -22; x <= 22; x++) for (int y = 81; y <= 92; y++) level.setBlock(new BlockPos(x, y, 40), Blocks.DEEPSLATE_TILES.defaultBlockState(), 3);
-        ArmorStand stand = EntityType.ARMOR_STAND.create(level);
-        stand.moveTo(-6.5, 81, 4.5, 180, 0);
+        ArmorStand stand = EntityType.ARMOR_STAND.create(level, net.minecraft.world.entity.EntitySpawnReason.COMMAND);
+        stand.snapTo(-6.5, 81, 4.5, 180, 0);
         dress(stand, ArmorSet.COLLAPSAR, 50);
         level.addFreshEntity(stand);
         for (int i = 0; i < 3; i++) {
-            Husk husk = EntityType.HUSK.create(level);
-            husk.moveTo(new double[]{OX + 2.3, OX - 2.3, OX}[i], 81, OZ + 5.5, 180, 0);
+            Husk husk = EntityType.HUSK.create(level, net.minecraft.world.entity.EntitySpawnReason.COMMAND);
+            husk.snapTo(new double[]{OX + 2.3, OX - 2.3, OX}[i], 81, OZ + 5.5, 180, 0);
             husk.setNoAi(true);
             husk.setPersistenceRequired();
             husk.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.MAX_HEALTH).setBaseValue(1000);
@@ -261,8 +263,8 @@ public final class ArsenalReview {
         Connection connection = new Connection(PacketFlow.SERVERBOUND);
         new EmbeddedChannel(connection);
         server.getPlayerList().placeNewPlayer(connection, o, cookie);
-        o.setGameMode(GameType.SURVIVAL);
-        o.teleportTo(level, OX, 81, OZ, 0, 0);
+        o.connection.markClientLoaded(); o.setGameMode(GameType.SURVIVAL);
+        o.teleportTo(level, OX, 81, OZ, java.util.Set.of(), 0, 0, true);
         o.setYHeadRot(0);
         o.setInvulnerable(true);
         other = o;
@@ -312,8 +314,8 @@ public final class ArsenalReview {
     }
 
     private static void selectSlot(Minecraft mc, int slot) {
-        mc.player.getInventory().selected = slot;
-        local(mc, p -> p.getInventory().selected = slot);
+        mc.player.getInventory().setSelectedSlot(slot);
+        local(mc, p -> p.getInventory().setSelectedSlot(slot));
     }
 
     private static void press(Minecraft mc) {
@@ -325,8 +327,8 @@ public final class ArsenalReview {
     private static void reviewInventory(Minecraft mc) {
         mc.setScreen(new net.minecraft.client.gui.screens.inventory.InventoryScreen(mc.player) {
             @Override
-            public void render(net.minecraft.client.gui.GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-                super.render(graphics, -100, -100, partialTick);
+            public void extractRenderState(net.minecraft.client.gui.GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+                super.extractRenderState(graphics, -100, -100, partialTick);
             }
         });
     }
@@ -350,10 +352,10 @@ public final class ArsenalReview {
         });
         step(20, () -> {
             mc.options.guiScale().set(4);
-            mc.resizeDisplay();
+            mc.resizeGui();
             reviewInventory(mc);
             // Park the cursor in the corner so no tooltip covers the icons.
-            org.lwjgl.glfw.GLFW.glfwSetCursorPos(mc.getWindow().getWindow(), 0, 0);
+            org.lwjgl.glfw.GLFW.glfwSetCursorPos(mc.getWindow().handle(), 0, 0);
         });
         at += 10;
         shot("icons");
@@ -371,16 +373,16 @@ public final class ArsenalReview {
         // Plain nihonium gear: worn on the vanilla armor layer in the inventory preview, then the sword in first person.
         step(4, () -> local(mc, p -> {
             p.getInventory().clearContent();
-            p.getInventory().selected = 0;
+            p.getInventory().setSelectedSlot(0);
             p.getInventory().setItem(0, new ItemStack(io.github.genichimaruo.singuloarsenal.nihonium.Nihonium.SWORD.get()));
             p.getInventory().setItem(1, new ItemStack(io.github.genichimaruo.singuloarsenal.nihonium.Nihonium.PICKAXE.get()));
             p.getInventory().setItem(2, new ItemStack(io.github.genichimaruo.singuloarsenal.nihonium.Nihonium.AXE.get()));
             p.getInventory().setItem(3, new ItemStack(io.github.genichimaruo.singuloarsenal.nihonium.Nihonium.SHOVEL.get()));
             for (var piece : io.github.genichimaruo.singuloarsenal.nihonium.Nihonium.ARMOR.values()) {
-                p.setItemSlot(piece.get().getEquipmentSlot(), new ItemStack(piece.get()));
+                p.setItemSlot(piece.get().getEquipmentSlot(new ItemStack(piece.get())), new ItemStack(piece.get()));
             }
         }));
-        step(2, () -> mc.player.getInventory().selected = 0);
+        step(2, () -> mc.player.getInventory().setSelectedSlot(0));
         at += 10;
         shot("nihonium-inventory");
         step(2, () -> mc.setScreen(null));
@@ -389,6 +391,20 @@ public final class ArsenalReview {
         step(4, () -> done = true);
     }
 
+    /** Inspect the actual loaded special-model layer, not a duplicate of JSON transforms. */
+    private static net.minecraft.client.resources.model.cuboid.ItemTransform fixedTransform(Minecraft mc, ItemStack stack) {
+        var state = new net.minecraft.client.renderer.item.ItemStackRenderState();
+        mc.getItemModelResolver().updateForTopItem(state, stack, net.minecraft.world.item.ItemDisplayContext.FIXED, mc.level, null, 0);
+        if (state.isEmpty()) throw new IllegalStateException("Missing review model: " + stack);
+        try {
+            var layersField = state.getClass().getDeclaredField("layers");
+            layersField.setAccessible(true);
+            Object layer = ((Object[]) layersField.get(state))[0];
+            var transformField = layer.getClass().getDeclaredField("itemTransform");
+            transformField.setAccessible(true);
+            return (net.minecraft.client.resources.model.cuboid.ItemTransform) transformField.get(layer);
+        } catch (ReflectiveOperationException e) { throw new IllegalStateException("Cannot inspect loaded FIXED transform", e); }
+    }
     /** Measures all weapon/tool art with each loaded baked model's actual FIXED transform. */
     private static void fixedBounds(Minecraft mc) {
         java.util.Map<Item, java.util.function.Consumer<Canvas>> art = new java.util.LinkedHashMap<>();
@@ -406,7 +422,9 @@ public final class ArsenalReview {
             List<org.joml.Vector3f> points = new ArrayList<>();
             VertexConsumer sink = new VertexConsumer() {
                 @Override public VertexConsumer addVertex(float x, float y, float z) { points.add(new org.joml.Vector3f(x, y, z)); return this; }
+                @Override public VertexConsumer setColor(int argb) { return this; }
                 @Override public VertexConsumer setColor(int r, int g, int b, int a) { return this; }
+                @Override public VertexConsumer setLineWidth(float width) { return this; }
                 @Override public VertexConsumer setUv(float u, float v) { return this; }
                 @Override public VertexConsumer setUv1(int u, int v) { return this; }
                 @Override public VertexConsumer setUv2(int u, int v) { return this; }
@@ -414,10 +432,10 @@ public final class ArsenalReview {
             };
             Canvas.drawFine(new PoseStack(), type -> sink, 0, 0, Canvas.noOverlay(), false, entry.getValue());
             PoseStack fixed = new PoseStack();
-            var model = mc.getItemRenderer().getModel(new ItemStack(entry.getKey()), mc.level, null, 0);
-            var transform = model.getTransforms().getTransform(net.minecraft.world.item.ItemDisplayContext.FIXED);
-            transform.apply(false, fixed);
-            // ItemRenderer -0.5 and GearRenderer +0.5 cancel before model-pixel scale.
+            var transform = fixedTransform(mc, new ItemStack(entry.getKey()));
+            transform.apply(false, fixed.last());
+            // 26.1.2 ItemTransform.apply includes -0.5; reproduce GearRenderer +0.5 before pixel scaling.
+            fixed.translate(0.5, 0.5, 0.5);
             fixed.scale(1F / 16, 1F / 16, 1F / 16);
             float[] raw = bounds(points, new org.joml.Matrix4f());
             float[] result = bounds(points, fixed.last().pose());
@@ -427,7 +445,7 @@ public final class ArsenalReview {
             report.append(net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(entry.getKey()))
                     .append(" vertices=").append(points.size())
                     .append("\n  model pixels=").append(java.util.Arrays.toString(raw))
-                    .append("\n  FIXED rotation=").append(transform.rotation).append(" translation=").append(transform.translation).append(" scale=").append(transform.scale)
+                    .append("\n  FIXED rotation=").append(transform.rotation()).append(" translation=").append(transform.translation()).append(" scale=").append(transform.scale())
                     .append("\n  FIXED item units=").append(java.util.Arrays.toString(result))
                     .append("\n  FIXED midpoint XY=").append(cx).append(", ").append(cy)
                     .append(" tolerance=0.001 centered=").append(centered).append('\n');
@@ -471,7 +489,9 @@ public final class ArsenalReview {
             List<float[]> normals = new ArrayList<>();
             VertexConsumer sink = new VertexConsumer() {
                 @Override public VertexConsumer addVertex(float x, float y, float z) { points.add(new float[]{x, y, z}); normals.add(new float[3]); return this; }
+                @Override public VertexConsumer setColor(int argb) { return this; }
                 @Override public VertexConsumer setColor(int r, int g, int b, int a) { return this; }
+                @Override public VertexConsumer setLineWidth(float width) { return this; }
                 @Override public VertexConsumer setUv(float u, float v) { return this; }
                 @Override public VertexConsumer setUv1(int u, int v) { return this; }
                 @Override public VertexConsumer setUv2(int u, int v) { return this; }
@@ -516,17 +536,62 @@ public final class ArsenalReview {
             var g = event.getGuiGraphics();
             g.fill(0, 0, g.guiWidth(), g.guiHeight(), 0xFF8B8B8B);
             List<Item> gear = ArsenalItems.powered();
-            for (int i = 0; i < gear.size(); i++) g.renderItem(new ItemStack(gear.get(i)), 8 + 18 * (i % 9), 8 + 18 * (i / 9));
+            for (int i = 0; i < gear.size(); i++) g.item(new ItemStack(gear.get(i)), 8 + 18 * (i % 9), 8 + 18 * (i / 9));
         }
         if (tip == null) return;
-        event.getGuiGraphics().renderComponentTooltip(mc.font, net.minecraft.client.gui.screens.Screen.getTooltipFromItem(mc, tip), 40, 20);
+        event.getGuiGraphics().setComponentTooltipForNextFrame(mc.font, net.minecraft.client.gui.screens.Screen.getTooltipFromItem(mc, tip), 40, 20);
+    }
+
+    /** Explicitly exercise both paper-doll screens, not the default creative building tab. */
+    private static void paperDollScript(Minecraft mc) {
+        step(10, () -> {
+            local(mc, p -> {
+                p.setGameMode(GameType.SURVIVAL);
+                dress(p, ArmorSet.COLLAPSAR, 50);
+                p.setItemSlot(EquipmentSlot.MAINHAND, charged(weapons().get(0)));
+                p.inventoryMenu.broadcastChanges();
+            });
+            await("survival-mode", () -> !mc.player.getAbilities().instabuild);
+        });
+        step(20, () -> {
+            mc.options.guiScale().set(3); mc.resizeGui();
+            reviewInventory(mc);
+        });
+        at += 20;
+        shot("paperdoll-survival");
+        step(4, () -> {
+            mc.setScreen(null);
+            local(mc, p -> p.setGameMode(GameType.CREATIVE));
+            await("creative-mode", () -> mc.player.getAbilities().instabuild);
+        });
+        step(20, () -> {
+            var screen = new net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen(
+                    mc.player, mc.level.enabledFeatures(), true);
+            mc.setScreen(screen);
+            try {
+                var tab = net.minecraft.world.item.CreativeModeTabs.allTabs().stream()
+                        .filter(t -> t.getType() == net.minecraft.world.item.CreativeModeTab.Type.INVENTORY)
+                        .findFirst().orElseThrow();
+                var method = screen.getClass().getDeclaredMethod("selectTab", net.minecraft.world.item.CreativeModeTab.class);
+                method.setAccessible(true);
+                method.invoke(screen, tab);
+            } catch (ReflectiveOperationException e) {
+                throw new IllegalStateException("Cannot select review inventory tab", e);
+            }
+            if (!screen.isInventoryOpen()) throw new IllegalStateException("Creative paper doll tab not selected");
+            org.lwjgl.glfw.GLFW.glfwSetCursorPos(mc.getWindow().handle(), 0, 0);
+        });
+        at += 20;
+        shot("paperdoll-creative");
+        step(4, () -> done = true);
     }
 
     private static void script(Minecraft mc) {
-        if (mc.options.getSoundSourceVolume(net.minecraft.sounds.SoundSource.MUSIC) != 0) {
-            throw new IllegalStateException("Review music must be muted; rerun prepare_gui.py");
+        if (mc.options.getSoundSourceVolume(net.minecraft.sounds.SoundSource.MUSIC) != 0 || mc.options.getSoundSourceVolume(net.minecraft.sounds.SoundSource.MASTER) != 0) {
+            throw new IllegalStateException("Review master and music must be muted; rerun prepare_gui.py");
         }
-        System.out.println("ARSENAL_REVIEW_MUSIC_MUTED (other sound categories unchanged)");
+        System.out.println("ARSENAL_REVIEW_MASTER_AND_MUSIC_MUTED");
+        if (Files.exists(mc.gameDirectory.toPath().resolve("paperdoll-only"))) { paperDollScript(mc); return; }
         if (Boolean.getBoolean("arsenal.review.render") || Files.exists(mc.gameDirectory.toPath().resolve("render-only"))) {
             renderScript(mc);
             return;
@@ -583,7 +648,7 @@ public final class ArsenalReview {
         step(30, () -> server(mc, o -> hold(o, weapons().get(2))));
         step(2, () -> watch(mc, -100, 5));
         // Through use(), as a right click arrives on the server.
-        step(12, () -> server(mc, o -> o.getMainHandItem().getItem().use(o.serverLevel(), o, InteractionHand.MAIN_HAND)));
+        step(12, () -> server(mc, o -> o.getMainHandItem().getItem().use(o.level(), o, InteractionHand.MAIN_HAND)));
         at += 35;
         shot("other-reaver-focus");
         at += 15;
@@ -696,7 +761,7 @@ public final class ArsenalReview {
         step(10, () -> server(mc, o -> {
             dress(o, ArmorSet.COLLAPSAR, 10);
             Modules.install(o.getItemBySlot(EquipmentSlot.CHEST), List.of(new ItemStack(ModuleContent.MODULES.get(ModuleType.BIT_DRONE).get()), new ItemStack(ModuleContent.MODULES.get(ModuleType.BIT_DRONE).get())));
-            o.setGameMode(GameType.SURVIVAL);
+            o.connection.markClientLoaded(); o.setGameMode(GameType.SURVIVAL);
         }));
         step(2, () -> watch(mc, -40, 4.5));
         at += 14;
@@ -707,24 +772,24 @@ public final class ArsenalReview {
         at += 8;
         shot("other-bits-rear");
         step(2, () -> local(mc, p -> {
-            var level = p.serverLevel();
+            var level = p.level();
             BlockPos at = new BlockPos(3, 81, 3);
             level.setBlock(at, ModuleContent.INTEGRATOR.get().defaultBlockState(), 3);
             var entity = (IntegratorBlockEntity) level.getBlockEntity(at);
-            entity.energy().receiveEnergy(400_000, false);
+            try (var tx = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) { entity.energy().insert(400_000, tx); tx.commit(); }
             entity.items().setStackInSlot(0, charged(ArsenalItems.JET_CANNON.get()));
             entity.items().setStackInSlot(1, new ItemStack(ModuleContent.MODULES.get(ModuleType.MELTDOWN).get()));
             entity.items().setStackInSlot(2, new ItemStack(ModuleContent.MODULES.get(ModuleType.AMPLIFIER).get()));
             p.connection.teleport(3.5, 81, 0.6, 0, 18);
-            p.getInventory().selected = 8;
+            p.getInventory().setSelectedSlot(8);
         }));
         at += 20;
         shot("integrator-idle");
-        step(2, () -> local(mc, p -> ((IntegratorBlockEntity) p.serverLevel().getBlockEntity(new BlockPos(3, 81, 3))).start()));
+        step(2, () -> local(mc, p -> ((IntegratorBlockEntity) p.level().getBlockEntity(new BlockPos(3, 81, 3))).start()));
         at += 30;
         shot("integrator-working");
         at += 70;
-        step(4, () -> local(mc, p -> p.openMenu((IntegratorBlockEntity) p.serverLevel().getBlockEntity(new BlockPos(3, 81, 3)), new BlockPos(3, 81, 3))));
+        step(4, () -> local(mc, p -> p.openMenu((IntegratorBlockEntity) p.level().getBlockEntity(new BlockPos(3, 81, 3)), new BlockPos(3, 81, 3))));
         at += 14;
         shot("integrator-screen");
         step(2, () -> mc.setScreen(null));
@@ -733,7 +798,7 @@ public final class ArsenalReview {
 
         // A meltdown shot through a mixed hill: tunnel, deepest-point blast, stone melting and planks blowing apart.
         step(2, () -> server(mc, o -> {
-            var level = o.serverLevel();
+            var level = o.level();
             for (int x = -6; x <= 6; x++) for (int y = 81; y <= 90; y++) for (int z = 22; z <= 32; z++) {
                 level.setBlock(new BlockPos(x, y, z), (z < 27 ? Blocks.OAK_PLANKS : Blocks.STONE).defaultBlockState(), 3);
             }
@@ -771,7 +836,7 @@ public final class ArsenalReview {
         }
         step(2, () -> local(mc, p -> {
             for (int i = 0; i < 4; i++) p.getInventory().setItem(5 + i, charged(tools().get(i)));
-            for (int x = -3; x <= 3; x += 2) p.serverLevel().setBlock(new BlockPos(x, 80, -2), Blocks.DIAMOND_ORE.defaultBlockState(), 3);
+            for (int x = -3; x <= 3; x += 2) p.level().setBlock(new BlockPos(x, 80, -2), Blocks.DIAMOND_ORE.defaultBlockState(), 3);
             p.connection.teleport(OX, 81, -5, 0, 25);
         }));
         for (int i = 0; i < 4; i++) {
@@ -791,7 +856,7 @@ public final class ArsenalReview {
         at += 10;
         int[][] effects = {{FxPayload.RIPPLE, 1, 6}, {FxPayload.COLLAPSE, 5, 8}, {FxPayload.QUENCH, 4, 6}, {FxPayload.HORIZON, 8, 16}, {FxPayload.SHEAR, 8, 7}, {FxPayload.MELTDOWN, 7, 6}, {FxPayload.MELTDOWN, 7, 12}};
         for (int[] effect : effects) {
-            step(30, () -> server(mc, o -> FxPayload.send(o.serverLevel(), effect[0], new net.minecraft.world.phys.Vec3(OX, 82.5, 18), new net.minecraft.world.phys.Vec3(0, 0, -1), effect[1])));
+            step(30, () -> server(mc, o -> FxPayload.send(o.level(), effect[0], new net.minecraft.world.phys.Vec3(OX, 82.5, 18), new net.minecraft.world.phys.Vec3(0, 0, -1), effect[1])));
             at += effect[2];
             shot("fx-" + effect[0] + "-" + effect[2]);
         }
@@ -828,7 +893,7 @@ public final class ArsenalReview {
             for (var child : mc.screen.children()) {
                 if (child instanceof net.minecraft.client.gui.components.Button b
                         && b.getMessage().getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents t
-                        && t.getKey().equals("selectWorld.backupJoinSkipButton")) { b.onPress(); return; }
+                        && t.getKey().equals("selectWorld.backupJoinSkipButton")) { b.onPress(new net.minecraft.client.input.KeyEvent(257, 0, 0)); return; }
             }
         }
         if (mc.player == null || mc.level == null || mc.getSingleplayerServer() == null) return;
@@ -859,12 +924,16 @@ public final class ArsenalReview {
         if (capture != null) {
             var directory = mc.gameDirectory.toPath().resolve("screenshots");
             Files.createDirectories(directory);
-            try (var shot = Screenshot.takeScreenshot(mc.getMainRenderTarget())) {
-                shot.writeToFile(directory.resolve(capture + ".png"));
-            }
-            System.out.println("ARSENAL_REVIEW_CAPTURE " + capture);
+            String name = capture;
+            pendingCaptures.incrementAndGet();
+            Screenshot.takeScreenshot(mc.getMainRenderTarget(), shot -> {
+                try (shot) { shot.writeToFile(directory.resolve(name + ".png")); }
+                catch (java.io.IOException e) { throw new java.io.UncheckedIOException(e); }
+                finally { pendingCaptures.decrementAndGet(); }
+                System.out.println("ARSENAL_REVIEW_CAPTURE " + name);
+            });
             capture = null;
         }
-        if (done) mc.stop();
+        if (done && pendingCaptures.get() == 0) mc.stop();
     }
 }

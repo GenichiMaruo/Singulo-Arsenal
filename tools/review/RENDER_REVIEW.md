@@ -10,8 +10,8 @@ is not a visual pass.
 Use the existing `tools/review/prepare_gui.py` and `-I tools/review/gui.gradle`
 client-review workflow. After preparation, create an empty marker file
 `build/gui-review/render-only` before starting the client. This marker takes
-precedence over `icons-only`. Preparation mutes only music in this disposable
-game directory; the harness asserts music volume zero and leaves effects enabled. Remove it to return to the ordinary review.
+precedence over `icons-only`. Preparation mutes music and master volume in this disposable
+game directory; the harness asserts both volumes are zero. The world stays clear with weather advancement disabled. Remove it to return to the ordinary review.
 Alternatively, pass `-Darsenal.review.render=true` **to the client JVM**;
 a Gradle JVM system property alone is not automatically forwarded.
 

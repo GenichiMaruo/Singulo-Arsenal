@@ -7,15 +7,9 @@
     "NGN"
   ],
   "key": {
-    "G": {
-      "item": "singulo_arsenal:pressure_lattice"
-    },
-    "D": {
-      "item": "singulo:degenerate_matter_shell"
-    },
-    "N": {
-      "item": "singulo:nihonium_plate"
-    }
+    "G": "singulo_arsenal:pressure_lattice",
+    "D": "singulo:degenerate_matter_shell",
+    "N": "singulo:nihonium_plate"
   },
   "result": {
     "id": "singulo_arsenal:degeneracy_chestplate",
