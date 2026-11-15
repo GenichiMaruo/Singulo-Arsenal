@@ -64,7 +64,7 @@ public final class GearRenderer implements SpecialModelRenderer<GearRenderer.Fra
             state = new Owner(player.getId(), player.getMainArm() == net.minecraft.world.entity.HumanoidArm.RIGHT,
                     player.getMainHandItem().getItem() instanceof JetCannonItem, using, using ? player.getTicksUsingItem() : 0, running,
                     eye.add(player.getViewVector(partial).scale(distance)).subtract(camera), hit.subtract(camera), camera,
-                    context.firstPerson() || !(mc.screen instanceof net.minecraft.client.gui.screens.inventory.InventoryScreen),
+                    context.firstPerson() || !(mc.screen instanceof net.minecraft.client.gui.screens.inventory.InventoryScreen) && !(mc.screen instanceof net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen),
                     context.firstPerson() && stack.getItem() instanceof JetCannonItem ? FirstPersonHands.capture(player) : null);
         }
         return new Frame(stack.copy(), now, partial, state);

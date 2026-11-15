@@ -542,11 +542,56 @@ public final class ArsenalReview {
         event.getGuiGraphics().setComponentTooltipForNextFrame(mc.font, net.minecraft.client.gui.screens.Screen.getTooltipFromItem(mc, tip), 40, 20);
     }
 
+    /** Explicitly exercise both paper-doll screens, not the default creative building tab. */
+    private static void paperDollScript(Minecraft mc) {
+        step(10, () -> {
+            local(mc, p -> {
+                p.setGameMode(GameType.SURVIVAL);
+                dress(p, ArmorSet.COLLAPSAR, 50);
+                p.setItemSlot(EquipmentSlot.MAINHAND, charged(weapons().get(0)));
+                p.inventoryMenu.broadcastChanges();
+            });
+            await("survival-mode", () -> !mc.player.getAbilities().instabuild);
+        });
+        step(20, () -> {
+            mc.options.guiScale().set(3); mc.resizeGui();
+            reviewInventory(mc);
+        });
+        at += 20;
+        shot("paperdoll-survival");
+        step(4, () -> {
+            mc.setScreen(null);
+            local(mc, p -> p.setGameMode(GameType.CREATIVE));
+            await("creative-mode", () -> mc.player.getAbilities().instabuild);
+        });
+        step(20, () -> {
+            var screen = new net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen(
+                    mc.player, mc.level.enabledFeatures(), true);
+            mc.setScreen(screen);
+            try {
+                var tab = net.minecraft.world.item.CreativeModeTabs.allTabs().stream()
+                        .filter(t -> t.getType() == net.minecraft.world.item.CreativeModeTab.Type.INVENTORY)
+                        .findFirst().orElseThrow();
+                var method = screen.getClass().getDeclaredMethod("selectTab", net.minecraft.world.item.CreativeModeTab.class);
+                method.setAccessible(true);
+                method.invoke(screen, tab);
+            } catch (ReflectiveOperationException e) {
+                throw new IllegalStateException("Cannot select review inventory tab", e);
+            }
+            if (!screen.isInventoryOpen()) throw new IllegalStateException("Creative paper doll tab not selected");
+            org.lwjgl.glfw.GLFW.glfwSetCursorPos(mc.getWindow().handle(), 0, 0);
+        });
+        at += 20;
+        shot("paperdoll-creative");
+        step(4, () -> done = true);
+    }
+
     private static void script(Minecraft mc) {
         if (mc.options.getSoundSourceVolume(net.minecraft.sounds.SoundSource.MUSIC) != 0 || mc.options.getSoundSourceVolume(net.minecraft.sounds.SoundSource.MASTER) != 0) {
             throw new IllegalStateException("Review master and music must be muted; rerun prepare_gui.py");
         }
         System.out.println("ARSENAL_REVIEW_MASTER_AND_MUSIC_MUTED");
+        if (Files.exists(mc.gameDirectory.toPath().resolve("paperdoll-only"))) { paperDollScript(mc); return; }
         if (Boolean.getBoolean("arsenal.review.render") || Files.exists(mc.gameDirectory.toPath().resolve("render-only"))) {
             renderScript(mc);
             return;
