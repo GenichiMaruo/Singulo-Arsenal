@@ -1,5 +1,9 @@
 # Singulo Arsenal
 
+## 0.3.1 compatibility update
+
+Singulo 0.20.0 integration update. See [verification notes](docs/development/singulo-0.20-compatibility.md). Historical 0.3.0 notes below describe original verification; this update retains the Singulo >=0.19.0 dependency policy.
+
 [日本語](docs/player/ja.md) · [English](docs/player/en.md) · [装備仕様・レシピ](docs/arsenal.md)
 
 **超伝導、縮退圧、ブラックホール。Singulo の物理を、そのまま身に着ける装備にする公式アドオンです。**

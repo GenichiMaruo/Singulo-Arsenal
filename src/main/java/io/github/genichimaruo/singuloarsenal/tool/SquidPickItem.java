@@ -135,8 +135,8 @@ public final class SquidPickItem extends PoweredTool {
         ResourceLocation id = BuiltInRegistries.ITEM.getKey(stack.getItem());
         if (!id.getNamespace().equals("singulo")) return 0;
         return switch (id.getPath()) {
-            case "scanner_module_2" -> 2;
-            case "scanner_module_3" -> 3;
+            case "scanner_module_2", "neutrino_scanner_module_2" -> 2;
+            case "scanner_module_3", "neutrino_scanner_module_3" -> 3;
             default -> 0;
         };
     }
