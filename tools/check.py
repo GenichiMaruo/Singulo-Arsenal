@@ -126,6 +126,17 @@ assert 'singulo_arsenal:collapsar_lamina' in (recipes / 'jet_lance.json').read_t
 if os.environ.get('SINGULO_SOURCE'):
     singulo = Path(os.environ['SINGULO_SOURCE']) / 'src/generated/resources'
     known = {p.stem for p in (singulo / 'assets/singulo/models/item').glob('*.json')}
+    # Singulo 0.20 keeps old recipe ingredients valid via registered item aliases.
+    # Read only item/block aliases and require their canonical targets to exist.
+    legacy = Path(os.environ['SINGULO_SOURCE']) / 'src/main/java/io/github/genichimaruo/singulo/registry/LegacyIds.java'
+    if legacy.is_file():
+        source = legacy.read_text(encoding='utf-8')
+        for table in ('BLOCKS', 'ITEMS'):
+            section = re.search(r'\b' + table + r'\s*=\s*Map\.ofEntries\((.*?)\);', source, re.S)
+            if section:
+                for old, new in re.findall(r'Map\.entry\("([a-z0-9_]+)",\s*"([a-z0-9_]+)"\)', section.group(1)):
+                    assert new in known, f'alias target does not exist: {old} -> {new}'
+                    known.add(old)
     fluids = {m for p in (singulo / 'data/singulo/recipes').rglob('*.json')
               for m in re.findall(r'"fluid": "singulo:([a-z0-9_]+)"', p.read_text(encoding='utf-8'))}
     used = 0
