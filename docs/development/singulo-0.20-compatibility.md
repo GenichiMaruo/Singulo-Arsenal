@@ -1,6 +1,6 @@
 # Singulo 0.20 compatibility
 
-Arsenal 0.3.1 is a compatibility-only update of 0.3.0. Production equipment implementation, recipes, resource IDs, save formats, and dependency range `[0.19.0,)` remain unchanged.
+Arsenal 0.3.1 is a compatibility-only update of 0.3.0. Except for accepting renamed scanner-module IDs, production equipment behavior, recipes, addon resource IDs, save formats, and dependency range `[0.19.0,)` remain unchanged.
 
 Integration CI pins matching Singulo 0.20.0 source. Release requires successful build/integration at the final addon head and release-workflow checks, plus availability of the matching base release.
 
@@ -11,3 +11,5 @@ Reflective client entry points `GravitationalLensing.add(Vec3,float,float,float)
 Future Singulo versions are not certified by the open dependency range. Existing 0.3.0 migration precautions and the 1.20.1 legacy datapack item-tag limitation remain applicable.
 
 Recipe references retain the old base IDs to support 0.19.0. On 0.20.0 the base registers their official aliases. Ingredient validation accepts only BLOCKS/ITEMS aliases whose canonical target exists; runtime GameTests also verify recipe loading.
+
+The initial 0.20 integration run correctly failed the sensitivity-module GameTest: canonical renamed module IDs did not match the old string switch. The fix accepts both 0.19 and 0.20 names, retaining the same tier/consumption rules. The unchanged regression test exercises real module use and prevents publication until passing.
