@@ -15,3 +15,5 @@ Recipe references retain the old base IDs to support 0.19.0. On 0.20.0 the base 
 The initial 0.20 integration run correctly failed the sensitivity-module GameTest: canonical renamed module IDs did not match the old string switch. The fix accepts both 0.19 and 0.20 names, retaining the same tier/consumption rules. The unchanged regression test exercises real module use and prevents publication until passing.
 
 Initial 1.21.1 verification: addon head `9c27e7f`, workflow run `44021720464`: build and all 65 integration GameTests passed against base candidate `5eddee390c3847a46e372187dc2c6c2105d549e8`. Final release still requires the final merged base pin and a fresh successful run. Local release/review script regression tests passed (26 + 3 tests) on each version branch.
+
+Final 1.20.1 base pin: merged Singulo `f05ed56af936e1285708ee6ef9f3b67fbb81eef2`. Both loader candidate integrations passed; final CI and matching public base files are required before addon publication.
