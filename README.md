@@ -11,24 +11,26 @@ Singulo 0.20.0 integration update. See [verification notes](docs/development/sin
 [日本語](docs/player/ja.md) · [English](docs/player/en.md) · [装備仕様・レシピ](docs/arsenal.md)
 
 **超伝導、縮退圧、ブラックホール。Singulo の物理を、そのまま身に着ける装備にする公式アドオンです。**
-Minecraft 1.21.1（NeoForge）向け。Singulo の工場で作った素材から防具・武器・工具を作ります。どの装備も本体で扱う物理現象をひとつ題材にしていて、その現象が性能にも見た目にも出ます。
+Minecraft 1.21.1（NeoForge）、1.20.1（Forge / NeoForge）、26.1.2（NeoForge）向け。Singulo の工場で作った素材から防具・武器・工具を作ります。どの装備も本体で扱う物理現象をひとつ題材にしていて、その現象が性能にも見た目にも出ます。
 
 ## 対応バージョン / Minecraft versions
 
-Singulo 本体が必須です。Minecraft・ローダー・Singulo の版が合うファイルを選んでください。
-Singulo is required. Choose the file that matches your Minecraft version, loader and Singulo version.
+Arsenal 0.3.2 は、下の4構成で Singulo 0.21.0 と動作確認済みです。依存関係の宣言は Singulo 0.19.0 以上ですが、導入時は同じ行の 0.21.0 を推奨します。
 
-以下は **0.3.0** の対応範囲です。Singulo 0.19.0 以上が必須です。0.19.0 で検証済みで、0.20 以降の互換性は未検証です。0.2.2 は 0.16.x–0.18.x 対応です。
-The table describes **0.3.0**. Singulo >=0.19.0 is required, without an upper bound. Tested with 0.19.0; compatibility with 0.20 and later is unverified. Arsenal 0.2.2 supports 0.16.x–0.18.x.
+Arsenal 0.3.2 was tested with Singulo 0.21.0 on all four configurations below. The declared dependency accepts 0.19.0 and later; use the matching 0.21.0 build for the tested setup.
 
-| Minecraft | ローダー / Loader | Java | Singulo | ソース / Source | ダウンロード / Download |
-| --- | --- | --- | --- | --- | --- |
-| **1.21.1** | **NeoForge** 21.1.256+ | **21** | >=0.19.0 | [1.21.1](https://github.com/GenichiMaruo/Singulo-Arsenal/tree/1.21.1) | [CurseForge](https://www.curseforge.com/minecraft/mc-mods/singulo-arsenal/files) |
-| 1.20.1 | Forge / NeoForge | 17 | >=0.19.0 | [1.20.1](https://github.com/GenichiMaruo/Singulo-Arsenal/tree/1.20.1) | [CurseForge](https://www.curseforge.com/minecraft/mc-mods/singulo-arsenal/files) |
+| Minecraft | ローダー / Loader | Java | Singulo 0.21.0 | Arsenal 0.3.2 |
+| --- | --- | --- | --- | --- |
+| 1.21.1 | NeoForge 21.1.256+ | 21 | [本体 / Core](https://www.curseforge.com/minecraft/mc-mods/singulo/files/9709614) | [1.21.1N](https://www.curseforge.com/minecraft/mc-mods/singulo-arsenal/files/9709876) |
+| 1.20.1 | Forge 47.4.26+ | 17 | [本体 / Core](https://www.curseforge.com/minecraft/mc-mods/singulo/files/9709620) | [1.20.1F](https://www.curseforge.com/minecraft/mc-mods/singulo-arsenal/files/9709929) |
+| 1.20.1 | NeoForge 47.1.106+ | 17 | [本体 / Core](https://www.curseforge.com/minecraft/mc-mods/singulo/files/9709627) | [1.20.1N](https://www.curseforge.com/minecraft/mc-mods/singulo-arsenal/files/9709956) |
+| 26.1.2 | NeoForge 26.1.2.126+ | 25 | [本体 / Core](https://www.curseforge.com/minecraft/mc-mods/singulo/files/9709632) | [26.1.2N](https://www.curseforge.com/minecraft/mc-mods/singulo-arsenal/files/9709976) |
 
-ファイル名は `Singulo-Arsenal-<版>-<Minecraft><ローダー>` で、末尾の `N` は NeoForge です。マルチプレイではクライアントとサーバーの両方に導入してください。
-初回の 0.1.0 は GitHub Releases で配布しています。以後の版の配布先は [CurseForge](https://www.curseforge.com/minecraft/mc-mods/singulo-arsenal) です。0.2.0 は Minecraft 1.21.1 と 1.20.1 に対応しています。
-File names follow `Singulo-Arsenal-<version>-<Minecraft><loader>`, where `N` means NeoForge. Install it on both the client and the server.
+ファイル名の末尾は `N` が NeoForge、`F` が Forge です。マルチプレイではクライアントとサーバーの両方に導入してください。
+
+File names end in `N` for NeoForge or `F` for Forge. Install both mods on the client and the server for multiplayer.
+
+初回の 0.1.0 は GitHub Releases で配布しています。以後の版は [CurseForge](https://www.curseforge.com/minecraft/mc-mods/singulo-arsenal/files) を参照してください。
 
 ## 何ができる？
 
@@ -38,7 +40,7 @@ File names follow `Singulo-Arsenal-<version>-<Minecraft><loader>`, where `N` mea
 - **装備を組み替える**（0.2.0） — モジュール統合台で、ビットドローン、電力だけでの飛行、融解起爆、自動精錬、誘導給電、アイテム回収などの拡張モジュールを、装備の段階に応じて 1／3／5 個組み込めます。
 - **本体の電力で動かす** — 装備は標準 FE で充電します。コラプサー級は質量ペレットを直接電力に変え、ペレットは質量ペレット缶にまとめて持ち歩けます。
 
-**Singulo Arsenal** is the official equipment add-on for [Singulo](https://github.com/GenichiMaruo/Singulo) on Minecraft 1.21.1 (NeoForge). It adds three armor sets, four weapons and, from 0.2.0, four powered tools, each built around one piece of physics from the base mod: superconductivity, degeneracy pressure, tidal forces, relativistic jets. Gear runs on FE, takes upgrade modules at the Module Integrator, and the top tier feeds on mass pellets. Start with the [English guide](docs/player/en.md).
+**Singulo Arsenal** is the official equipment add-on for [Singulo](https://github.com/GenichiMaruo/Singulo) on Minecraft 1.21.1 (NeoForge), 1.20.1 (Forge or NeoForge), and 26.1.2 (NeoForge). It adds three armor sets, four weapons and, from 0.2.0, four powered tools, each built around one piece of physics from the base mod: superconductivity, degeneracy pressure, tidal forces, relativistic jets. Gear runs on FE, takes upgrade modules at the Module Integrator, and the top tier feeds on mass pellets. Start with the [English guide](docs/player/en.md).
 
 ## ドキュメント
 
@@ -49,11 +51,11 @@ File names follow `Singulo-Arsenal-<version>-<Minecraft><loader>`, where `N` mea
 
 ## 開発するには
 
-Java 21 の JDK と Python 3 を用意し、Singulo 本体の JAR を指定して起動します。0.3.0 の開発・互換性情報は [検証記録](docs/development/singulo-0.19-compatibility.md) を参照してください。
+Java 21 の JDK と Python 3 を用意し、Singulo 本体の JAR を指定して起動します。0.3.2 の開発・互換性情報は [検証記録](docs/development/singulo-0.21-compatibility.md) を参照してください。
 
 ```sh
 ./gradlew --no-daemon build
-./gradlew runClient -PsinguloJar=/absolute/path/Singulo-0.19.0-1.21.1N.jar
+./gradlew runClient -PsinguloJar=/absolute/path/Singulo-0.21.0-1.21.1N.jar
 ```
 
 生成元と実装時の条件は[開発ガイド](docs/development/README.md)、検査と GameTest は[テスト手順](docs/development/testing.md)、配布は[公開・配布手順](docs/curseforge.md)を参照してください。
