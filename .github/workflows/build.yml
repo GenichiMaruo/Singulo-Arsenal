@@ -58,7 +58,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: GenichiMaruo/Singulo
-          ref: 7a96455ee4327ed605dcef52b6c963281de74ff2
+          ref: fdf32b22a5da296c98fe8d993906e36b11b6de8c
           path: singulo-source
       - uses: actions/setup-java@v4
         with:
