@@ -58,7 +58,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: GenichiMaruo/Singulo
-          ref: 7d3a758c7ef4ca8ab60111ca5139aa3fc1b3ea20
+          ref: f8ed2ff2868da5ec198521ce42fc3256589eccbe
           path: singulo-source
       - uses: actions/setup-java@v4
         with:
@@ -87,7 +87,7 @@ jobs:
           SINGULO_SOURCE: ${{ github.workspace }}/singulo-source
         run: python3 tools/check.py
       - name: Run armor GameTests with Singulo
-        run: ./gradlew --no-daemon --max-workers=4 runGameTestServer -PsinguloJar="$GITHUB_WORKSPACE/singulo-source/build/libs/Singulo-0.21.0-1.21.1N.jar"
+        run: ./gradlew --no-daemon --max-workers=4 runGameTestServer -PsinguloJar="$GITHUB_WORKSPACE/singulo-source/build/libs/Singulo-0.23.0-1.21.1N.jar"
       - name: Save integration logs
         if: always()
         uses: actions/upload-artifact@v4
