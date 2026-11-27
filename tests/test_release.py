@@ -57,7 +57,7 @@ class ArtifactTests(unittest.TestCase):
     def test_repository_requires_minimum_without_upper_bound(self):
         props = dict(line.split('=', 1) for line in (ROOT / 'gradle.properties').read_text(encoding='utf-8').splitlines()
                      if line and not line.startswith('#') and '=' in line)
-        self.assertEqual(props['singulo_version_range'], '[0.19.0,)')
+        self.assertEqual(props['singulo_version_range'], '[0.23.1,)')
 
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
