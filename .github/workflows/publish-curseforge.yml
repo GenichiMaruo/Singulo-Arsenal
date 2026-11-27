@@ -13,6 +13,12 @@ on:
         description: Validate the JAR and CurseForge credentials without uploading
         type: boolean
         default: true
+      verified_run_id:
+        description: Successful build.yml run for the current 1.20.1 branch commit (required for upload)
+        type: string
+      verified_sha256:
+        description: SHA-256 of the downloaded loader JAR after startup testing (required for upload)
+        type: string
       release_type:
         description: CurseForge release channel
         type: choice
@@ -21,6 +27,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: curseforge
@@ -32,14 +39,41 @@ jobs:
     steps:
       - name: Require the release branch for uploads
         if: ${{ !inputs.dry_run }}
-        run: test "$GITHUB_REF" = refs/heads/1.20.1
+        env:
+          VERIFIED_RUN: ${{ inputs.verified_run_id }}
+          VERIFIED_HASH: ${{ inputs.verified_sha256 }}
+        run: |
+          test "$GITHUB_REF" = refs/heads/1.20.1
+          [[ "$VERIFIED_RUN" =~ ^[0-9]{1,20}$ ]]
+          [[ "$VERIFIED_HASH" =~ ^[a-fA-F0-9]{64}$ ]]
+      - name: Verify successful source build
+        if: ${{ inputs.verified_run_id != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERIFIED_RUN: ${{ inputs.verified_run_id }}
+          VERIFIED_HASH: ${{ inputs.verified_sha256 }}
+        run: |
+          [[ "$VERIFIED_RUN" =~ ^[0-9]{1,20}$ ]]
+          [[ "$VERIFIED_HASH" =~ ^[a-fA-F0-9]{64}$ ]]
+          workflow_id=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/build.yml" --jq '.id')
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$VERIFIED_RUN" |
+            jq -e --arg workflow "$workflow_id" --arg sha "$GITHUB_SHA" --arg repo "$GITHUB_REPOSITORY" '
+              (.workflow_id | tostring) == $workflow and .head_sha == $sha and
+              .head_repository.full_name == $repo and .head_branch == "1.20.1" and
+              .event == "push" and .status == "completed" and .conclusion == "success"
+            ' >/dev/null
+      - name: Reject a hash without a source build
+        if: ${{ inputs.verified_run_id == '' && inputs.verified_sha256 != '' }}
+        run: exit 1
 
   checks:
     needs: target
+    if: ${{ inputs.verified_run_id == '' }}
     uses: ./.github/workflows/build.yml
 
   publish:
-    needs: checks
+    needs: [target, checks]
+    if: ${{ !cancelled() && needs.target.result == 'success' && (needs.checks.result == 'success' || (inputs.verified_run_id != '' && needs.checks.result == 'skipped')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: curseforge
@@ -52,10 +86,34 @@ jobs:
         with:
           python-version: '3.12'
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        if: ${{ inputs.verified_run_id == '' }}
         with:
           pattern: Singulo-Arsenal-*
           merge-multiple: true
           path: build/release
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        if: ${{ inputs.verified_run_id != '' }}
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.verified_run_id }}
+          pattern: Singulo-Arsenal-*
+          merge-multiple: true
+          path: build/release
+      - name: Verify the startup-tested JAR bytes
+        if: ${{ inputs.verified_run_id != '' }}
+        env:
+          VERIFIED_HASH: ${{ inputs.verified_sha256 }}
+          LOADER: ${{ inputs.loader }}
+        run: |
+          case "$LOADER" in
+            forge) suffix=F ;;
+            neoforge) suffix=N ;;
+            *) exit 1 ;;
+          esac
+          shopt -s nullglob
+          jars=(build/release/Singulo-Arsenal-*-1.20.1"$suffix".jar)
+          test "${#jars[@]}" -eq 1
+          printf '%s  %s\n' "${VERIFIED_HASH,,}" "${jars[0]}" | sha256sum --check --strict
       - name: Validate the tested artifact and upload configuration
         id: release
         env:
