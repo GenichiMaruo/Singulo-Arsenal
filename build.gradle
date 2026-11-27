@@ -102,6 +102,8 @@ dependencies {
     testImplementation 'org.joml:joml:1.10.5'
     testImplementation 'org.junit.jupiter:junit-jupiter:5.11.4'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.11.4'
+    compileOnly 'io.github.llamalad7:mixinextras-common:0.5.4'
+    annotationProcessor 'io.github.llamalad7:mixinextras-common:0.5.4'
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor' }
 
 tasks.named('test') { useJUnitPlatform() }
